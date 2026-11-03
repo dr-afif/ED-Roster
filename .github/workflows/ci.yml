@@ -1,0 +1,58 @@
+name: Validate Foundation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Lint, Typecheck, Test & Build
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://ci-staging-fixture.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_synthetic_fixture_000000
+      VITE_APP_ENV: staging
+      VITE_BASE_PATH: /ED-Roster/
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Guard against tracked environment files or secret keys
+        run: |
+          if git ls-files --error-unmatch .env .env.local >/dev/null 2>&1; then
+            echo "ERROR: Local environment file is tracked in Git."
+            exit 1
+          fi
+          if git grep -nE 'sb_secret_|SUPABASE_SERVICE_ROLE_KEY|TELEGRAM_BOT_TOKEN' -- ':!MODULAR_APP_BLUEPRINT/**' ':(exclude).github/workflows/ci.yml'; then
+            echo "ERROR: Potential secret key marker detected in tracked source files."
+            exit 1
+          fi
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript type-check
+        run: npm run typecheck
+
+      - name: Run Vitest unit and component tests
+        run: npm test
+
+      - name: Run production build (/ED-Roster/ base path)
+        run: npm run build

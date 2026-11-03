@@ -1,0 +1,97 @@
+project:
+  name: RESQ Modular App
+  purpose: Emergency Department roster, request, staff record, and document management
+  timezone: Asia/Kuala_Lumpur
+  locale: en-MY
+  target_first_native_roster: 2027-01-01
+  blueprint_status: architecture-review
+
+repositories:
+  legacy:
+    url: https://github.com/dr-afif/REQUEST-APP
+    branch: main
+    baseline_commit: ff6b5119ae448e0dde2ff01243d394b6cd834573
+    live_during_build: true
+    mutate_from_new_project: false
+  replacement:
+    name: ED-Roster
+    url: https://github.com/dr-afif/ED-Roster
+    visibility: public
+    branch_policy: short-lived-feature-branches
+    planned_pages_url: https://dr-afif.github.io/ED-Roster/
+
+systems:
+  frontend:
+    type: static-spa
+    framework: React with TypeScript and Vite
+    hosting: GitHub Pages initially
+  application_backend:
+    provider: Supabase
+    projects:
+      staging:
+        ref: hgrutigkgnrcjhcjxabs
+        url: https://hgrutigkgnrcjhcjxabs.supabase.co
+        purpose: development, testing, migration rehearsal, and UAT
+        management_access: pending additional approved accounts
+      production:
+        ref: bubvwijyaqfbugsaedxp
+        url: https://bubvwijyaqfbugsaedxp.supabase.co
+        purpose: final production only
+        change_policy: no agent changes until explicit production deployment approval
+    products:
+      - Auth
+      - Postgres
+      - Edge Functions
+      - Realtime only for invalidation where justified
+  legacy_source:
+    provider: Google Sheets and Google Apps Script
+    post_cutover_mode: read-only audit source
+  document_storage:
+    provider: Google Drive
+    preferred_container: organization Shared Drive
+  personal_delivery:
+    provider: Telegram Bot API
+    recipient_count: 1
+    recipient: application owner
+
+environments:
+  local:
+    supabase: local stack
+    data: synthetic fixtures only
+  nonproduction:
+    supabase: hgrutigkgnrcjhcjxabs
+    drive: dedicated test folder
+    telegram: disabled by default or dedicated test bot
+  production:
+    supabase: bubvwijyaqfbugsaedxp
+    drive: controlled production root folder
+    telegram: owner's private chat
+
+security:
+  login_provider: Google via Supabase Auth
+  access_gate: approved email allowlist plus active application role
+  roles:
+    - owner
+    - staff
+  sole_roster_administrator_at_launch: true
+  browser_secrets_allowed: false
+  row_level_security_required: true
+  audit_for_privileged_actions_required: true
+
+data_policy:
+  supabase_is_operational_source_of_truth: true
+  historical_imports_are_read_only: true
+  arbitrary_executable_formulas_in_database: false
+  medical_diagnoses_collected: false
+  roster_pdfs_are_immutable_snapshots: true
+
+open_inputs:
+  - add approved management accounts and coding-tool connections to both Supabase projects
+  - approved owner email
+  - complete approved-email list
+  - Google Drive Shared Drive availability
+  - production Drive root folder ID
+  - source spreadsheet IDs and tab inventory
+  - confirmed January 2027 cutover date
+  - final GitHub Pages URL or custom domain
+

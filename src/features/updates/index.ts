@@ -1,0 +1,1 @@
+export { UpdatesRoute } from './UpdatesRoute';

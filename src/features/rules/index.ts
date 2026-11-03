@@ -1,0 +1,1 @@
+export { RulesAdminRoute } from './RulesAdminRoute';

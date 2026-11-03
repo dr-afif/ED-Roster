@@ -1,0 +1,1 @@
+export { ProfessionalRecordsRoute } from './ProfessionalRecordsRoute';

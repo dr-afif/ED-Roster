@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+:root {
+  /* Semantic surfaces (08_FRONTEND_UX.md) */
+  --color-surface-canvas: #f4f7fb;
+  --color-surface-canvas-subtle: #eaf0f8;
+  --color-surface-glass: rgba(255, 255, 255, 0.96);
+  --color-surface-solid: #ffffff;
+  --color-surface-muted: #f8fafc;
+
+  /* Semantic typography colors (WCAG 2.2 AA verified >= 4.5:1) */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-inverse: #ffffff;
+
+  /* Brand & focus tokens */
+  --color-brand-primary: #4338ca;
+  --color-brand-primary-hover: #3730a3;
+  --color-brand-primary-soft: #eef2ff;
+  --color-brand-secondary: #0f766e;
+  --color-brand-secondary-soft: #f0fdfa;
+
+  /* Semantic state tokens (always paired with icon + text, never color alone) */
+  --color-success: #047857;
+  --color-success-soft: #ecfdf5;
+  --color-success-border: #a7f3d0;
+
+  --color-warning: #92400e;
+  --color-warning-soft: #fffbeb;
+  --color-warning-border: #fde68a;
+
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  /* Structural borders & elevation */
+  --color-border-subtle: #dbe3ee;
+  --color-border-strong: #94a3b8;
+  --shadow-glass: 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.07);
+}
+
+@supports ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+  :root {
+    --color-surface-glass: rgba(255, 255, 255, 0.86);
+  }
+}
+
+@theme inline {
+  --color-surface-canvas: var(--color-surface-canvas);
+  --color-surface-canvas-subtle: var(--color-surface-canvas-subtle);
+  --color-surface-glass: var(--color-surface-glass);
+  --color-surface-solid: var(--color-surface-solid);
+  --color-surface-muted: var(--color-surface-muted);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-inverse: var(--color-text-inverse);
+
+  --color-brand-primary: var(--color-brand-primary);
+  --color-brand-primary-hover: var(--color-brand-primary-hover);
+  --color-brand-primary-soft: var(--color-brand-primary-soft);
+  --color-brand-secondary: var(--color-brand-secondary);
+  --color-brand-secondary-soft: var(--color-brand-secondary-soft);
+
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-success-border: var(--color-success-border);
+
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-warning-border: var(--color-warning-border);
+
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
+  --color-danger-border: var(--color-danger-border);
+
+  --color-border-subtle: var(--color-border-subtle);
+  --color-border-strong: var(--color-border-strong);
+
+  --font-sans:
+    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    font-family: var(--font-sans);
+    background-color: var(--color-surface-canvas);
+    color: var(--color-text-primary);
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--color-surface-canvas);
+    background-image: radial-gradient(
+      circle at 10% 0%,
+      var(--color-surface-canvas-subtle) 0%,
+      var(--color-surface-canvas) 55%
+    );
+    color: var(--color-text-primary);
+  }
+
+  /* Visible 2-3 px WCAG 2.2 AA keyboard focus indicator */
+  :focus-visible {
+    outline: 3px solid var(--color-brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Frosted glass utility reserved strictly for navigation, dialogs, and summary cards */
+.surface-frosted {
+  background-color: var(--color-surface-glass);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-glass);
+}
+
+@supports ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+  .surface-frosted {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* Solid surface utility for forms, tables, and dense roster grids */
+.surface-opaque {
+  background-color: var(--color-surface-solid);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

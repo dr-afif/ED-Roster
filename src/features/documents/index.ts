@@ -1,0 +1,1 @@
+export { DocumentsCatalogRoute } from './DocumentsCatalogRoute';
