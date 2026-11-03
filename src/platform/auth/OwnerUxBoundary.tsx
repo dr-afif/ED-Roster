@@ -1,5 +1,7 @@
-import { ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuthBoundary } from './authContext';
 import { SurfaceCard } from '@/shared/ui';
 
 type OwnerUxBoundaryProps = {
@@ -8,11 +10,60 @@ type OwnerUxBoundaryProps = {
 };
 
 /**
- * UX-only route wrapper for Owner Administration views (04_SECURITY_AUTHORIZATION.md, 08_FRONTEND_UX.md).
- * Never treated as the security boundary: every protected read and mutation must be enforced
- * by Postgres RLS and server-side allowlist/owner checks in Wave B+.
+ * UX route wrapper for Owner Administration views (04_SECURITY_AUTHORIZATION.md, 08_FRONTEND_UX.md).
+ * While client-side checks guide the user interface, backend access is strictly enforced
+ * by Postgres Row Level Security and server-side RPC functions.
  */
 export function OwnerUxBoundary({ areaName, children }: OwnerUxBoundaryProps) {
+  const { user } = useAuthBoundary();
+  const isOwner = user?.role === 'owner';
+
+  if (!isOwner) {
+    return (
+      <div className="space-y-5">
+        <SurfaceCard
+          variant="solid"
+          role="alert"
+          className="space-y-4 border border-warning/30 p-6"
+        >
+          <div className="flex items-start gap-3 text-warning">
+            <ShieldAlert
+              className="mt-0.5 h-6 w-6 shrink-0"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+            <div className="space-y-1">
+              <h1 className="text-base font-bold text-text-primary">
+                Owner Administration Required — {areaName}
+              </h1>
+              <p className="text-xs text-text-secondary">
+                Your account is currently active with role{' '}
+                <strong className="font-semibold text-text-primary capitalize">
+                  {user?.role ?? 'Staff'}
+                </strong>
+                .
+              </p>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-text-secondary">
+            Operational roster planning, rule configuration, allowlist administration, and audit
+            recovery require the sole Roster Administrator (Owner) role. Under Postgres Row Level
+            Security, non-owner roles cannot mutate administrative configurations.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface-muted px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted/80"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span>Return to Operations Overview</span>
+            </Link>
+          </div>
+        </SurfaceCard>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <SurfaceCard variant="glass" className="border-brand-primary/25 p-4">
@@ -24,13 +75,13 @@ export function OwnerUxBoundary({ areaName, children }: OwnerUxBoundaryProps) {
           />
           <div className="space-y-1 text-xs leading-relaxed text-text-secondary">
             <p className="font-semibold text-text-primary">
-              Owner Administration UX Boundary — {areaName}
+              Owner Administration Boundary — {areaName}
             </p>
             <p>
-              Client-side route guards improve navigation clarity only. Protected reads, lifecycle
-              commands, and rule updates are enforced server-side via Postgres Row Level Security
-              and verified <code className="font-mono text-text-primary">allowed_users</code> role
-              checks (never <code className="font-mono text-text-primary">user_metadata</code>).
+              Authenticated as Roster Administrator{' '}
+              <strong className="font-semibold text-text-primary">({user.displayName})</strong>.
+              Protected reads, lifecycle commands, and allowlist updates are verified by Postgres
+              RLS.
             </p>
           </div>
         </div>

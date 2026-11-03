@@ -58,6 +58,24 @@ describe('Architecture & Blueprint Integrity Boundaries', () => {
     }
   });
 
+  it('prevents real staff/owner personal emails in repository source or test files', () => {
+    const allSourceFiles = [
+      ...collectSourceFiles(srcRoot),
+      ...(fs.existsSync(path.join(repoRoot, 'supabase'))
+        ? collectSourceFiles(path.join(repoRoot, 'supabase'))
+        : []),
+    ].filter((file) => !file.endsWith('architecture-boundaries.test.ts'));
+    const personalPiiPattern = new RegExp(['muhammad', 'afif', '@'].join(''), 'i');
+
+    for (const file of allSourceFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      expect(
+        personalPiiPattern.test(content),
+        `Real personal PII detected in ${path.relative(repoRoot, file)}`,
+      ).toBe(false);
+    }
+  });
+
   it('preserves the complete MODULAR_APP_BLUEPRINT baseline files', () => {
     const blueprintRoot = path.join(repoRoot, 'MODULAR_APP_BLUEPRINT');
     const requiredFiles = [

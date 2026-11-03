@@ -8,20 +8,20 @@ const WAVE_READINESS = [
   {
     wave: 'Wave A',
     focus: 'Modular SPA scaffold, env validator, tokens, accessible shell, CI',
-    statusLabel: 'Active scaffold',
+    statusLabel: 'Completed',
     tone: 'success' as const,
   },
   {
     wave: 'Wave B',
-    focus: 'Supabase staging schema, RLS policies, allowlist Google OAuth bootstrap',
-    statusLabel: 'Awaiting approval',
-    tone: 'warning' as const,
+    focus: 'Supabase Staging Identity & RLS Foundation, Google OAuth PKCE allowlist',
+    statusLabel: 'Applied on Staging',
+    tone: 'brand' as const,
   },
   {
     wave: 'Wave C–D',
     focus: 'Profiles, requests, pure roster engine, native January 2027 lifecycle',
-    statusLabel: 'Deferred',
-    tone: 'neutral' as const,
+    statusLabel: 'Next milestone',
+    tone: 'warning' as const,
   },
   {
     wave: 'Wave E',

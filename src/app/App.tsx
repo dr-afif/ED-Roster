@@ -1,7 +1,7 @@
 import { ShieldAlert } from 'lucide-react';
 import { useMemo } from 'react';
 import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from '@/platform/auth';
+import { AuthProvider, type AuthBoundaryState } from '@/platform/auth';
 import { QueryProvider } from '@/platform/query';
 import {
   EnvironmentConfigurationError,
@@ -16,6 +16,7 @@ import { createAppHashRouter } from './router';
 type AppProps = {
   runtimeBundle?: SupabaseRuntimeBundle;
   router?: ReturnType<typeof createAppHashRouter>;
+  authState?: AuthBoundaryState;
 };
 
 export function EnvironmentErrorScreen({ error }: { error: EnvironmentConfigurationError }) {
@@ -48,7 +49,7 @@ export function EnvironmentErrorScreen({ error }: { error: EnvironmentConfigurat
   );
 }
 
-export function App({ runtimeBundle, router }: AppProps) {
+export function App({ runtimeBundle, router, authState }: AppProps) {
   const bootResult = useMemo(() => {
     if (runtimeBundle) {
       return { ok: true as const, bundle: runtimeBundle };
@@ -73,7 +74,7 @@ export function App({ runtimeBundle, router }: AppProps) {
     <AppErrorBoundary>
       <SupabaseProvider bundle={bootResult.bundle}>
         <QueryProvider>
-          <AuthProvider>
+          <AuthProvider value={authState}>
             <RouterProvider router={activeRouter} />
           </AuthProvider>
         </QueryProvider>
