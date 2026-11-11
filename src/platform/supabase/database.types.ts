@@ -1,4 +1,4 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -506,6 +506,117 @@ export type Database = {
         };
         Relationships: [];
       };
+      roster_draft_assignments: {
+        Row: {
+          cell_note: string | null;
+          duty_date: string;
+          id: number;
+          period_id: number;
+          row_revision: number;
+          shift_code: string;
+          staff_id: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          cell_note?: string | null;
+          duty_date: string;
+          id?: never;
+          period_id: number;
+          row_revision?: number;
+          shift_code: string;
+          staff_id: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          cell_note?: string | null;
+          duty_date?: string;
+          id?: never;
+          period_id?: number;
+          row_revision?: number;
+          shift_code?: string;
+          staff_id?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_draft_assignments_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_draft_assignments_shift_code_fkey';
+            columns: ['shift_code'];
+            isOneToOne: false;
+            referencedRelation: 'shift_definitions';
+            referencedColumns: ['code'];
+          },
+          {
+            foreignKeyName: 'roster_draft_assignments_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      roster_periods: {
+        Row: {
+          active_rule_version_id: number | null;
+          closed_at: string | null;
+          closed_by: string | null;
+          created_at: string;
+          id: number;
+          period_end: string;
+          period_start: string;
+          published_at: string | null;
+          published_by: string | null;
+          revision: number;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          active_rule_version_id?: number | null;
+          closed_at?: string | null;
+          closed_by?: string | null;
+          created_at?: string;
+          id?: never;
+          period_end: string;
+          period_start: string;
+          published_at?: string | null;
+          published_by?: string | null;
+          revision?: number;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          active_rule_version_id?: number | null;
+          closed_at?: string | null;
+          closed_by?: string | null;
+          created_at?: string;
+          id?: never;
+          period_end?: string;
+          period_start?: string;
+          published_at?: string | null;
+          published_by?: string | null;
+          revision?: number;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_periods_active_rule_version_id_fkey';
+            columns: ['active_rule_version_id'];
+            isOneToOne: false;
+            referencedRelation: 'rule_versions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       roster_requests: {
         Row: {
           created_at: string;
@@ -590,6 +701,160 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'staff_directory';
             referencedColumns: ['id'];
+          },
+        ];
+      };
+      rule_sets: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          is_active: boolean;
+          name: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id: string;
+          is_active?: boolean;
+          name: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          is_active?: boolean;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      rule_versions: {
+        Row: {
+          approved_at: string | null;
+          change_summary: string;
+          config: Json;
+          config_hash: string;
+          created_at: string;
+          created_by: string | null;
+          effective_from: string;
+          effective_to: string | null;
+          id: number;
+          rule_set_id: string;
+          status: string;
+          version: number;
+        };
+        Insert: {
+          approved_at?: string | null;
+          change_summary: string;
+          config: Json;
+          config_hash: string;
+          created_at?: string;
+          created_by?: string | null;
+          effective_from: string;
+          effective_to?: string | null;
+          id?: never;
+          rule_set_id: string;
+          status?: string;
+          version: number;
+        };
+        Update: {
+          approved_at?: string | null;
+          change_summary?: string;
+          config?: Json;
+          config_hash?: string;
+          created_at?: string;
+          created_by?: string | null;
+          effective_from?: string;
+          effective_to?: string | null;
+          id?: never;
+          rule_set_id?: string;
+          status?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'rule_versions_rule_set_id_fkey';
+            columns: ['rule_set_id'];
+            isOneToOne: false;
+            referencedRelation: 'rule_sets';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      shift_definitions: {
+        Row: {
+          code: string;
+          color_token: string;
+          created_at: string;
+          is_active: boolean;
+          label: string;
+          short_label: string;
+          sort_order: number;
+          updated_at: string;
+        };
+        Insert: {
+          code: string;
+          color_token: string;
+          created_at?: string;
+          is_active?: boolean;
+          label: string;
+          short_label: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Update: {
+          code?: string;
+          color_token?: string;
+          created_at?: string;
+          is_active?: boolean;
+          label?: string;
+          short_label?: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      shift_semantics: {
+        Row: {
+          created_at: string;
+          displaces_off_earns_goff: boolean;
+          modifier_inheritance: string;
+          night_policy_b_qualifying: boolean;
+          provides_coverage: boolean;
+          semantic_class: string;
+          shift_code: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          displaces_off_earns_goff?: boolean;
+          modifier_inheritance?: string;
+          night_policy_b_qualifying?: boolean;
+          provides_coverage?: boolean;
+          semantic_class: string;
+          shift_code: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          displaces_off_earns_goff?: boolean;
+          modifier_inheritance?: string;
+          night_policy_b_qualifying?: boolean;
+          provides_coverage?: boolean;
+          semantic_class?: string;
+          shift_code?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'shift_semantics_shift_code_fkey';
+            columns: ['shift_code'];
+            isOneToOne: true;
+            referencedRelation: 'shift_definitions';
+            referencedColumns: ['code'];
           },
         ];
       };
@@ -699,6 +964,44 @@ export type Database = {
             columns: ['staff_id'];
             isOneToOne: true;
             referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      staffing_thresholds: {
+        Row: {
+          created_at: string;
+          day_type: string;
+          id: number;
+          min_staff: number;
+          rule_version_id: number;
+          shift_bucket: string;
+          target_staff: number;
+        };
+        Insert: {
+          created_at?: string;
+          day_type: string;
+          id?: never;
+          min_staff?: number;
+          rule_version_id: number;
+          shift_bucket: string;
+          target_staff?: number;
+        };
+        Update: {
+          created_at?: string;
+          day_type?: string;
+          id?: never;
+          min_staff?: number;
+          rule_version_id?: number;
+          shift_bucket?: string;
+          target_staff?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'staffing_thresholds_rule_version_id_fkey';
+            columns: ['rule_version_id'];
+            isOneToOne: false;
+            referencedRelation: 'rule_versions';
             referencedColumns: ['id'];
           },
         ];

@@ -30,12 +30,17 @@ export const queryKeys = {
     all: ['rosters'] as const,
     period: (year: string, month: string) =>
       [...queryKeys.rosters.all, 'period', year, month] as const,
+    draftAssignments: (periodId: number) =>
+      [...queryKeys.rosters.all, 'draft-assignments', periodId] as const,
+    shiftDefinitions: () => [...queryKeys.rosters.all, 'shift-definitions'] as const,
     snapshots: (year: string, month: string) =>
       [...queryKeys.rosters.all, 'snapshots', year, month] as const,
   },
   rules: {
     all: ['rules'] as const,
     activeSets: () => [...queryKeys.rules.all, 'active-sets'] as const,
+    version: (versionId: number) => [...queryKeys.rules.all, 'version', versionId] as const,
+    thresholds: (versionId: number) => [...queryKeys.rules.all, 'thresholds', versionId] as const,
   },
   documents: {
     all: ['documents'] as const,
