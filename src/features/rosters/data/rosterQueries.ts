@@ -135,7 +135,7 @@ export function useDraftAssignmentsQuery(periodId?: number | null) {
 
 export function useRosterStaffQuery() {
   return useQuery({
-    queryKey: queryKeys.directory.activeList(),
+    queryKey: queryKeys.rosters.staffList(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff_directory')
@@ -147,20 +147,28 @@ export function useRosterStaffQuery() {
       return (data ?? []).map(
         (s: {
           id: number;
-          staff_code: string;
-          roster_name: string;
-          display_name: string;
-          staff_group: string;
-          active: boolean;
-        }) => ({
-          id: s.id,
-          staffCode: s.staff_code,
-          rosterName: s.roster_name,
-          displayName: s.display_name,
-          staffGroup: s.staff_group,
-          active: s.active,
-        }),
-      ) as StaffRosterIdentity[];
+          staff_code?: string | null;
+          roster_name?: string | null;
+          display_name?: string | null;
+          staff_group?: string | null;
+          active?: boolean | null;
+        }) => {
+          const staffCode = s.staff_code ?? '';
+          const rosterName = s.roster_name ?? s.display_name ?? (staffCode || 'Staff');
+          const displayName = s.display_name ?? s.roster_name ?? rosterName;
+          const staffGroup = s.staff_group ?? 'medical_officer';
+          const active = s.active ?? true;
+
+          return {
+            id: s.id,
+            staffCode,
+            rosterName,
+            displayName,
+            staffGroup,
+            active,
+          } as StaffRosterIdentity;
+        },
+      );
     },
     staleTime: 1000 * 60 * 5,
   });

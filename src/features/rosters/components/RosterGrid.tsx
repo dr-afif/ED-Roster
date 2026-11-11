@@ -39,13 +39,21 @@ export function RosterGrid({
     colorMap.set(s.code.toUpperCase(), s.color_token);
   }
 
-  // Filter staff list
-  const filteredStaff = staffList.filter(
-    (s) =>
-      s.rosterName.toLowerCase().includes(filterQuery.toLowerCase()) ||
-      s.staffCode.toLowerCase().includes(filterQuery.toLowerCase()) ||
-      s.displayName.toLowerCase().includes(filterQuery.toLowerCase()),
-  );
+  // Filter staff list defensively
+  const filteredStaff = staffList.filter((s) => {
+    const q = (filterQuery || '').toLowerCase().trim();
+    if (!q) return true;
+    const rName = String(
+      s.rosterName ?? (s as unknown as { roster_name?: string }).roster_name ?? '',
+    ).toLowerCase();
+    const sCode = String(
+      s.staffCode ?? (s as unknown as { staff_code?: string }).staff_code ?? '',
+    ).toLowerCase();
+    const dName = String(
+      s.displayName ?? (s as unknown as { display_name?: string }).display_name ?? '',
+    ).toLowerCase();
+    return rName.includes(q) || sCode.includes(q) || dName.includes(q);
+  });
 
   return (
     <div className="space-y-3">
@@ -135,78 +143,92 @@ export function RosterGrid({
                 </td>
               </tr>
             ) : (
-              filteredStaff.map((staff) => (
-                <tr key={staff.id} className="hover:bg-surface-secondary/40">
-                  {/* Sticky Staff Name Cell */}
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-10 bg-surface-primary px-3 py-2 font-normal shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
-                  >
-                    <div className="font-semibold text-text-primary">{staff.rosterName}</div>
-                    <div className="text-[10px] text-text-muted">
-                      {staff.staffCode} · {staff.staffGroup}
-                    </div>
-                  </th>
+              filteredStaff.map((staff) => {
+                const rosterName =
+                  staff.rosterName ||
+                  (staff as unknown as { roster_name?: string }).roster_name ||
+                  'Staff';
+                const staffCode =
+                  staff.staffCode || (staff as unknown as { staff_code?: string }).staff_code || '';
+                const staffGroup =
+                  staff.staffGroup ||
+                  (staff as unknown as { staff_group?: string }).staff_group ||
+                  '';
 
-                  {/* Day Cells */}
-                  {periodDates.map((date) => {
-                    const assignment = cellMap.get(`${staff.id}:${date}`);
-                    const shiftCode = assignment?.shiftCode;
-                    const isSelected =
-                      selectedCell?.staffId === staff.id && selectedCell?.date === date;
-                    const colorToken = shiftCode
-                      ? (colorMap.get(shiftCode.toUpperCase()) ?? 'default')
-                      : null;
+                return (
+                  <tr key={staff.id} className="hover:bg-surface-secondary/40">
+                    {/* Sticky Staff Name Cell */}
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-surface-primary px-3 py-2 font-normal shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
+                    >
+                      <div className="font-semibold text-text-primary">{rosterName}</div>
+                      <div className="text-[10px] text-text-muted">
+                        {staffCode ? `${staffCode} · ` : ''}
+                        {staffGroup}
+                      </div>
+                    </th>
 
-                    return (
-                      <td
-                        key={date}
-                        onClick={() => {
-                          if (isEditable) {
-                            onSelectCell(staff, date, shiftCode);
-                          }
-                        }}
-                        className={`border-l border-border-subtle p-0.5 text-center transition-colors ${
-                          isSelected ? 'ring-2 ring-brand-primary ring-inset z-10' : ''
-                        } ${isEditable ? 'cursor-pointer hover:bg-surface-secondary' : ''}`}
-                      >
-                        <div
-                          className={`flex items-center justify-center rounded font-semibold ${
-                            density === 'comfortable' ? 'h-8 text-xs' : 'h-6 text-[11px]'
-                          } ${
-                            shiftCode
-                              ? colorToken === 'am'
-                                ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                                : colorToken === 'pm'
-                                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                                  : colorToken === 'on'
-                                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                                    : colorToken === 'pn'
-                                      ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
-                                      : colorToken === 'off'
-                                        ? 'bg-slate-500/15 text-slate-700 dark:text-slate-300 font-bold'
-                                        : colorToken === 'goff'
-                                          ? 'bg-teal-500/15 text-teal-700 dark:text-teal-300'
-                                          : colorToken === 'al'
-                                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                            : colorToken === 'course'
-                                              ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                                              : 'bg-surface-secondary text-text-primary'
-                              : 'text-text-muted hover:text-text-primary'
-                          }`}
-                          title={
-                            shiftCode
-                              ? `${staff.rosterName} on ${date}: ${shiftCode}`
-                              : `${staff.rosterName} on ${date}: No assignment`
-                          }
+                    {/* Day Cells */}
+                    {periodDates.map((date) => {
+                      const assignment = cellMap.get(`${staff.id}:${date}`);
+                      const shiftCode = assignment?.shiftCode;
+                      const isSelected =
+                        selectedCell?.staffId === staff.id && selectedCell?.date === date;
+                      const colorToken = shiftCode
+                        ? (colorMap.get(shiftCode.toUpperCase()) ?? 'default')
+                        : null;
+
+                      return (
+                        <td
+                          key={date}
+                          onClick={() => {
+                            if (isEditable) {
+                              onSelectCell(staff, date, shiftCode);
+                            }
+                          }}
+                          className={`border-l border-border-subtle p-0.5 text-center transition-colors ${
+                            isSelected ? 'ring-2 ring-brand-primary ring-inset z-10' : ''
+                          } ${isEditable ? 'cursor-pointer hover:bg-surface-secondary' : ''}`}
                         >
-                          {shiftCode ?? '·'}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
+                          <div
+                            className={`flex items-center justify-center rounded font-semibold ${
+                              density === 'comfortable' ? 'h-8 text-xs' : 'h-6 text-[11px]'
+                            } ${
+                              shiftCode
+                                ? colorToken === 'am'
+                                  ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                                  : colorToken === 'pm'
+                                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                    : colorToken === 'on'
+                                      ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                                      : colorToken === 'pn'
+                                        ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
+                                        : colorToken === 'off'
+                                          ? 'bg-slate-500/15 text-slate-700 dark:text-slate-300 font-bold'
+                                          : colorToken === 'goff'
+                                            ? 'bg-teal-500/15 text-teal-700 dark:text-teal-300'
+                                            : colorToken === 'al'
+                                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                              : colorToken === 'course'
+                                                ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                                : 'bg-surface-secondary text-text-primary'
+                                : 'text-text-muted hover:text-text-primary'
+                            }`}
+                            title={
+                              shiftCode
+                                ? `${rosterName} on ${date}: ${shiftCode}`
+                                : `${rosterName} on ${date}: No assignment`
+                            }
+                          >
+                            {shiftCode ?? '·'}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

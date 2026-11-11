@@ -72,7 +72,16 @@ export function useTeamMembersQuery() {
       if (error) {
         throw new Error(`Failed to load team members: ${error.message}`);
       }
-      return data ?? [];
+      return (data ?? []).map((row) => ({
+        ...row,
+        id: row.id,
+        staffCode: row.staff_code ?? '',
+        rosterName: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
+        displayName: row.display_name ?? row.roster_name ?? 'Staff',
+        staff_code: row.staff_code ?? '',
+        roster_name: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
+        display_name: row.display_name ?? row.roster_name ?? 'Staff',
+      }));
     },
     staleTime: 60_000,
   });

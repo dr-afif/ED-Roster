@@ -42,6 +42,7 @@ export const queryKeys = {
       [...queryKeys.rosters.all, 'amendment-lines', periodId] as const,
     goffLedger: (staffId?: number) =>
       [...queryKeys.rosters.all, 'goff-ledger', staffId ?? 'all'] as const,
+    staffList: () => [...queryKeys.rosters.all, 'staff-list'] as const,
     shiftDefinitions: () => [...queryKeys.rosters.all, 'shift-definitions'] as const,
     snapshots: (year: string, month: string) =>
       [...queryKeys.rosters.all, 'snapshots', year, month] as const,
