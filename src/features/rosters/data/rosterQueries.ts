@@ -2,13 +2,27 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/platform/query';
 import { supabase } from '@/platform/supabase';
 import type { Database } from '@/platform/supabase';
-import type { StaffRosterIdentity } from '../domain/types';
+import type {
+  AmendmentCategory,
+  AmendmentEvent,
+  AmendmentLineAction,
+  AmendmentLineItem,
+  GoffLedgerEntry,
+  GoffTransactionType,
+  StaffRosterIdentity,
+} from '../domain/types';
 
 export type RosterPeriodRow = Database['public']['Tables']['roster_periods']['Row'];
 export type ShiftDefinitionRow = Database['public']['Tables']['shift_definitions']['Row'];
 export type ShiftSemanticRow = Database['public']['Tables']['shift_semantics']['Row'];
 export type DraftAssignmentRow = Database['public']['Tables']['roster_draft_assignments']['Row'];
 export type StaffingThresholdRow = Database['public']['Tables']['staffing_thresholds']['Row'];
+export type PlannedAssignmentRow =
+  Database['public']['Tables']['roster_planned_assignments']['Row'];
+export type PublicationRow = Database['public']['Tables']['roster_publications']['Row'];
+export type AmendmentEventRow = Database['public']['Tables']['roster_amendment_events']['Row'];
+export type AmendmentLineRow = Database['public']['Tables']['roster_amendment_lines']['Row'];
+export type GoffLedgerRow = Database['public']['Tables']['goff_ledger']['Row'];
 
 export function getRosterPeriodQueryKey(year: string, month: string) {
   return queryKeys.rosters.period(year, month);
@@ -229,6 +243,259 @@ export function useDeleteDraftAssignmentMutation(periodId: number) {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.rosters.draftAssignments(periodId),
+      });
+    },
+  });
+}
+
+export function usePlannedAssignmentsQuery(periodId?: number | null) {
+  return useQuery({
+    queryKey: periodId
+      ? queryKeys.rosters.plannedAssignments(periodId)
+      : ['rosters', 'planned-empty'],
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data, error } = await supabase
+        .from('roster_planned_assignments')
+        .select('*')
+        .eq('period_id', periodId);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(periodId),
+    staleTime: 1000 * 30,
+  });
+}
+
+export function usePublicationsQuery(periodId?: number | null) {
+  return useQuery({
+    queryKey: periodId
+      ? queryKeys.rosters.publications(periodId)
+      : ['rosters', 'publications-empty'],
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data, error } = await supabase
+        .from('roster_publications')
+        .select('*')
+        .eq('period_id', periodId)
+        .order('publication_version', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(periodId),
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useAmendmentEventsQuery(periodId?: number | null) {
+  return useQuery({
+    queryKey: periodId
+      ? queryKeys.rosters.amendmentEvents(periodId)
+      : ['rosters', 'amendment-events-empty'],
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data, error } = await supabase
+        .from('roster_amendment_events')
+        .select('*, roster_amendment_lines(*)')
+        .eq('period_id', periodId)
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []).map((e): AmendmentEvent => ({
+        id: e.id,
+        periodId: e.period_id,
+        category: e.category as AmendmentCategory,
+        reason: e.reason,
+        status: e.status as 'active' | 'reversed',
+        reversedByEventId: e.reversed_by_event_id,
+        reversalReason: e.reversal_reason,
+        operationId: e.operation_id,
+        createdBy: e.created_by,
+        createdAt: e.created_at,
+        lines: ((e.roster_amendment_lines as AmendmentLineRow[]) ?? []).map(
+          (l): AmendmentLineItem => ({
+            id: l.id,
+            eventId: l.event_id,
+            periodId: l.period_id,
+            staffId: l.staff_id,
+            dutyDate: l.duty_date,
+            lineAction: l.line_action as AmendmentLineAction,
+            fromShiftCode: l.from_shift_code,
+            toShiftCode: l.to_shift_code,
+            notes: l.notes,
+          }),
+        ),
+      }));
+    },
+    enabled: Boolean(periodId),
+    staleTime: 1000 * 15,
+  });
+}
+
+export function useGoffLedgerQuery(staffId?: number) {
+  return useQuery({
+    queryKey: queryKeys.rosters.goffLedger(staffId),
+    queryFn: async () => {
+      let query = supabase
+        .from('goff_ledger')
+        .select('*')
+        .order('effective_date', { ascending: true });
+      if (staffId) {
+        query = query.eq('staff_id', staffId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row): GoffLedgerEntry => ({
+        id: row.id,
+        staffId: row.staff_id,
+        periodId: row.period_id,
+        transactionType: row.transaction_type as GoffTransactionType,
+        amount: row.amount,
+        reason: row.reason,
+        effectiveDate: row.effective_date,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+      }));
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+export function usePublishRosterMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload?: { notes?: string }) => {
+      const { data, error } = await supabase.rpc('publish_roster_period', {
+        p_period_id: periodId,
+        p_notes: payload?.notes ?? undefined,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.audit.all,
+      });
+    },
+  });
+}
+
+export function useSubmitAmendmentMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      category: AmendmentCategory;
+      reason: string;
+      lines: readonly AmendmentLineItem[];
+    }) => {
+      const formattedLines = payload.lines.map((l) => ({
+        staff_id: l.staffId,
+        duty_date: l.dutyDate,
+        line_action: l.lineAction,
+        from_shift_code: l.fromShiftCode,
+        to_shift_code: l.toShiftCode,
+        notes: l.notes ?? null,
+      }));
+
+      const { data, error } = await supabase.rpc('submit_roster_amendment', {
+        p_period_id: periodId,
+        p_category: payload.category,
+        p_reason: payload.reason,
+        p_lines: formattedLines,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.audit.all,
+      });
+    },
+  });
+}
+
+export function useReverseAmendmentMutation(periodId?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { eventId: number; reason: string }) => {
+      const { data, error } = await supabase.rpc('reverse_roster_amendment', {
+        p_event_id: payload.eventId,
+        p_reason: payload.reason,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+      if (periodId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.rosters.amendmentEvents(periodId),
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.audit.all,
+      });
+    },
+  });
+}
+
+export function useCloseRosterMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload?: { notes?: string }) => {
+      const { error } = await supabase.rpc('close_roster_period', {
+        p_period_id: periodId,
+        p_notes: payload?.notes ?? undefined,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.audit.all,
+      });
+    },
+  });
+}
+
+export function useReopenRosterMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { reason: string }) => {
+      const { error } = await supabase.rpc('reopen_roster_period', {
+        p_period_id: periodId,
+        p_reason: payload.reason,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.audit.all,
       });
     },
   });

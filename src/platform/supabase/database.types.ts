@@ -1,4 +1,4 @@
-﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -120,6 +120,60 @@ export type Database = {
           {
             foreignKeyName: 'audit_events_actor_staff_id_fkey';
             columns: ['actor_staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      goff_ledger: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          effective_date: string;
+          id: number;
+          operation_id: string | null;
+          period_id: number | null;
+          reason: string;
+          staff_id: number;
+          transaction_type: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          effective_date: string;
+          id?: never;
+          operation_id?: string | null;
+          period_id?: number | null;
+          reason: string;
+          staff_id: number;
+          transaction_type: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          effective_date?: string;
+          id?: never;
+          operation_id?: string | null;
+          period_id?: number | null;
+          reason?: string;
+          staff_id?: number;
+          transaction_type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'goff_ledger_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'goff_ledger_staff_id_fkey';
+            columns: ['staff_id'];
             isOneToOne: false;
             referencedRelation: 'staff_directory';
             referencedColumns: ['id'];
@@ -506,6 +560,135 @@ export type Database = {
         };
         Relationships: [];
       };
+      roster_amendment_events: {
+        Row: {
+          category: string;
+          created_at: string;
+          created_by: string | null;
+          id: number;
+          operation_id: string | null;
+          period_id: number;
+          reason: string;
+          reversal_reason: string | null;
+          reversed_by_event_id: number | null;
+          status: string;
+        };
+        Insert: {
+          category: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          operation_id?: string | null;
+          period_id: number;
+          reason: string;
+          reversal_reason?: string | null;
+          reversed_by_event_id?: number | null;
+          status?: string;
+        };
+        Update: {
+          category?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          operation_id?: string | null;
+          period_id?: number;
+          reason?: string;
+          reversal_reason?: string | null;
+          reversed_by_event_id?: number | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_amendment_events_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_amendment_events_reversed_by_event_id_fkey';
+            columns: ['reversed_by_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_amendment_events';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      roster_amendment_lines: {
+        Row: {
+          created_at: string;
+          duty_date: string;
+          event_id: number;
+          from_shift_code: string;
+          id: number;
+          line_action: string;
+          notes: string | null;
+          period_id: number;
+          staff_id: number;
+          to_shift_code: string;
+        };
+        Insert: {
+          created_at?: string;
+          duty_date: string;
+          event_id: number;
+          from_shift_code: string;
+          id?: never;
+          line_action: string;
+          notes?: string | null;
+          period_id: number;
+          staff_id: number;
+          to_shift_code: string;
+        };
+        Update: {
+          created_at?: string;
+          duty_date?: string;
+          event_id?: number;
+          from_shift_code?: string;
+          id?: never;
+          line_action?: string;
+          notes?: string | null;
+          period_id?: number;
+          staff_id?: number;
+          to_shift_code?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_amendment_lines_event_id_fkey';
+            columns: ['event_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_amendment_events';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_amendment_lines_from_shift_code_fkey';
+            columns: ['from_shift_code'];
+            isOneToOne: false;
+            referencedRelation: 'shift_definitions';
+            referencedColumns: ['code'];
+          },
+          {
+            foreignKeyName: 'roster_amendment_lines_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_amendment_lines_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_amendment_lines_to_shift_code_fkey';
+            columns: ['to_shift_code'];
+            isOneToOne: false;
+            referencedRelation: 'shift_definitions';
+            referencedColumns: ['code'];
+          },
+        ];
+      };
       roster_draft_assignments: {
         Row: {
           cell_note: string | null;
@@ -611,6 +794,119 @@ export type Database = {
           {
             foreignKeyName: 'roster_periods_active_rule_version_id_fkey';
             columns: ['active_rule_version_id'];
+            isOneToOne: false;
+            referencedRelation: 'rule_versions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      roster_planned_assignments: {
+        Row: {
+          cell_note: string | null;
+          created_at: string;
+          duty_date: string;
+          id: number;
+          period_id: number;
+          publication_id: string;
+          shift_code: string;
+          staff_id: number;
+        };
+        Insert: {
+          cell_note?: string | null;
+          created_at?: string;
+          duty_date: string;
+          id?: never;
+          period_id: number;
+          publication_id: string;
+          shift_code: string;
+          staff_id: number;
+        };
+        Update: {
+          cell_note?: string | null;
+          created_at?: string;
+          duty_date?: string;
+          id?: never;
+          period_id?: number;
+          publication_id?: string;
+          shift_code?: string;
+          staff_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_planned_assignments_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_planned_assignments_publication_id_fkey';
+            columns: ['publication_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_publications';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_planned_assignments_shift_code_fkey';
+            columns: ['shift_code'];
+            isOneToOne: false;
+            referencedRelation: 'shift_definitions';
+            referencedColumns: ['code'];
+          },
+          {
+            foreignKeyName: 'roster_planned_assignments_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      roster_publications: {
+        Row: {
+          canonical_data_hash: string;
+          id: string;
+          notes: string | null;
+          period_id: number;
+          period_revision: number;
+          publication_version: number;
+          published_at: string;
+          published_by: string | null;
+          rule_version_id: number | null;
+        };
+        Insert: {
+          canonical_data_hash: string;
+          id?: string;
+          notes?: string | null;
+          period_id: number;
+          period_revision?: number;
+          publication_version?: number;
+          published_at?: string;
+          published_by?: string | null;
+          rule_version_id?: number | null;
+        };
+        Update: {
+          canonical_data_hash?: string;
+          id?: string;
+          notes?: string | null;
+          period_id?: number;
+          period_revision?: number;
+          publication_version?: number;
+          published_at?: string;
+          published_by?: string | null;
+          rule_version_id?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_publications_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_publications_rule_version_id_fkey';
+            columns: ['rule_version_id'];
             isOneToOne: false;
             referencedRelation: 'rule_versions';
             referencedColumns: ['id'];
@@ -1066,6 +1362,10 @@ export type Database = {
           staff_id: number;
         }[];
       };
+      close_roster_period: {
+        Args: { p_notes?: string; p_period_id: number };
+        Returns: undefined;
+      };
       decide_roster_request: {
         Args: {
           p_decision: string;
@@ -1101,6 +1401,27 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      publish_roster_period: {
+        Args: { p_notes?: string; p_period_id: number };
+        Returns: string;
+      };
+      reopen_roster_period: {
+        Args: { p_period_id: number; p_reason: string };
+        Returns: undefined;
+      };
+      reverse_roster_amendment: {
+        Args: { p_event_id: number; p_reason: string };
+        Returns: number;
+      };
+      submit_roster_amendment: {
+        Args: {
+          p_category: string;
+          p_lines: Json;
+          p_period_id: number;
+          p_reason: string;
+        };
+        Returns: number;
       };
     };
     Enums: {

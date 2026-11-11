@@ -183,3 +183,50 @@ export type RosterPeriodShellDescriptor = {
   readonly month: string;
   readonly lifecycleStatus: 'draft' | 'published' | 'amended' | 'closed';
 };
+
+export type AmendmentCategory =
+  'absence_only' | 'absence_plus_replacement' | 'shift_swap' | 'admin_correction' | 'reversal';
+
+export type AmendmentLineAction = 'absent' | 'replace' | 'swap' | 'modify' | 'compensate';
+
+export type AmendmentLineItem = {
+  readonly id?: number;
+  readonly eventId?: number;
+  readonly periodId?: number;
+  readonly staffId: number;
+  readonly dutyDate: string; // YYYY-MM-DD
+  readonly lineAction: AmendmentLineAction;
+  readonly fromShiftCode: string;
+  readonly toShiftCode: string;
+  readonly notes?: string | null;
+};
+
+export type AmendmentEvent = {
+  readonly id: number;
+  readonly periodId: number;
+  readonly category: AmendmentCategory;
+  readonly reason: string;
+  readonly status: 'active' | 'reversed';
+  readonly reversedByEventId?: number | null;
+  readonly reversalReason?: string | null;
+  readonly operationId?: string | null;
+  readonly createdBy?: string | null;
+  readonly createdAt: string;
+  readonly lines: readonly AmendmentLineItem[];
+};
+
+export type GoffTransactionType = 'opening_balance' | 'earned' | 'used' | 'expired' | 'adjustment';
+
+export type GoffLedgerEntry = {
+  readonly id: number;
+  readonly staffId: number;
+  readonly periodId?: number | null;
+  readonly transactionType: GoffTransactionType;
+  readonly amount: number;
+  readonly reason: string;
+  readonly effectiveDate: string;
+  readonly createdBy?: string | null;
+  readonly createdAt: string;
+};
+
+export type RosterOperationalViewMode = 'current' | 'planned' | 'changes';

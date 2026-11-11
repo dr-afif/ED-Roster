@@ -32,6 +32,16 @@ export const queryKeys = {
       [...queryKeys.rosters.all, 'period', year, month] as const,
     draftAssignments: (periodId: number) =>
       [...queryKeys.rosters.all, 'draft-assignments', periodId] as const,
+    plannedAssignments: (periodId: number) =>
+      [...queryKeys.rosters.all, 'planned-assignments', periodId] as const,
+    publications: (periodId: number) =>
+      [...queryKeys.rosters.all, 'publications', periodId] as const,
+    amendmentEvents: (periodId: number) =>
+      [...queryKeys.rosters.all, 'amendment-events', periodId] as const,
+    amendmentLines: (periodId: number) =>
+      [...queryKeys.rosters.all, 'amendment-lines', periodId] as const,
+    goffLedger: (staffId?: number) =>
+      [...queryKeys.rosters.all, 'goff-ledger', staffId ?? 'all'] as const,
     shiftDefinitions: () => [...queryKeys.rosters.all, 'shift-definitions'] as const,
     snapshots: (year: string, month: string) =>
       [...queryKeys.rosters.all, 'snapshots', year, month] as const,

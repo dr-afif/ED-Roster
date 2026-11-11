@@ -225,6 +225,36 @@ vi.mock('../data/rosterQueries', () => ({
     mutate: mockDeleteMutate,
     isPending: false,
   }),
+  usePlannedAssignmentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+  useAmendmentEventsQuery: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+  usePublishRosterMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useSubmitAmendmentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useReverseAmendmentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useCloseRosterMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useReopenRosterMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 function renderRosterWorkspace(userRole: 'owner' | 'staff' = 'owner') {
@@ -318,5 +348,20 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
       dutyDate: '2027-01-04',
       shiftCode: 'PM',
     });
+  });
+
+  it('renders Publish Roster button for owner in draft mode and opens PublishModal', () => {
+    renderRosterWorkspace('owner');
+
+    const publishBtn = screen.getByRole('button', { name: /Publish Roster/i });
+    expect(publishBtn).toBeDefined();
+
+    fireEvent.click(publishBtn);
+
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Publish January 2027 Roster/i }),
+    ).toBeDefined();
+    expect(screen.getByText(/Atomic Publication Invariant/i)).toBeDefined();
   });
 });

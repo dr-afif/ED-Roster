@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarRange, CheckCircle2, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarRange,
+  CheckCircle2,
+  FileEdit,
+  History,
+  Layers,
+  Lock,
+  ShieldAlert,
+  Unlock,
+} from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '@/platform/auth';
 import {
@@ -7,17 +17,24 @@ import {
   formatRosterPeriodLabel,
   isValidRosterYearMonth,
 } from '@/shared/dates';
-import { PageHeader, SaveStatusBar, StatusBadge, SurfaceCard } from '@/shared/ui';
+import { Button, PageHeader, SaveStatusBar, StatusBadge, SurfaceCard } from '@/shared/ui';
 import { rosterRouteParamsSchema } from '@/shared/validation';
+import { AmendmentHistoryList } from '../components/AmendmentHistoryList';
+import { AmendRosterModal } from '../components/AmendRosterModal';
+import { CloseReconcileModal } from '../components/CloseReconcileModal';
+import { PublishModal } from '../components/PublishModal';
 import { RosterGrid } from '../components/RosterGrid';
 import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
 import { ShiftPickerModal } from '../components/ShiftPickerModal';
 import {
   type DraftAssignmentRow,
+  type PlannedAssignmentRow,
   type ShiftSemanticRow,
   type StaffingThresholdRow,
+  useAmendmentEventsQuery,
   useDeleteDraftAssignmentMutation,
   useDraftAssignmentsQuery,
+  usePlannedAssignmentsQuery,
   usePublicHolidaysQuery,
   useRosterPeriodQuery,
   useRosterStaffQuery,
@@ -27,11 +44,14 @@ import {
   useStaffingThresholdsQuery,
   useUpsertDraftAssignmentMutation,
 } from '../data/rosterQueries';
+import { computeCurrentAssignments } from '../domain/amendments';
+import { detectOffDisplacementGoffAccruals } from '../domain/goff';
 import { evaluateRosterRules, getDatesInRange } from '../domain/rulesEngine';
 import type {
   Assignment,
   PublicHolidayEntry,
   RosterIssue,
+  RosterOperationalViewMode,
   RosterPeriod,
   StaffRosterIdentity,
   VersionedRuleConfiguration,
@@ -49,6 +69,19 @@ export function RosterPeriodRoute() {
   const isOwner = user?.role === 'owner';
 
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
+  const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
+
+  // Modal control states
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isAmendModalOpen, setIsAmendModalOpen] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [amendModalPrefill, setAmendModalPrefill] = useState<{
+    staffId?: number;
+    date?: string;
+    shiftCode?: string;
+  } | null>(null);
+
+  // Selected cell for draft editing
   const [selectedCell, setSelectedCell] = useState<{
     staff: StaffRosterIdentity;
     date: string;
@@ -63,6 +96,11 @@ export function RosterPeriodRoute() {
   const { data: ruleVersionRow } = useRuleVersionQuery(periodRow?.active_rule_version_id);
   const { data: thresholdsRows = [] } = useStaffingThresholdsQuery(ruleVersionRow?.id);
   const { data: draftAssignmentRows = [], isFetching: isDraftFetching } = useDraftAssignmentsQuery(
+    periodRow?.id,
+  );
+  const { data: plannedAssignmentRows = [], isLoading: isPlannedLoading } =
+    usePlannedAssignmentsQuery(periodRow?.id);
+  const { data: amendmentEvents = [], isLoading: isAmendmentsLoading } = useAmendmentEventsQuery(
     periodRow?.id,
   );
   const { data: publicHolidays = [] } = usePublicHolidaysQuery();
@@ -80,8 +118,8 @@ export function RosterPeriodRoute() {
     return getDatesInRange(startDate, endDate);
   }, [yyyy, mm]);
 
-  // Construct domain assignments
-  const domainAssignments: Assignment[] = useMemo(() => {
+  // Construct draft assignments
+  const draftAssignments: Assignment[] = useMemo(() => {
     return draftAssignmentRows.map((r: DraftAssignmentRow) => ({
       staffId: r.staff_id,
       dutyDate: r.duty_date,
@@ -89,6 +127,35 @@ export function RosterPeriodRoute() {
       note: r.cell_note ?? undefined,
     }));
   }, [draftAssignmentRows]);
+
+  // Construct planned assignments (frozen at publication)
+  const plannedAssignments: Assignment[] = useMemo(() => {
+    return plannedAssignmentRows.map((r: PlannedAssignmentRow) => ({
+      staffId: r.staff_id,
+      dutyDate: r.duty_date,
+      shiftCode: r.shift_code,
+      note: r.cell_note ?? undefined,
+    }));
+  }, [plannedAssignmentRows]);
+
+  // Construct current assignments (planned + active amendments)
+  const currentAssignments: Assignment[] = useMemo(() => {
+    if (periodRow?.status === 'draft' || !periodRow) {
+      return draftAssignments;
+    }
+    return computeCurrentAssignments(plannedAssignments, amendmentEvents);
+  }, [periodRow, draftAssignments, plannedAssignments, amendmentEvents]);
+
+  // Determine active assignments based on operational view mode
+  const activeAssignments: Assignment[] = useMemo(() => {
+    if (periodRow?.status === 'draft' || !periodRow) {
+      return draftAssignments;
+    }
+    if (viewMode === 'planned') {
+      return plannedAssignments;
+    }
+    return currentAssignments;
+  }, [periodRow, draftAssignments, plannedAssignments, currentAssignments, viewMode]);
 
   // Construct rule configuration
   const ruleConfig: VersionedRuleConfiguration = useMemo(() => {
@@ -131,7 +198,7 @@ export function RosterPeriodRoute() {
     };
   }, [ruleVersionRow, thresholdsRows, shiftSemanticsRows]);
 
-  // Evaluate rules in real time
+  // Evaluate rules on active assignments
   const domainPeriod: RosterPeriod = useMemo(() => {
     return {
       id: periodRow?.id ?? 1,
@@ -148,11 +215,20 @@ export function RosterPeriodRoute() {
     return evaluateRosterRules({
       period: domainPeriod,
       people: staffList,
-      assignments: domainAssignments,
+      assignments: activeAssignments,
       holidays: publicHolidays as PublicHolidayEntry[],
       configuration: ruleConfig,
     });
-  }, [domainPeriod, staffList, domainAssignments, publicHolidays, ruleConfig]);
+  }, [domainPeriod, staffList, activeAssignments, publicHolidays, ruleConfig]);
+
+  // Detect compensatory rest (GOFF) accrual candidates
+  const accruedGoffCandidates = useMemo(() => {
+    return detectOffDisplacementGoffAccruals(
+      plannedAssignments,
+      currentAssignments,
+      ruleConfig.semantics ?? [],
+    );
+  }, [plannedAssignments, currentAssignments, ruleConfig.semantics]);
 
   if (!isPeriodValid) {
     const fallbackHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
@@ -176,7 +252,29 @@ export function RosterPeriodRoute() {
     );
   }
 
-  const isEditable = isOwner && (periodRow?.status === 'draft' || !periodRow);
+  const periodStatus = periodRow?.status ?? 'draft';
+  const isDraft = periodStatus === 'draft';
+  const isPublished = periodStatus === 'published' || periodStatus === 'amended';
+  const isClosed = periodStatus === 'closed';
+
+  // Grid cell interactability:
+  // In draft mode: clicking cell opens ShiftPickerModal (for owner).
+  // In published/amended mode (current view): clicking cell opens AmendRosterModal (for owner).
+  // In planned view or closed status: strictly read-only.
+  const isGridInteractive = isOwner && (isDraft || (isPublished && viewMode === 'current'));
+
+  const handleCellSelect = (staff: StaffRosterIdentity, date: string, currentCode?: string) => {
+    if (isDraft) {
+      setSelectedCell({ staff, date, currentCode });
+    } else if (isPublished && viewMode === 'current') {
+      setAmendModalPrefill({
+        staffId: staff.id,
+        date,
+        shiftCode: currentCode,
+      });
+      setIsAmendModalOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -184,17 +282,32 @@ export function RosterPeriodRoute() {
         eyebrow={`Roster Workspace · ${yyyy}-${mm}`}
         title={`${periodLabel} Roster`}
         description={
-          isOwner
-            ? 'Interactive draft roster grid. Click any cell to assign shifts with real-time rules verification and Policy-B weekly OFF enforcement.'
-            : 'Viewing schedule. Only administrators can edit draft cell assignments.'
+          isDraft
+            ? 'Interactive draft roster grid. Build and verify schedule assignments before official atomic publication.'
+            : isClosed
+              ? 'Closed operational period. Reconciled and sealed with immutable audit trail.'
+              : 'Live operational schedule with active amendment overlay and GOFF compensatory rest tracking.'
         }
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge
-              label={periodRow?.status ? periodRow.status.toUpperCase() : 'DRAFT'}
-              tone={periodRow?.status === 'published' ? 'success' : 'brand'}
-              icon={periodRow?.status === 'published' ? CheckCircle2 : CalendarRange}
+              label={periodStatus.toUpperCase()}
+              tone={
+                periodStatus === 'published' || periodStatus === 'amended'
+                  ? 'success'
+                  : periodStatus === 'closed'
+                    ? 'neutral'
+                    : 'brand'
+              }
+              icon={
+                periodStatus === 'published' || periodStatus === 'amended'
+                  ? CheckCircle2
+                  : periodStatus === 'closed'
+                    ? Lock
+                    : CalendarRange
+              }
             />
+
             <SaveStatusBar
               state={
                 isDraftFetching || upsertMutation.isPending || deleteMutation.isPending
@@ -208,54 +321,162 @@ export function RosterPeriodRoute() {
               }
               revision={periodRow?.revision ?? 0}
             />
-          </>
+
+            {/* Owner Actions */}
+            {isOwner && (
+              <>
+                {isDraft && (
+                  <Button
+                    variant="primary"
+                    onClick={() => setIsPublishModalOpen(true)}
+                    disabled={draftAssignments.length === 0}
+                    className="gap-1.5"
+                  >
+                    <Lock className="h-4 w-4" />
+                    Publish Roster
+                  </Button>
+                )}
+
+                {isPublished && (
+                  <>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setAmendModalPrefill(null);
+                        setIsAmendModalOpen(true);
+                      }}
+                      className="gap-1.5"
+                    >
+                      <FileEdit className="h-4 w-4" />
+                      Amend Roster
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setIsCloseModalOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Close Period
+                    </Button>
+                  </>
+                )}
+
+                {isClosed && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsCloseModalOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <Unlock className="h-4 w-4" />
+                    Reopen Period
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         }
       />
 
-      {/* Toolbar & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-border-default bg-surface-primary p-0.5 text-xs">
+      {/* Operational View Switcher (for Published/Amended/Closed periods) */}
+      {!isDraft && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3">
+          <div className="inline-flex rounded-xl border border-border-default bg-surface-primary p-1 text-xs">
             <button
               type="button"
-              onClick={() => setDensity('comfortable')}
-              className={`rounded-md px-3 py-1 font-medium transition-colors ${
-                density === 'comfortable'
+              onClick={() => setViewMode('current')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+                viewMode === 'current'
                   ? 'bg-brand-primary text-text-inverse'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              Comfortable
+              <Layers className="h-3.5 w-3.5" />
+              Live Schedule (Current)
             </button>
             <button
               type="button"
-              onClick={() => setDensity('compact')}
-              className={`rounded-md px-3 py-1 font-medium transition-colors ${
-                density === 'compact'
+              onClick={() => setViewMode('planned')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+                viewMode === 'planned'
                   ? 'bg-brand-primary text-text-inverse'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              Compact
+              <Lock className="h-3.5 w-3.5" />
+              Original Planned
             </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('changes')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+                viewMode === 'changes'
+                  ? 'bg-brand-primary text-text-inverse'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              Changes & Audit ({amendmentEvents.length})
+            </button>
+          </div>
+
+          <div className="text-xs text-text-muted">
+            {viewMode === 'current' &&
+              (isOwner
+                ? 'Showing live duty truth with active amendments. Click any cell to submit an amendment.'
+                : 'Showing live operational duty truth.')}
+            {viewMode === 'planned' &&
+              'Showing immutable baseline frozen at publication time (Read-Only).'}
+            {viewMode === 'changes' &&
+              'Showing append-only audit trail of operational adjustments.'}
           </div>
         </div>
+      )}
 
-        {/* Status / Checksum badge */}
-        {rulesOutput && (
-          <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <span className="font-mono text-text-muted">
-              Policy:{' '}
-              {ruleConfig.weeklyOffPolicy === 'policy_b'
-                ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'
-                : 'Policy A (1 OFF)'}
-            </span>
+      {/* Grid Toolbar & Density Controls (hidden in changes view) */}
+      {viewMode !== 'changes' && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-lg border border-border-default bg-surface-primary p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setDensity('comfortable')}
+                className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  density === 'comfortable'
+                    ? 'bg-brand-primary text-text-inverse'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Comfortable
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity('compact')}
+                className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  density === 'compact'
+                    ? 'bg-brand-primary text-text-inverse'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Compact
+              </button>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Loading state */}
-      {isPeriodLoading || isStaffLoading ? (
+          {rulesOutput && (
+            <div className="flex items-center gap-2 text-xs text-text-secondary">
+              <span className="font-mono text-text-muted">
+                Policy:{' '}
+                {ruleConfig.weeklyOffPolicy === 'policy_b'
+                  ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'
+                  : 'Policy A (1 OFF)'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      {isPeriodLoading || isStaffLoading || (isPublished && isPlannedLoading) ? (
         <SurfaceCard variant="solid" className="p-8 text-center text-sm text-text-muted">
           Loading roster workspace for {periodLabel}...
         </SurfaceCard>
@@ -275,23 +496,30 @@ export function RosterPeriodRoute() {
             Go to Staff Directory
           </Link>
         </SurfaceCard>
+      ) : viewMode === 'changes' ? (
+        /* Changes / Audit View */
+        <AmendmentHistoryList
+          periodId={periodId}
+          isOwner={isOwner}
+          staffList={staffList}
+          events={amendmentEvents}
+          isLoading={isAmendmentsLoading}
+        />
       ) : (
+        /* Grid Matrix View (Current or Planned) */
         <>
-          {/* Main 2D Matrix */}
           <RosterGrid
             periodDates={periodDates}
             staffList={staffList}
-            assignments={domainAssignments}
+            assignments={activeAssignments}
             shiftDefinitions={shiftDefinitions}
             holidays={publicHolidays as PublicHolidayEntry[]}
             density={density}
-            isEditable={isEditable}
+            isEditable={isGridInteractive}
             selectedCell={
               selectedCell ? { staffId: selectedCell.staff.id, date: selectedCell.date } : null
             }
-            onSelectCell={(staff, date, currentCode) => {
-              setSelectedCell({ staff, date, currentCode });
-            }}
+            onSelectCell={handleCellSelect}
           />
 
           {/* Live Rules Guidance Panel */}
@@ -302,46 +530,94 @@ export function RosterPeriodRoute() {
                 if (issue.staffId && issue.date) {
                   const targetStaff = staffList.find((s) => s.id === issue.staffId);
                   if (targetStaff) {
-                    setSelectedCell({
-                      staff: targetStaff,
-                      date: issue.date,
-                      currentCode: domainAssignments.find(
-                        (a) => a.staffId === issue.staffId && a.dutyDate === issue.date,
-                      )?.shiftCode,
-                    });
+                    const currentCode = activeAssignments.find(
+                      (a) => a.staffId === issue.staffId && a.dutyDate === issue.date,
+                    )?.shiftCode;
+                    handleCellSelect(targetStaff, issue.date, currentCode);
                   }
                 }
               }}
             />
           )}
-
-          {/* Shift Picker Modal */}
-          {selectedCell && (
-            <ShiftPickerModal
-              isOpen={Boolean(selectedCell)}
-              staff={selectedCell.staff}
-              date={selectedCell.date}
-              currentCode={selectedCell.currentCode}
-              shiftDefinitions={shiftDefinitions}
-              onClose={() => setSelectedCell(null)}
-              onSelectShift={(code) => {
-                if (!periodId) return;
-                upsertMutation.mutate({
-                  staffId: selectedCell.staff.id,
-                  dutyDate: selectedCell.date,
-                  shiftCode: code,
-                });
-              }}
-              onClearShift={() => {
-                if (!periodId) return;
-                deleteMutation.mutate({
-                  staffId: selectedCell.staff.id,
-                  dutyDate: selectedCell.date,
-                });
-              }}
-            />
-          )}
         </>
+      )}
+
+      {/* Shift Picker Modal (Draft Mode Only) */}
+      {selectedCell && isDraft && (
+        <ShiftPickerModal
+          isOpen={Boolean(selectedCell)}
+          staff={selectedCell.staff}
+          date={selectedCell.date}
+          currentCode={selectedCell.currentCode}
+          shiftDefinitions={shiftDefinitions}
+          onClose={() => setSelectedCell(null)}
+          onSelectShift={(code) => {
+            if (!periodId) return;
+            upsertMutation.mutate({
+              staffId: selectedCell.staff.id,
+              dutyDate: selectedCell.date,
+              shiftCode: code,
+            });
+          }}
+          onClearShift={() => {
+            if (!periodId) return;
+            deleteMutation.mutate({
+              staffId: selectedCell.staff.id,
+              dutyDate: selectedCell.date,
+            });
+          }}
+        />
+      )}
+
+      {/* Publish Modal */}
+      {isPublishModalOpen && (
+        <PublishModal
+          isOpen={isPublishModalOpen}
+          onClose={() => setIsPublishModalOpen(false)}
+          periodLabel={periodLabel}
+          periodId={periodId}
+          assignmentCount={draftAssignments.length}
+          issueCount={rulesOutput?.issues.length ?? 0}
+          ruleVersion={ruleVersionRow?.version ?? 1}
+          onPublished={() => {
+            setViewMode('current');
+          }}
+        />
+      )}
+
+      {/* Amend Roster Modal */}
+      {isAmendModalOpen && (
+        <AmendRosterModal
+          isOpen={isAmendModalOpen}
+          onClose={() => {
+            setIsAmendModalOpen(false);
+            setAmendModalPrefill(null);
+          }}
+          periodId={periodId}
+          periodDates={periodDates}
+          staffList={staffList}
+          shiftDefinitions={shiftDefinitions}
+          currentAssignments={currentAssignments}
+          shiftSemantics={ruleConfig.semantics ?? []}
+          initialStaffId={amendModalPrefill?.staffId}
+          initialDate={amendModalPrefill?.date}
+          initialShiftCode={amendModalPrefill?.shiftCode}
+        />
+      )}
+
+      {/* Close / Reconcile Modal */}
+      {isCloseModalOpen && (
+        <CloseReconcileModal
+          isOpen={isCloseModalOpen}
+          onClose={() => setIsCloseModalOpen(false)}
+          periodId={periodId}
+          periodLabel={periodLabel}
+          isClosed={isClosed}
+          plannedCount={plannedAssignments.length}
+          amendmentCount={amendmentEvents.length}
+          accruedGoffCandidates={accruedGoffCandidates}
+          staffList={staffList}
+        />
       )}
     </div>
   );
