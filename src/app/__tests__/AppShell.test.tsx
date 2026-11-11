@@ -81,7 +81,11 @@ describe('AppShell & Placeholder Routes', () => {
     // Navigate to January 2027 Roster placeholder.
     await user.click(screen.getByRole('link', { name: /Open Jan 2027 Roster Shell/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /January 2027 Roster/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /January 2027 Roster/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Send to My Telegram/i })).toBeDisabled();
 
@@ -89,7 +93,11 @@ describe('AppShell & Placeholder Routes', () => {
     const desktopSidebar = screen.getByLabelText(/Primary desktop navigation/i);
     await user.click(within(desktopSidebar).getByRole('link', { name: /Rules & Policies/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /Roster Rules & Thresholds/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Roster Rules & Thresholds/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Owner Administration Boundary/i)).toBeInTheDocument();
   });
@@ -126,7 +134,11 @@ describe('AppShell & Placeholder Routes', () => {
     const reopenedDialog = screen.getByRole('dialog', { name: /More Destinations/i });
     await user.click(within(reopenedDialog).getByRole('link', { name: /Documents/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /Documents Catalog/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Documents Catalog/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
   });
 

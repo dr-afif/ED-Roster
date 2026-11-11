@@ -1,4 +1,5 @@
 export {
+  useAuth,
   useAuthBoundary,
   type AuthBootstrapStatus,
   type AuthBoundaryState,

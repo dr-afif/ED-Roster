@@ -56,3 +56,5 @@ export const AuthContext = createContext<AuthBoundaryState>(DEFAULT_AUTH_STATE);
 export function useAuthBoundary(): AuthBoundaryState {
   return useContext(AuthContext);
 }
+
+export const useAuth = useAuthBoundary;

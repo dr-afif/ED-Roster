@@ -126,6 +126,72 @@ export type Database = {
           },
         ];
       };
+      leave_records: {
+        Row: {
+          approved_at: string;
+          approved_by: string | null;
+          created_at: string;
+          created_by: string | null;
+          end_date: string;
+          id: number;
+          leave_type: string;
+          operational_note: string | null;
+          request_id: number | null;
+          staff_id: number;
+          start_date: string;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          approved_at?: string;
+          approved_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          end_date: string;
+          id?: never;
+          leave_type: string;
+          operational_note?: string | null;
+          request_id?: number | null;
+          staff_id: number;
+          start_date: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          approved_at?: string;
+          approved_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          end_date?: string;
+          id?: never;
+          leave_type?: string;
+          operational_note?: string | null;
+          request_id?: number | null;
+          staff_id?: number;
+          start_date?: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leave_records_request_id_fkey';
+            columns: ['request_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_requests';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'leave_records_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       operation_log: {
         Row: {
           actor_auth_user_id: string | null;
@@ -176,6 +242,351 @@ export type Database = {
           {
             foreignKeyName: 'operation_log_actor_staff_id_fkey';
             columns: ['actor_staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      professional_records: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          expiry_date: string | null;
+          id: number;
+          issue_date: string | null;
+          issuer: string;
+          record_type_id: number;
+          reference_number: string | null;
+          source_system: string;
+          staff_id: number;
+          status: string;
+          title: string;
+          updated_at: string;
+          updated_by: string | null;
+          verification_notes: string | null;
+          verification_status: string;
+          verified_at: string | null;
+          verified_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date?: string | null;
+          id?: never;
+          issue_date?: string | null;
+          issuer: string;
+          record_type_id: number;
+          reference_number?: string | null;
+          source_system?: string;
+          staff_id: number;
+          status?: string;
+          title: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          verification_notes?: string | null;
+          verification_status?: string;
+          verified_at?: string | null;
+          verified_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date?: string | null;
+          id?: never;
+          issue_date?: string | null;
+          issuer?: string;
+          record_type_id?: number;
+          reference_number?: string | null;
+          source_system?: string;
+          staff_id?: number;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          verification_notes?: string | null;
+          verification_status?: string;
+          verified_at?: string | null;
+          verified_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'professional_records_record_type_id_fkey';
+            columns: ['record_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'record_type_definitions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'professional_records_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      public_holidays: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          holiday_date: string;
+          id: number;
+          is_state_specific: boolean;
+          jurisdiction: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          holiday_date: string;
+          id?: never;
+          is_state_specific?: boolean;
+          jurisdiction?: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          holiday_date?: string;
+          id?: never;
+          is_state_specific?: boolean;
+          jurisdiction?: string;
+          name?: string;
+        };
+        Relationships: [];
+      };
+      record_type_definitions: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          created_by: string | null;
+          default_validity_years: number | null;
+          id: number;
+          issuer_type: string;
+          label: string;
+          requires_expiry: boolean;
+          requires_reference_number: boolean;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          created_by?: string | null;
+          default_validity_years?: number | null;
+          id?: never;
+          issuer_type: string;
+          label: string;
+          requires_expiry?: boolean;
+          requires_reference_number?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          created_by?: string | null;
+          default_validity_years?: number | null;
+          id?: never;
+          issuer_type?: string;
+          label?: string;
+          requires_expiry?: boolean;
+          requires_reference_number?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      request_status_events: {
+        Row: {
+          actor_auth_user_id: string | null;
+          actor_staff_id: number | null;
+          created_at: string;
+          id: number;
+          new_status: string;
+          previous_status: string | null;
+          reason: string | null;
+          request_id: number;
+        };
+        Insert: {
+          actor_auth_user_id?: string | null;
+          actor_staff_id?: number | null;
+          created_at?: string;
+          id?: never;
+          new_status: string;
+          previous_status?: string | null;
+          reason?: string | null;
+          request_id: number;
+        };
+        Update: {
+          actor_auth_user_id?: string | null;
+          actor_staff_id?: number | null;
+          created_at?: string;
+          id?: never;
+          new_status?: string;
+          previous_status?: string | null;
+          reason?: string | null;
+          request_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'request_status_events_actor_staff_id_fkey';
+            columns: ['actor_staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'request_status_events_request_id_fkey';
+            columns: ['request_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_requests';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      request_types: {
+        Row: {
+          active: boolean;
+          category: string;
+          code: string;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: number;
+          label: string;
+          max_days_per_request: number;
+          min_lead_days: number;
+          requires_dates: boolean;
+          requires_shift_code: boolean;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          category: string;
+          code: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: never;
+          label: string;
+          max_days_per_request?: number;
+          min_lead_days?: number;
+          requires_dates?: boolean;
+          requires_shift_code?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          category?: string;
+          code?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: never;
+          label?: string;
+          max_days_per_request?: number;
+          min_lead_days?: number;
+          requires_dates?: boolean;
+          requires_shift_code?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      roster_requests: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_reason: string | null;
+          end_date: string;
+          id: number;
+          legacy_source_id: string | null;
+          notes: string | null;
+          period_start_date: string | null;
+          public_id: string;
+          reason_category: string;
+          request_type_id: number;
+          requested_shift_code: string | null;
+          source_system: string;
+          staff_id: number;
+          start_date: string;
+          status: string;
+          submitted_at: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          end_date: string;
+          id?: never;
+          legacy_source_id?: string | null;
+          notes?: string | null;
+          period_start_date?: string | null;
+          public_id?: string;
+          reason_category?: string;
+          request_type_id: number;
+          requested_shift_code?: string | null;
+          source_system?: string;
+          staff_id: number;
+          start_date: string;
+          status?: string;
+          submitted_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          end_date?: string;
+          id?: never;
+          legacy_source_id?: string | null;
+          notes?: string | null;
+          period_start_date?: string | null;
+          public_id?: string;
+          reason_category?: string;
+          request_type_id?: number;
+          requested_shift_code?: string | null;
+          source_system?: string;
+          staff_id?: number;
+          start_date?: string;
+          status?: string;
+          submitted_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_requests_request_type_id_fkey';
+            columns: ['request_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'request_types';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_requests_staff_id_fkey';
+            columns: ['staff_id'];
             isOneToOne: false;
             referencedRelation: 'staff_directory';
             referencedColumns: ['id'];
@@ -297,6 +708,50 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_create_staff_member: {
+        Args: {
+          p_display_name: string;
+          p_email: string;
+          p_phone?: string;
+          p_registration_number?: string;
+          p_role: string;
+          p_roster_name: string;
+          p_staff_code: string;
+          p_staff_group: string;
+        };
+        Returns: number;
+      };
+      admin_update_allowlist_status: {
+        Args: {
+          p_allowed_user_id: number;
+          p_new_status: string;
+          p_reason?: string;
+        };
+        Returns: {
+          activated_at: string | null;
+          auth_user_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string;
+          id: number;
+          invited_at: string;
+          invited_by: string | null;
+          revocation_reason: string | null;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          role: string;
+          staff_id: number | null;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'allowed_users';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       bootstrap_my_session: {
         Args: never;
         Returns: {
@@ -307,6 +762,42 @@ export type Database = {
           staff_code: string;
           staff_id: number;
         }[];
+      };
+      decide_roster_request: {
+        Args: {
+          p_decision: string;
+          p_decision_reason?: string;
+          p_request_id: number;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_reason: string | null;
+          end_date: string;
+          id: number;
+          legacy_source_id: string | null;
+          notes: string | null;
+          period_start_date: string | null;
+          public_id: string;
+          reason_category: string;
+          request_type_id: number;
+          requested_shift_code: string | null;
+          source_system: string;
+          staff_id: number;
+          start_date: string;
+          status: string;
+          submitted_at: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'roster_requests';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
     };
     Enums: {

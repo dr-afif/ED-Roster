@@ -14,12 +14,18 @@ const WAVE_READINESS = [
   {
     wave: 'Wave B',
     focus: 'Supabase Staging Identity & RLS Foundation, Google OAuth PKCE allowlist',
-    statusLabel: 'Applied on Staging',
+    statusLabel: 'Completed',
+    tone: 'success' as const,
+  },
+  {
+    wave: 'Wave C',
+    focus: 'Staff Directory, Allowlist Admin, Self-Service Profiles, Requests Lifecycle',
+    statusLabel: 'Live on Staging',
     tone: 'brand' as const,
   },
   {
-    wave: 'Wave C–D',
-    focus: 'Profiles, requests, pure roster engine, native January 2027 lifecycle',
+    wave: 'Wave D',
+    focus: 'Roster engine rules, January 2027 draft workspace, atomic publish lifecycle',
     statusLabel: 'Next milestone',
     tone: 'warning' as const,
   },
