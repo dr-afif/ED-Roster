@@ -600,6 +600,11 @@ export function AmendRosterModal({
               placeholder="e.g. Acute gastroenteritis with MC; clinical coverage confirmed..."
               className="w-full rounded-xl border border-border-default bg-surface-solid px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none"
             />
+            {reason.length > 0 && reason.trim().length < 3 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                Please enter at least 3 characters for audit justification.
+              </p>
+            )}
           </div>
 
           {/* Internal Notes (Optional) */}
