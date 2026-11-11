@@ -68,4 +68,10 @@ export const queryKeys = {
     all: ['audit'] as const,
     recent: () => [...queryKeys.audit.all, 'recent'] as const,
   },
+  migration: {
+    all: ['migration'] as const,
+    batches: () => [...queryKeys.migration.all, 'batches'] as const,
+    batchDetails: (batchId: string) =>
+      [...queryKeys.migration.all, 'batch-details', batchId] as const,
+  },
 } as const;

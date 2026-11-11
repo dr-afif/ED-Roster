@@ -883,6 +883,8 @@ export type Database = {
           closed_by: string | null;
           created_at: string;
           id: number;
+          import_batch_id: string | null;
+          legacy_read_only: boolean;
           period_end: string;
           period_start: string;
           published_at: string | null;
@@ -897,6 +899,8 @@ export type Database = {
           closed_by?: string | null;
           created_at?: string;
           id?: never;
+          import_batch_id?: string | null;
+          legacy_read_only?: boolean;
           period_end: string;
           period_start: string;
           published_at?: string | null;
@@ -911,6 +915,8 @@ export type Database = {
           closed_by?: string | null;
           created_at?: string;
           id?: never;
+          import_batch_id?: string | null;
+          legacy_read_only?: boolean;
           period_end?: string;
           period_start?: string;
           published_at?: string | null;
@@ -1633,6 +1639,17 @@ export type Database = {
         Args: { p_notes?: string; p_period_id: number };
         Returns: undefined;
       };
+      create_migration_batch: {
+        Args: {
+          p_batch_id: string;
+          p_file_hashes?: Json;
+          p_notes?: string;
+          p_source_label?: string;
+          p_source_spreadsheet_id: string;
+          p_tab_manifest?: Json;
+        };
+        Returns: Json;
+      };
       create_or_get_roster_snapshot: {
         Args: {
           p_canonical_hash: string;
@@ -1683,6 +1700,15 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      execute_migration_transform: {
+        Args: { p_batch_id: string; p_dry_run?: boolean };
+        Returns: Json;
+      };
+      get_migration_batch_details: {
+        Args: { p_batch_id: string };
+        Returns: Json;
+      };
+      get_migration_batches: { Args: never; Returns: Json };
       publish_roster_period: {
         Args: { p_notes?: string; p_period_id: number };
         Returns: string;
@@ -1706,6 +1732,25 @@ export type Database = {
         Args: { p_event_id: number; p_reason: string };
         Returns: number;
       };
+      revert_migration_batch: { Args: { p_batch_id: string }; Returns: Json };
+      save_id_mapping: {
+        Args: {
+          p_batch_id: string;
+          p_canonical_id: string;
+          p_canonical_label: string;
+          p_canonical_table: string;
+          p_confidence?: string;
+          p_notes?: string;
+          p_source_entity: string;
+          p_source_key: string;
+          p_source_tab: string;
+        };
+        Returns: Json;
+      };
+      stage_raw_rows: {
+        Args: { p_batch_id: string; p_rows: Json; p_tab_name: string };
+        Returns: Json;
+      };
       submit_roster_amendment: {
         Args: {
           p_category: string;
@@ -1714,6 +1759,10 @@ export type Database = {
           p_reason: string;
         };
         Returns: number;
+      };
+      update_reconciliation_disposition: {
+        Args: { p_disposition: string; p_notes?: string; p_result_id: number };
+        Returns: Json;
       };
       upsert_roster_ep_assignment: {
         Args: {
