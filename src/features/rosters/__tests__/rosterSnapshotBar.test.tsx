@@ -119,6 +119,10 @@ describe('RosterSnapshotBar (Wave F Workflow)', () => {
     const previewBtn = screen.getByRole('button', { name: /Preview PDF/i });
     fireEvent.click(previewBtn);
 
+    expect(screen.getByText('Select Roster PDF Format to Preview')).toBeInTheDocument();
+    const previewTableBtn = screen.getByRole('button', { name: /Preview Table/i });
+    fireEvent.click(previewTableBtn);
+
     await waitFor(() => {
       expect(mockWindowOpen).toHaveBeenCalledTimes(1);
     });

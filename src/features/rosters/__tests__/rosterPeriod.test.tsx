@@ -255,6 +255,19 @@ vi.mock('../data/rosterQueries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useRosterEpAssignmentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+  useUpsertEpAssignmentMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useBatchUpsertEpAssignmentsMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 function renderRosterWorkspace(userRole: 'owner' | 'staff' = 'owner') {

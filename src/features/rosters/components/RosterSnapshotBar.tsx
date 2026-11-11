@@ -1,7 +1,17 @@
 import { useState } from 'react';
-import { Archive, CheckCircle2, Eye, FileCheck2, Loader2, Send, X } from 'lucide-react';
+import {
+  Archive,
+  Calendar,
+  CheckCircle2,
+  Eye,
+  FileCheck2,
+  Loader2,
+  Send,
+  Table2,
+  X,
+} from 'lucide-react';
 import { SurfaceCard } from '@/shared/ui';
-import type { ShiftDefinitionRow } from '../data/rosterQueries';
+import type { EpAssignmentRow, ShiftDefinitionRow } from '../data/rosterQueries';
 import {
   type RosterSnapshotRow,
   useArchiveRosterSnapshotMutation,
@@ -9,8 +19,8 @@ import {
   useRosterSnapshotsQuery,
   useSendToTelegramMutation,
 } from '../data/snapshotQueries';
-import { generateRosterPdf } from '../domain/pdfGenerator';
-import type { Assignment, StaffRosterIdentity } from '../domain/types';
+import { generateCalendarRosterPdf, generateRosterPdf } from '../domain/pdfGenerator';
+import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
 
 export interface RosterSnapshotBarProps {
   periodId: number;
@@ -21,6 +31,8 @@ export interface RosterSnapshotBarProps {
   staffList: readonly StaffRosterIdentity[];
   assignments: readonly Assignment[];
   shiftDefinitions: readonly ShiftDefinitionRow[];
+  epAssignments?: readonly EpAssignmentRow[];
+  holidays?: readonly PublicHolidayEntry[];
   isOwner: boolean;
 }
 
@@ -33,9 +45,12 @@ export function RosterSnapshotBar({
   staffList,
   assignments,
   shiftDefinitions,
+  epAssignments = [],
+  holidays = [],
   isOwner,
 }: RosterSnapshotBarProps) {
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -50,8 +65,8 @@ export function RosterSnapshotBar({
   const { data: deliveries = [] } = useRosterSnapshotDeliveriesQuery(latestSnapshot?.id);
   const isDeliveredToTelegram = deliveries.some((d) => d.status === 'sent');
 
-  // 1. Preview PDF
-  const handlePreviewPdf = async () => {
+  // 1. Preview Table PDF
+  const handlePreviewTablePdf = async () => {
     try {
       setIsPreviewing(true);
       setActionMessage(null);
@@ -86,18 +101,71 @@ export function RosterSnapshotBar({
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
-      // Open in new tab or trigger download
       const win = window.open(url, '_blank');
       if (!win) {
-        // Fallback for popup blocker: download
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
         a.click();
       }
-      setActionMessage(`Generated PDF preview: ${fileName}`);
+      setIsPdfModalOpen(false);
+      setActionMessage(`Generated Table Grid PDF: ${fileName}`);
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : 'Failed to generate PDF.');
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  // 1b. Preview Calendar Duty Schedule PDF
+  const handlePreviewCalendarPdf = async () => {
+    try {
+      setIsPreviewing(true);
+      setActionMessage(null);
+
+      const canonicalPayload = {
+        period: {
+          year: periodYear,
+          month: periodMonth,
+          periodStart,
+          revision: periodRevision,
+        },
+        staffCount: staffList.length,
+        assignmentCount: assignments.length,
+        epCount: epAssignments.length,
+      };
+
+      const { pdfBytes, fileName } = await generateCalendarRosterPdf({
+        period: {
+          year: periodYear,
+          month: periodMonth,
+          periodStart,
+          revision: periodRevision,
+        },
+        snapshotVersion: latestSnapshot ? latestSnapshot.snapshot_version + 1 : 1,
+        snapshotType: periodRevision === 0 ? 'initial' : 'amendment',
+        staffList,
+        assignments,
+        epAssignments,
+        holidays,
+        generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        canonicalHash: JSON.stringify(canonicalPayload),
+      });
+
+      const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+
+      const win = window.open(url, '_blank');
+      if (!win) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+      }
+      setIsPdfModalOpen(false);
+      setActionMessage(`Generated Calendar Duty PDF: ${fileName}`);
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to generate Calendar PDF.');
     } finally {
       setIsPreviewing(false);
     }
@@ -186,7 +254,7 @@ export function RosterSnapshotBar({
           {/* Action 1: Preview PDF */}
           <button
             type="button"
-            onClick={handlePreviewPdf}
+            onClick={() => setIsPdfModalOpen(true)}
             disabled={isPreviewing}
             className="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-primary px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-secondary shadow-xs transition-colors disabled:opacity-50"
           >
@@ -329,6 +397,99 @@ export function RosterSnapshotBar({
                     <span>Confirm &amp; Send</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Format Selector Modal */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl border border-border-default bg-surface-primary p-6 shadow-xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-brand-primary" />
+                <h3 className="text-sm font-bold text-text-primary">
+                  Select Roster PDF Format to Preview
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="rounded-lg p-1 text-text-muted hover:bg-surface-secondary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              {/* Option 1: Calendar View Timetable */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border-default bg-surface-secondary/20 hover:border-brand-primary/50 transition">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-brand-primary" />
+                    <span className="text-xs font-bold text-text-primary">
+                      Monthly Duty Timetable (Calendar View)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Official A4 portrait duty roster showing daily Medical Officer on-duty coverage
+                    (AM, PM, Night) and Emergency Physicians (Office Hour, On Call).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={isPreviewing}
+                  onClick={handlePreviewCalendarPdf}
+                  className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold text-text-inverse hover:bg-brand-primary-hover shadow-xs disabled:opacity-50"
+                >
+                  {isPreviewing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                  <span>Preview Calendar</span>
+                </button>
+              </div>
+
+              {/* Option 2: Table View Matrix */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border-default bg-surface-secondary/20 hover:border-brand-primary/50 transition">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Table2 className="h-4 w-4 text-brand-primary" />
+                    <span className="text-xs font-bold text-text-primary">
+                      Staff Spreadsheet Grid (Table View)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Official A4 landscape matrix showing all doctor rows across 31 days with color
+                    badges and shift semantics legend.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={isPreviewing}
+                  onClick={handlePreviewTablePdf}
+                  className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold text-text-inverse hover:bg-brand-primary-hover shadow-xs disabled:opacity-50"
+                >
+                  {isPreviewing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                  <span>Preview Table</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="rounded-xl border border-border-default px-4 py-2 text-xs font-medium text-text-secondary hover:bg-surface-secondary"
+              >
+                Close
               </button>
             </div>
           </div>

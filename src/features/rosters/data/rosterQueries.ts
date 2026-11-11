@@ -638,3 +638,109 @@ export function useCreateShiftDefinitionMutation() {
     },
   });
 }
+
+export interface EpAssignmentRow {
+  id: number;
+  period_id: number;
+  duty_date: string;
+  slot_type: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+  physician_names: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export function useRosterEpAssignmentsQuery(periodId?: number) {
+  return useQuery<EpAssignmentRow[]>({
+    queryKey: periodId
+      ? queryKeys.rosters.epAssignments(periodId)
+      : ['rosters', 'ep-assignments', 0],
+    enabled: Boolean(periodId),
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data, error } = await supabase
+        .from('roster_ep_assignments')
+        .select('*')
+        .eq('period_id', periodId)
+        .order('duty_date', { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as EpAssignmentRow[];
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useUpsertEpAssignmentMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      dutyDate: string;
+      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+      physicianNames: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('roster_ep_assignments')
+        .upsert(
+          {
+            period_id: periodId,
+            duty_date: payload.dutyDate,
+            slot_type: payload.slotType,
+            physician_names: payload.physicianNames.trim(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'period_id,duty_date,slot_type',
+          },
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.epAssignments(periodId),
+      });
+    },
+  });
+}
+
+export function useBatchUpsertEpAssignmentsMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      payloads: Array<{
+        dutyDate: string;
+        slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+        physicianNames: string;
+      }>,
+    ) => {
+      if (!payloads.length) return [];
+      const records = payloads.map((p) => ({
+        period_id: periodId,
+        duty_date: p.dutyDate,
+        slot_type: p.slotType,
+        physician_names: p.physicianNames.trim(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data, error } = await supabase
+        .from('roster_ep_assignments')
+        .upsert(records, {
+          onConflict: 'period_id,duty_date,slot_type',
+        })
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.epAssignments(periodId),
+      });
+    },
+  });
+}

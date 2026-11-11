@@ -275,6 +275,19 @@ vi.mock('../data/rosterQueries', () => ({
     mutateAsync: mockReopenRoster,
     isPending: false,
   }),
+  useRosterEpAssignmentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+  useUpsertEpAssignmentMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useBatchUpsertEpAssignmentsMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 function renderPublishedWorkspace(userRole: 'owner' | 'staff' = 'owner') {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { generateRosterPdf, type RosterPdfPayload } from '../pdfGenerator';
+import {
+  generateCalendarRosterPdf,
+  generateRosterPdf,
+  type CalendarRosterPdfPayload,
+  type RosterPdfPayload,
+} from '../pdfGenerator';
 
 describe('Deterministic Roster PDF Generator (07_PDF_TELEGRAM_WORKFLOW.md)', () => {
   const samplePayload: RosterPdfPayload = {
@@ -122,5 +127,44 @@ describe('Deterministic Roster PDF Generator (07_PDF_TELEGRAM_WORKFLOW.md)', () 
     const result = await generateRosterPdf(amendmentPayload);
     expect(result.fileName).toBe('ED_Roster_2027-01_v02_Amendment_2027-01.pdf');
     expect(result.pdfSha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('generates portrait Calendar Duty Schedule PDF with MO & EP coverage', async () => {
+    const calendarPayload: CalendarRosterPdfPayload = {
+      period: {
+        year: '2027',
+        month: '01',
+        periodStart: '2027-01-01',
+        revision: 1,
+      },
+      snapshotVersion: 1,
+      snapshotType: 'initial',
+      staffList: samplePayload.staffList,
+      assignments: samplePayload.assignments,
+      epAssignments: [
+        {
+          duty_date: '2027-01-01',
+          slot_type: 'EP_OFFICE_HOUR',
+          physician_names: 'Dr Afif',
+        },
+        {
+          duty_date: '2027-01-01',
+          slot_type: 'EP_ONCALL',
+          physician_names: 'Dr Afif',
+        },
+      ],
+      holidays: [{ date: '2027-01-01', name: "New Year's Day" }],
+      generatedAt: '2027-01-01 10:00:00',
+      canonicalHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    };
+
+    const result = await generateCalendarRosterPdf(calendarPayload);
+    expect(result.pdfBytes).toBeInstanceOf(Uint8Array);
+    expect(result.pdfBytes.length).toBeGreaterThan(1000);
+    expect(result.fileName).toBe('ED_Duty_Roster_Timetable_2027-01_v01.pdf');
+    expect(result.pdfSha256).toMatch(/^[a-f0-9]{64}$/);
+
+    const headerStr = new TextDecoder().decode(result.pdfBytes.slice(0, 5));
+    expect(headerStr).toBe('%PDF-');
   });
 });

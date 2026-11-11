@@ -23,9 +23,11 @@ import { AmendmentHistoryList } from '../components/AmendmentHistoryList';
 import { AmendRosterModal } from '../components/AmendRosterModal';
 import { CloseReconcileModal } from '../components/CloseReconcileModal';
 import { PublishModal } from '../components/PublishModal';
+import { RosterCalendarView } from '../components/RosterCalendarView';
 import { RosterGrid } from '../components/RosterGrid';
 import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
 import { RosterSnapshotBar } from '../components/RosterSnapshotBar';
+import { RosterTallyTables } from '../components/RosterTallyTables';
 import { ShiftPickerModal } from '../components/ShiftPickerModal';
 import {
   type DraftAssignmentRow,
@@ -33,10 +35,12 @@ import {
   type ShiftSemanticRow,
   type StaffingThresholdRow,
   useAmendmentEventsQuery,
+  useBatchUpsertEpAssignmentsMutation,
   useDeleteDraftAssignmentMutation,
   useDraftAssignmentsQuery,
   usePlannedAssignmentsQuery,
   usePublicHolidaysQuery,
+  useRosterEpAssignmentsQuery,
   useRosterPeriodQuery,
   useRosterStaffQuery,
   useRuleVersionQuery,
@@ -44,6 +48,7 @@ import {
   useShiftSemanticsQuery,
   useStaffingThresholdsQuery,
   useUpsertDraftAssignmentMutation,
+  useUpsertEpAssignmentMutation,
 } from '../data/rosterQueries';
 import { computeCurrentAssignments } from '../domain/amendments';
 import { detectOffDisplacementGoffAccruals } from '../domain/goff';
@@ -71,6 +76,7 @@ export function RosterPeriodRoute() {
 
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
+  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
 
   // Modal control states
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
@@ -105,11 +111,14 @@ export function RosterPeriodRoute() {
     periodRow?.id,
   );
   const { data: publicHolidays = [] } = usePublicHolidaysQuery();
+  const { data: epAssignments = [] } = useRosterEpAssignmentsQuery(periodRow?.id);
 
   // Mutations
   const periodId = periodRow?.id ?? 0;
   const upsertMutation = useUpsertDraftAssignmentMutation(periodId);
   const deleteMutation = useDeleteDraftAssignmentMutation(periodId);
+  const upsertEpMutation = useUpsertEpAssignmentMutation(periodId);
+  const batchUpsertEpMutation = useBatchUpsertEpAssignmentsMutation(periodId);
 
   // Compute period dates
   const periodDates = useMemo(() => {
@@ -230,6 +239,30 @@ export function RosterPeriodRoute() {
       ruleConfig.semantics ?? [],
     );
   }, [plannedAssignments, currentAssignments, ruleConfig.semantics]);
+
+  const handleUpdateEpAssignment = (
+    dutyDate: string,
+    slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL',
+    names: string,
+  ) => {
+    if (!isOwner) return;
+    upsertEpMutation.mutate({
+      dutyDate,
+      slotType,
+      physicianNames: names,
+    });
+  };
+
+  const handleBatchUpdateEpAssignments = (
+    payloads: Array<{
+      dutyDate: string;
+      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+      physicianNames: string;
+    }>,
+  ) => {
+    if (!isOwner) return;
+    batchUpsertEpMutation.mutate(payloads);
+  };
 
   if (!isPeriodValid) {
     const fallbackHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
@@ -389,6 +422,8 @@ export function RosterPeriodRoute() {
           staffList={staffList}
           assignments={activeAssignments}
           shiftDefinitions={shiftDefinitions}
+          epAssignments={epAssignments}
+          holidays={publicHolidays as PublicHolidayEntry[]}
           isOwner={isOwner}
         />
       )}
@@ -448,46 +483,83 @@ export function RosterPeriodRoute() {
         </div>
       )}
 
-      {/* Grid Toolbar & Density Controls (hidden in changes view) */}
+      {/* View Format Switcher: Calendar View vs Table View */}
       {viewMode !== 'changes' && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-lg border border-border-default bg-surface-primary p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setDensity('comfortable')}
-                className={`rounded-md px-3 py-1 font-medium transition-colors ${
-                  density === 'comfortable'
-                    ? 'bg-brand-primary text-text-inverse'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                Comfortable
-              </button>
-              <button
-                type="button"
-                onClick={() => setDensity('compact')}
-                className={`rounded-md px-3 py-1 font-medium transition-colors ${
-                  density === 'compact'
-                    ? 'bg-brand-primary text-text-inverse'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                Compact
-              </button>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-1 select-none">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              id="tab-btn-calendar"
+              data-testid="tab-btn-calendar"
+              onClick={() => setViewFormat('calendar')}
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition -mb-px ${
+                viewFormat === 'calendar'
+                  ? 'border-brand-primary text-brand-primary'
+                  : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
+              }`}
+            >
+              <span>📅 Calendar View</span>
+              <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
+                (Duty Timetable &amp; EP)
+              </span>
+            </button>
+            <button
+              type="button"
+              id="tab-btn-table"
+              data-testid="tab-btn-table"
+              onClick={() => setViewFormat('table')}
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition -mb-px ${
+                viewFormat === 'table'
+                  ? 'border-brand-primary text-brand-primary'
+                  : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
+              }`}
+            >
+              <span>📊 Table View</span>
+              <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
+                (Spreadsheet &amp; Tallies)
+              </span>
+            </button>
           </div>
 
-          {rulesOutput && (
-            <div className="flex items-center gap-2 text-xs text-text-secondary">
-              <span className="font-mono text-text-muted">
-                Policy:{' '}
-                {ruleConfig.weeklyOffPolicy === 'policy_b'
-                  ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'
-                  : 'Policy A (1 OFF)'}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {viewFormat === 'table' && (
+              <div className="inline-flex rounded-lg border border-border-default bg-surface-primary p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDensity('comfortable')}
+                  className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                    density === 'comfortable'
+                      ? 'bg-brand-primary text-text-inverse'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Comfortable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDensity('compact')}
+                  className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                    density === 'compact'
+                      ? 'bg-brand-primary text-text-inverse'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Compact
+                </button>
+              </div>
+            )}
+
+            {rulesOutput && (
+              <div className="flex items-center gap-2 text-xs text-text-secondary">
+                <span className="font-mono text-text-muted">
+                  Policy:{' '}
+                  {ruleConfig.weeklyOffPolicy === 'policy_b'
+                    ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'
+                    : 'Policy A (1 OFF)'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -521,8 +593,20 @@ export function RosterPeriodRoute() {
           events={amendmentEvents}
           isLoading={isAmendmentsLoading}
         />
+      ) : viewFormat === 'calendar' ? (
+        /* Calendar View (Duty Timetable & EP Coverage) */
+        <RosterCalendarView
+          periodDates={periodDates}
+          staffList={staffList}
+          assignments={activeAssignments}
+          epAssignments={epAssignments}
+          holidays={publicHolidays as PublicHolidayEntry[]}
+          isEditable={isOwner}
+          onUpdateEpAssignment={handleUpdateEpAssignment}
+          onBatchUpdateEpAssignments={handleBatchUpdateEpAssignments}
+        />
       ) : (
-        /* Grid Matrix View (Current or Planned) */
+        /* Table Grid View & Tallies */
         <>
           <RosterGrid
             periodDates={periodDates}
@@ -536,6 +620,13 @@ export function RosterPeriodRoute() {
               selectedCell ? { staffId: selectedCell.staff.id, date: selectedCell.date } : null
             }
             onSelectCell={handleCellSelect}
+          />
+
+          {/* Shift Distribution Tally & Individual Member Shift Tally */}
+          <RosterTallyTables
+            periodDates={periodDates}
+            staffList={staffList}
+            assignments={activeAssignments}
           />
 
           {/* Live Rules Guidance Panel */}

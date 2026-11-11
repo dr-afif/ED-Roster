@@ -835,6 +835,47 @@ export type Database = {
           },
         ];
       };
+      roster_ep_assignments: {
+        Row: {
+          created_at: string;
+          duty_date: string;
+          id: number;
+          period_id: number;
+          physician_names: string;
+          slot_type: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          duty_date: string;
+          id?: never;
+          period_id: number;
+          physician_names?: string;
+          slot_type: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          duty_date?: string;
+          id?: never;
+          period_id?: number;
+          physician_names?: string;
+          slot_type?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_ep_assignments_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       roster_periods: {
         Row: {
           active_rule_version_id: number | null;
@@ -1673,6 +1714,30 @@ export type Database = {
           p_reason: string;
         };
         Returns: number;
+      };
+      upsert_roster_ep_assignment: {
+        Args: {
+          p_duty_date: string;
+          p_period_id: number;
+          p_physician_names: string;
+          p_slot_type: string;
+        };
+        Returns: {
+          created_at: string;
+          duty_date: string;
+          id: number;
+          period_id: number;
+          physician_names: string;
+          slot_type: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'roster_ep_assignments';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
     };
     Enums: {

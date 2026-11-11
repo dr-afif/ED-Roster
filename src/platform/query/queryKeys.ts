@@ -50,6 +50,8 @@ export const queryKeys = {
       [...queryKeys.rosters.all, 'snapshots-period', periodId] as const,
     snapshotDeliveries: (snapshotId: string) =>
       [...queryKeys.rosters.all, 'snapshot-deliveries', snapshotId] as const,
+    epAssignments: (periodId: number) =>
+      [...queryKeys.rosters.all, 'ep-assignments', periodId] as const,
   },
   rules: {
     all: ['rules'] as const,
