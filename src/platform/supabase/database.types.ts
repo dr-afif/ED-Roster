@@ -126,6 +126,94 @@ export type Database = {
           },
         ];
       };
+      document_records: {
+        Row: {
+          created_at: string;
+          document_category: string;
+          drive_file_id: string;
+          drive_parent_id: string;
+          drive_web_view_link: string | null;
+          file_name: string;
+          id: number;
+          mime_type: string;
+          professional_record_id: number | null;
+          roster_snapshot_id: string | null;
+          sha256: string;
+          size_bytes: number;
+          source_system: string;
+          staff_id: number | null;
+          status: string;
+          updated_at: string;
+          uploaded_at: string;
+          uploaded_by: string | null;
+          visibility: string;
+        };
+        Insert: {
+          created_at?: string;
+          document_category: string;
+          drive_file_id: string;
+          drive_parent_id: string;
+          drive_web_view_link?: string | null;
+          file_name: string;
+          id?: never;
+          mime_type?: string;
+          professional_record_id?: number | null;
+          roster_snapshot_id?: string | null;
+          sha256: string;
+          size_bytes?: number;
+          source_system?: string;
+          staff_id?: number | null;
+          status?: string;
+          updated_at?: string;
+          uploaded_at?: string;
+          uploaded_by?: string | null;
+          visibility?: string;
+        };
+        Update: {
+          created_at?: string;
+          document_category?: string;
+          drive_file_id?: string;
+          drive_parent_id?: string;
+          drive_web_view_link?: string | null;
+          file_name?: string;
+          id?: never;
+          mime_type?: string;
+          professional_record_id?: number | null;
+          roster_snapshot_id?: string | null;
+          sha256?: string;
+          size_bytes?: number;
+          source_system?: string;
+          staff_id?: number | null;
+          status?: string;
+          updated_at?: string;
+          uploaded_at?: string;
+          uploaded_by?: string | null;
+          visibility?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'document_records_professional_record_id_fkey';
+            columns: ['professional_record_id'];
+            isOneToOne: false;
+            referencedRelation: 'professional_records';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'document_records_roster_snapshot_fkey';
+            columns: ['roster_snapshot_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_snapshots';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'document_records_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       goff_ledger: {
         Row: {
           amount: number;
@@ -1000,6 +1088,144 @@ export type Database = {
           },
         ];
       };
+      roster_snapshot_deliveries: {
+        Row: {
+          attempt_count: number;
+          channel: string;
+          created_at: string;
+          id: number;
+          idempotency_key: string;
+          last_error: string | null;
+          sent_at: string | null;
+          sent_by: string | null;
+          snapshot_id: string;
+          status: string;
+          telegram_chat_id: string;
+          telegram_message_id: string | null;
+        };
+        Insert: {
+          attempt_count?: number;
+          channel?: string;
+          created_at?: string;
+          id?: never;
+          idempotency_key: string;
+          last_error?: string | null;
+          sent_at?: string | null;
+          sent_by?: string | null;
+          snapshot_id: string;
+          status?: string;
+          telegram_chat_id: string;
+          telegram_message_id?: string | null;
+        };
+        Update: {
+          attempt_count?: number;
+          channel?: string;
+          created_at?: string;
+          id?: never;
+          idempotency_key?: string;
+          last_error?: string | null;
+          sent_at?: string | null;
+          sent_by?: string | null;
+          snapshot_id?: string;
+          status?: string;
+          telegram_chat_id?: string;
+          telegram_message_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_snapshot_deliveries_snapshot_id_fkey';
+            columns: ['snapshot_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_snapshots';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      roster_snapshots: {
+        Row: {
+          canonical_hash: string;
+          canonical_payload: Json;
+          created_at: string;
+          created_by: string | null;
+          drive_file_id: string | null;
+          drive_parent_id: string | null;
+          error_message: string | null;
+          file_name: string;
+          id: string;
+          pdf_sha256: string | null;
+          period_id: number;
+          predecessor_snapshot_id: string | null;
+          publication_id: string | null;
+          reason: string | null;
+          snapshot_type: string;
+          snapshot_version: number;
+          source_revision: number;
+          status: string;
+        };
+        Insert: {
+          canonical_hash: string;
+          canonical_payload: Json;
+          created_at?: string;
+          created_by?: string | null;
+          drive_file_id?: string | null;
+          drive_parent_id?: string | null;
+          error_message?: string | null;
+          file_name: string;
+          id?: string;
+          pdf_sha256?: string | null;
+          period_id: number;
+          predecessor_snapshot_id?: string | null;
+          publication_id?: string | null;
+          reason?: string | null;
+          snapshot_type: string;
+          snapshot_version: number;
+          source_revision: number;
+          status?: string;
+        };
+        Update: {
+          canonical_hash?: string;
+          canonical_payload?: Json;
+          created_at?: string;
+          created_by?: string | null;
+          drive_file_id?: string | null;
+          drive_parent_id?: string | null;
+          error_message?: string | null;
+          file_name?: string;
+          id?: string;
+          pdf_sha256?: string | null;
+          period_id?: number;
+          predecessor_snapshot_id?: string | null;
+          publication_id?: string | null;
+          reason?: string | null;
+          snapshot_type?: string;
+          snapshot_version?: number;
+          source_revision?: number;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'roster_snapshots_period_id_fkey';
+            columns: ['period_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_periods';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_snapshots_predecessor_snapshot_id_fkey';
+            columns: ['predecessor_snapshot_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_snapshots';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'roster_snapshots_publication_id_fkey';
+            columns: ['publication_id'];
+            isOneToOne: false;
+            referencedRelation: 'roster_publications';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       rule_sets: {
         Row: {
           created_at: string;
@@ -1366,6 +1592,20 @@ export type Database = {
         Args: { p_notes?: string; p_period_id: number };
         Returns: undefined;
       };
+      create_or_get_roster_snapshot: {
+        Args: {
+          p_canonical_hash: string;
+          p_canonical_payload: Json;
+          p_drive_file_id: string;
+          p_drive_parent_id: string;
+          p_file_name: string;
+          p_pdf_sha256: string;
+          p_period_id: number;
+          p_reason?: string;
+          p_source_revision: number;
+        };
+        Returns: Json;
+      };
       decide_roster_request: {
         Args: {
           p_decision: string;
@@ -1405,6 +1645,17 @@ export type Database = {
       publish_roster_period: {
         Args: { p_notes?: string; p_period_id: number };
         Returns: string;
+      };
+      record_snapshot_delivery: {
+        Args: {
+          p_error?: string;
+          p_idempotency_key: string;
+          p_snapshot_id: string;
+          p_status?: string;
+          p_telegram_chat_id: string;
+          p_telegram_message_id?: string;
+        };
+        Returns: Json;
       };
       reopen_roster_period: {
         Args: { p_period_id: number; p_reason: string };

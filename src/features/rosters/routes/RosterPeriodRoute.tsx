@@ -25,6 +25,7 @@ import { CloseReconcileModal } from '../components/CloseReconcileModal';
 import { PublishModal } from '../components/PublishModal';
 import { RosterGrid } from '../components/RosterGrid';
 import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
+import { RosterSnapshotBar } from '../components/RosterSnapshotBar';
 import { ShiftPickerModal } from '../components/ShiftPickerModal';
 import {
   type DraftAssignmentRow,
@@ -376,6 +377,21 @@ export function RosterPeriodRoute() {
           </div>
         }
       />
+
+      {/* Roster Snapshot Archive & Telegram Dispatch */}
+      {periodRow && !isDraft && (
+        <RosterSnapshotBar
+          periodId={periodRow.id}
+          periodYear={yyyy}
+          periodMonth={mm}
+          periodStart={`${yyyy}-${mm}-01`}
+          periodRevision={periodRow.revision}
+          staffList={staffList}
+          assignments={activeAssignments}
+          shiftDefinitions={shiftDefinitions}
+          isOwner={isOwner}
+        />
+      )}
 
       {/* Operational View Switcher (for Published/Amended/Closed periods) */}
       {!isDraft && (

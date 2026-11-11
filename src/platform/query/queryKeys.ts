@@ -46,6 +46,10 @@ export const queryKeys = {
     shiftDefinitions: () => [...queryKeys.rosters.all, 'shift-definitions'] as const,
     snapshots: (year: string, month: string) =>
       [...queryKeys.rosters.all, 'snapshots', year, month] as const,
+    snapshotsByPeriod: (periodId: number) =>
+      [...queryKeys.rosters.all, 'snapshots-period', periodId] as const,
+    snapshotDeliveries: (snapshotId: string) =>
+      [...queryKeys.rosters.all, 'snapshot-deliveries', snapshotId] as const,
   },
   rules: {
     all: ['rules'] as const,
