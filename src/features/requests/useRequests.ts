@@ -1,243 +1,206 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/platform/supabase';
-import { useAuth } from '@/platform/auth';
+import { supabase } from '../../platform/supabase';
+import { queryKeys } from '../../platform/query/queryKeys';
+import type { RequestRecord } from './domain/quota';
 
-export type RequestTypeRecord = {
-  id: number;
-  code: string;
-  label: string;
-  description: string | null;
-  category: string;
-  requires_dates: boolean;
-  requires_shift_code: boolean;
-  max_days_per_request: number;
-  min_lead_days: number;
-  sort_order: number;
-};
-
-export type StaffRequestRecord = {
-  id: number;
-  public_id: string;
-  staff_id: number;
-  request_type_id: number;
-  period_start_date: string | null;
-  start_date: string;
-  end_date: string;
-  requested_shift_code: string | null;
-  reason_category: string;
-  notes: string | null;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'withdrawn' | 'superseded';
-  decision_reason: string | null;
-  decided_at: string | null;
-  submitted_at: string;
-  request_type: {
-    code: string;
-    label: string;
-    category: string;
-  };
-  staff?: {
-    id: number;
-    roster_name: string;
-    display_name: string;
-    staff_code: string;
-    staff_group: string;
-  } | null;
-};
-
-export function useRequestTypesQuery() {
-  return useQuery({
-    queryKey: ['request_types', 'active'],
-    queryFn: async (): Promise<RequestTypeRecord[]> => {
-      const { data, error } = await supabase
-        .from('request_types')
-        .select('*')
-        .eq('active', true)
-        .order('sort_order', { ascending: true });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data ?? [];
-    },
-  });
+export interface SubmitRequestPayload {
+  id?: number | string;
+  staffId: number;
+  date: string;
+  request: string;
+  comment?: string;
 }
 
-export function useMyRequestsQuery() {
-  const { user } = useAuth();
-  const staffId = user?.staffId;
-
+export function useAllRequestsQuery() {
   return useQuery({
-    queryKey: ['my_requests', staffId],
-    enabled: Boolean(staffId),
-    queryFn: async (): Promise<StaffRequestRecord[]> => {
-      if (!staffId) return [];
-
+    queryKey: queryKeys.requests.all,
+    queryFn: async (): Promise<RequestRecord[]> => {
       const { data, error } = await supabase
         .from('roster_requests')
         .select(
           `
-          *,
-          request_type:request_types (
-            code,
-            label,
-            category
+          id,
+          public_id,
+          staff_id,
+          start_date,
+          end_date,
+          requested_shift_code,
+          notes,
+          status,
+          created_at,
+          staff:staff_directory!roster_requests_staff_id_fkey (
+            id,
+            roster_name,
+            display_name,
+            staff_code
           )
         `,
         )
-        .eq('staff_id', staffId)
-        .order('submitted_at', { ascending: false });
+        .in('status', ['active', 'submitted', 'approved'])
+        .order('start_date', { ascending: true });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(`Failed to load requests: ${error.message}`);
       }
 
-      return (data as unknown as StaffRequestRecord[]) ?? [];
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        public_id: row.public_id,
+        staff_id: row.staff_id,
+        name: row.staff?.roster_name || row.staff?.display_name || row.staff?.staff_code || 'Staff',
+        date: row.start_date,
+        request: (row.requested_shift_code || 'OFF').toUpperCase(),
+        comment: row.notes,
+        status: row.status,
+        created_at: row.created_at,
+      }));
     },
+    staleTime: 30_000,
   });
 }
 
-export type CreateRequestPayload = {
-  request_type_id: number;
-  start_date: string;
-  end_date: string;
-  reason_category: string;
-  notes?: string;
-  requested_shift_code?: string;
-  period_start_date?: string;
-};
+export function useTeamMembersQuery() {
+  return useQuery({
+    queryKey: queryKeys.directory.activeList(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff_directory')
+        .select('id, staff_code, roster_name, display_name, active')
+        .eq('active', true)
+        .order('roster_name', { ascending: true });
 
-export function useCreateRequestMutation() {
+      if (error) {
+        throw new Error(`Failed to load team members: ${error.message}`);
+      }
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function usePublicHolidaysQuery() {
+  return useQuery({
+    queryKey: ['public-holidays'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('public_holidays')
+        .select('id, holiday_date, name')
+        .order('holiday_date', { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to load public holidays: ${error.message}`);
+      }
+      return data ?? [];
+    },
+    staleTime: 300_000,
+  });
+}
+
+export function useRequestTypesMapQuery() {
+  return useQuery({
+    queryKey: ['request-types-map'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('request_types')
+        .select('id, code, label')
+        .eq('active', true);
+
+      if (error) {
+        throw new Error(`Failed to load request types: ${error.message}`);
+      }
+
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((rt) => {
+        map[rt.code.toLowerCase()] = rt.id;
+      });
+      return map;
+    },
+    staleTime: 300_000,
+  });
+}
+
+export function useSubmitRequestMutation() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const staffId = user?.staffId;
 
   return useMutation({
-    mutationFn: async (payload: CreateRequestPayload) => {
-      if (!staffId) {
-        throw new Error('No staff identity found in active session.');
+    mutationFn: async (payload: SubmitRequestPayload) => {
+      const { data: requestTypes, error: rtError } = await supabase
+        .from('request_types')
+        .select('id, code')
+        .eq('active', true);
+
+      if (rtError) {
+        throw new Error(`Failed to resolve request type: ${rtError.message}`);
+      }
+
+      const cleanCode = payload.request.trim().toLowerCase();
+      const matched = (requestTypes ?? []).find((rt) => rt.code.toLowerCase() === cleanCode);
+      const requestTypeId = matched?.id || requestTypes?.[0]?.id;
+
+      if (!requestTypeId) {
+        throw new Error('No valid request type configured in system.');
+      }
+
+      if (payload.id) {
+        const { data, error } = await supabase
+          .from('roster_requests')
+          .update({
+            start_date: payload.date,
+            end_date: payload.date,
+            requested_shift_code: payload.request.trim().toUpperCase(),
+            request_type_id: requestTypeId,
+            notes: payload.comment?.trim() || null,
+            status: 'active',
+          })
+          .eq('id', Number(payload.id))
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(`Failed to update request: ${error.message}`);
+        }
+        return data;
       }
 
       const { data, error } = await supabase
         .from('roster_requests')
         .insert({
-          staff_id: staffId,
-          request_type_id: payload.request_type_id,
-          start_date: payload.start_date,
-          end_date: payload.end_date,
-          reason_category: payload.reason_category,
-          notes: payload.notes?.trim() || null,
-          requested_shift_code: payload.requested_shift_code?.trim() || null,
-          period_start_date: payload.period_start_date || '2027-01-01',
-          status: 'submitted',
+          staff_id: payload.staffId,
+          start_date: payload.date,
+          end_date: payload.date,
+          requested_shift_code: payload.request.trim().toUpperCase(),
+          request_type_id: requestTypeId,
+          notes: payload.comment?.trim() || null,
+          status: 'active',
         })
         .select()
         .single();
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(`Failed to create request: ${error.message}`);
       }
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my_requests'] });
-      queryClient.invalidateQueries({ queryKey: ['all_requests_admin'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.requests.all });
     },
   });
 }
 
-export function useWithdrawRequestMutation() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const staffId = user?.staffId;
-
-  return useMutation({
-    mutationFn: async (requestId: number) => {
-      if (!staffId) {
-        throw new Error('No staff identity found in active session.');
-      }
-
-      const { data, error } = await supabase
-        .from('roster_requests')
-        .update({
-          status: 'withdrawn',
-          decision_reason: 'Self-withdrawn by applicant',
-        })
-        .eq('id', requestId)
-        .eq('staff_id', staffId)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my_requests'] });
-      queryClient.invalidateQueries({ queryKey: ['all_requests_admin'] });
-    },
-  });
-}
-
-export function useAllRequestsAdminQuery() {
-  return useQuery({
-    queryKey: ['all_requests_admin'],
-    queryFn: async (): Promise<StaffRequestRecord[]> => {
-      const { data, error } = await supabase
-        .from('roster_requests')
-        .select(
-          `
-          *,
-          request_type:request_types (
-            code,
-            label,
-            category
-          ),
-          staff:staff_directory (
-            id,
-            roster_name,
-            display_name,
-            staff_code,
-            staff_group
-          )
-        `,
-        )
-        .order('submitted_at', { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return (data as unknown as StaffRequestRecord[]) ?? [];
-    },
-  });
-}
-
-export type DecideRequestPayload = {
-  request_id: number;
-  decision: 'approved' | 'rejected';
-  reason?: string;
-};
-
-export function useDecideRequestMutation() {
+export function useDeleteRequestMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ request_id, decision, reason }: DecideRequestPayload) => {
-      const { data, error } = await supabase.rpc('decide_roster_request', {
-        p_request_id: request_id,
-        p_decision: decision,
-        p_decision_reason: reason || undefined,
-      });
+    mutationFn: async (requestId: number | string) => {
+      const { error } = await supabase.from('roster_requests').delete().eq('id', Number(requestId));
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(`Failed to delete request: ${error.message}`);
       }
-      return data;
+      return true;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all_requests_admin'] });
-      queryClient.invalidateQueries({ queryKey: ['my_requests'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.requests.all });
     },
   });
 }

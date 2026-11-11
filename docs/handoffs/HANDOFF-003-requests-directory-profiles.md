@@ -8,7 +8,13 @@ The frontend SPA is enhanced with accessible, responsive interfaces for:
 
 1. **Owner Staff Directory & Allowlist Administration** (`/admin/staff`): Real-time metrics, search/filtering, modal dialogs for inviting staff by Google email, and account status transitions (activate, suspend, revoke) with mandatory audit logging.
 2. **Self-Service Staff Profiles** (`/profile/me`): Separation of immutable operational roster identity from user-editable contact fields (`full_name`, `phone`, `registration_number`) via React 19-idiomatic isolated form state and strict self-only RLS update boundaries.
-3. **Staff Roster Requests Lifecycle** (`/requests` and `/admin/requests`): Active staff can submit multi-day requests, view status timelines, and withdraw pending requests; Roster Administrators have an actionable review inbox to approve or reject requests with structured operational rationale recorded in append-only status event logs.
+3. **Live-Aligned Roster Request Workflow** (`/requests` and `/admin/requests`): Restored to match the exact live application (`dr-afif/REQUEST-APP`):
+   - **Interactive Calendar Surface** (`CalendarView.tsx`): 7-column grid (Mon–Sun) with Malaysian statutory public holiday badges, color-coded team shift tags (`AM`, `PM`, `ON`, `OFF`, `AL`, `HKA`, `GHKA`, `COURSE`), hover tooltips for comments, and month navigation (`‹ Prev`, `Today`, `Next ›`).
+   - **Date Detail Slide-Over Panel** (`DateDetailPanel.tsx`): Mobile bottom sheet and desktop right drawer displaying all team requests on the selected date with Edit/Delete controls for authors/admin.
+   - **New & Update Request Form** (`NewRequestForm.tsx`): 4-column shift type pill selector with real-time slot quota capping (e.g. max 3 OFFs/day across the ED), live monthly limit warning card, and Admin "submit on behalf of" capabilities.
+   - **Personal Request History** (`UserRequests.tsx`): Monthly accordion list of active requests with instant Edit (re-opens panel) and Delete actions.
+   - **Alternative Table View** (`RosterTable.tsx`): Team member rows × days columns grid.
+   - **Pure Domain Quota Rules** (`quota.ts`): Daily limit (3 slots for OFF/AL/HKA), monthly limit (10 requests), and weekend limit (4 weekend requests).
 
 Staging project reference: `hgrutigkgnrcjhcjxabs`. Production project (`bubvwijyaqfbugsaedxp`) and legacy repository (`dr-afif/REQUEST-APP`) remain 100% untouched.
 
@@ -31,13 +37,20 @@ Staging project reference: `hgrutigkgnrcjhcjxabs`. Production project (`bubvwijy
   - `src/features/directory/StaffDirectoryAdminRoute.tsx` (directory grid, invite modal, status transition flow)
   - `src/features/profiles/useMyProfile.ts` (TanStack Query hooks for self-service profile querying and mutation)
   - `src/features/profiles/MyProfileRoute.tsx` (operational directory summary & `<ProfileEditForm>` component)
-  - `src/features/requests/useRequests.ts` (TanStack Query hooks for request submission, withdrawal, and admin review)
+  - `src/features/requests/domain/quota.ts` (pure domain quota rules: daily group limits, monthly/weekend quotas)
+  - `src/features/requests/calendar.css` (calendar grid, chip styles, date-panel slide-over drawer styles)
+  - `src/features/requests/components/CalendarView.tsx` (interactive 7-column calendar, holiday badges, team chips)
+  - `src/features/requests/components/DateDetailPanel.tsx` (accessible date drawer with team request list & embedded form)
+  - `src/features/requests/components/NewRequestForm.tsx` (4-column shift type pills, live quota capping, on-behalf-of admin flow)
+  - `src/features/requests/components/UserRequests.tsx` (monthly accordion request history with inline edit/delete)
+  - `src/features/requests/components/RosterTable.tsx` (alternative table view: staff rows × days columns)
+  - `src/features/requests/useRequests.ts` (TanStack Query hooks for active team requests, holidays, mutations)
   - `src/features/requests/RequestsRoutes.tsx` (`StaffRequestsRoute` and `AdminRequestsRoute` implementations)
   - `src/features/dashboard/DashboardRoute.tsx` (updated roadmap status to reflect Wave C live on staging)
 - **Automated Tests**:
   - `src/features/directory/__tests__/directoryAdmin.test.tsx` (rendering, search, owner gate, invite flow)
   - `src/features/profiles/__tests__/myProfile.test.tsx` (profile display, editing, validation, save mutation)
-  - `src/features/requests/__tests__/requests.test.tsx` (request list, status chips, submit dialog, admin review decisions)
+  - `src/features/requests/__tests__/requests.test.tsx` (calendar render, table view toggle, quota calculation, date select, new request submission, delete flow)
   - `src/app/__tests__/AppShell.test.tsx` (navigation routing, authenticated dashboard gates)
 - **Task & Roadmap Documentation**:
   - `docs/tasks/TASK-003-requests-directory-profiles.md`
@@ -72,8 +85,8 @@ Staging project reference: `hgrutigkgnrcjhcjxabs`. Production project (`bubvwijy
 | TypeScript compilation       | `npm run typecheck`                                                   | Passed (0 errors)                                                                                                                                                                                                                                                 |
 | Linting                      | `npm run lint`                                                        | Passed (0 errors, 0 warnings)                                                                                                                                                                                                                                     |
 | Formatting                   | `npm run format:check`                                                | Passed (100% compliant)                                                                                                                                                                                                                                           |
-| Automated test suite         | `npm test -- --run`                                                   | Passed: 11 test suites, 43 tests passing                                                                                                                                                                                                                          |
-| Production build             | `npm run build`                                                       | Passed: Production bundle built in 1.75s (`dist/assets/*.js`)                                                                                                                                                                                                     |
+| Automated test suite         | `npm test -- --run`                                                   | Passed: 11 test suites, 46 tests passing                                                                                                                                                                                                                          |
+| Production build             | `npm run build`                                                       | Passed: Production bundle built in 1.89s (`dist/assets/*.js`)                                                                                                                                                                                                     |
 | Secret & PII scanner         | `architecture-boundaries.test.ts`                                     | Passed: Zero production secrets, zero real staff personal emails committed                                                                                                                                                                                        |
 
 ## Security and accessibility review

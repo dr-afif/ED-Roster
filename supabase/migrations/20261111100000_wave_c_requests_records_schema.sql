@@ -58,7 +58,7 @@ create table if not exists public.roster_requests (
   requested_shift_code text null,
   reason_category text not null default 'personal',
   notes text null,
-  status text not null default 'submitted',
+  status text not null default 'active',
   decision_reason text null,
   decided_at timestamptz null,
   decided_by uuid null references auth.users(id) on delete set null,
@@ -75,7 +75,7 @@ create table if not exists public.roster_requests (
     reason_category in ('personal', 'family', 'academic', 'operational', 'medical', 'other')
   ),
   constraint roster_requests_status_chk check (
-    status in ('draft', 'submitted', 'approved', 'rejected', 'withdrawn', 'superseded')
+    status in ('active', 'draft', 'submitted', 'approved', 'rejected', 'withdrawn', 'superseded')
   ),
   constraint roster_requests_source_system_chk check (
     source_system in ('native', 'legacy_sheets')
@@ -336,14 +336,20 @@ create policy "request_types_delete_owner"
   using (private.is_active_owner());
 
 -- 3.2 Roster Requests Policies
--- Staff can read own requests; Owner can read all
+-- Staff can read own requests or active/submitted/approved requests on the calendar; Owner can read all
 create policy "roster_requests_select"
   on public.roster_requests
   for select
   to authenticated
   using (
-    (staff_id = private.current_active_staff_id())
-    or private.is_active_owner()
+    private.is_active_owner()
+    or (
+      private.is_active_approved_user()
+      and (
+        staff_id = private.current_active_staff_id()
+        or status in ('active', 'submitted', 'approved')
+      )
+    )
   );
 
 -- Staff can insert own requests; Owner can insert any
@@ -352,39 +358,48 @@ create policy "roster_requests_insert"
   for insert
   to authenticated
   with check (
-    (
-      staff_id = private.current_active_staff_id()
-      and status in ('draft', 'submitted')
-      and private.is_active_approved_user()
+    private.is_active_owner()
+    or (
+      private.is_active_approved_user()
+      and staff_id = private.current_active_staff_id()
+      and status in ('active', 'draft', 'submitted')
     )
-    or private.is_active_owner()
   );
 
--- Staff can update own request if draft or submitted (e.g. withdraw); Owner can manage/decide all
+-- Staff can update own active/draft/submitted requests; Owner can manage all
 create policy "roster_requests_update"
   on public.roster_requests
   for update
   to authenticated
   using (
-    (staff_id = private.current_active_staff_id() and status in ('draft', 'submitted'))
-    or private.is_active_owner()
+    private.is_active_owner()
+    or (
+      private.is_active_approved_user()
+      and staff_id = private.current_active_staff_id()
+      and status in ('active', 'draft', 'submitted')
+    )
   )
   with check (
-    (
-      staff_id = private.current_active_staff_id()
-      and status in ('draft', 'submitted', 'withdrawn')
+    private.is_active_owner()
+    or (
+      private.is_active_approved_user()
+      and staff_id = private.current_active_staff_id()
+      and status in ('active', 'draft', 'submitted', 'withdrawn', 'superseded')
     )
-    or private.is_active_owner()
   );
 
--- Direct deletion restricted to draft requests by owner or author
+-- Direct deletion of active/draft/submitted requests by owner or author
 create policy "roster_requests_delete"
   on public.roster_requests
   for delete
   to authenticated
   using (
-    (staff_id = private.current_active_staff_id() and status = 'draft')
-    or private.is_active_owner()
+    private.is_active_owner()
+    or (
+      private.is_active_approved_user()
+      and staff_id = private.current_active_staff_id()
+      and status in ('active', 'draft', 'submitted')
+    )
   );
 
 -- 3.3 Request Status Events Policies
@@ -951,6 +966,14 @@ grant execute on function public.admin_update_allowlist_status(bigint, text, tex
 -- 6.1 Request Types
 insert into public.request_types (code, label, description, category, requires_dates, requires_shift_code, max_days_per_request, min_lead_days, active, sort_order)
 values
+  ('off', 'OFF', 'Day Off', 'shift_preference', true, false, 1, 0, true, 1),
+  ('am', 'AM', 'Morning Shift', 'shift_preference', true, false, 1, 0, true, 2),
+  ('pm', 'PM', 'Evening Shift', 'shift_preference', true, false, 1, 0, true, 3),
+  ('on', 'ON', 'Night Shift', 'shift_preference', true, false, 1, 0, true, 4),
+  ('al', 'AL', 'Annual Leave', 'leave', true, false, 1, 0, true, 5),
+  ('hka', 'HKA', 'Gantian HKA', 'leave', true, false, 1, 0, true, 6),
+  ('ghka', 'GHKA', 'Gantian HKA', 'leave', true, false, 1, 0, true, 7),
+  ('course', 'COURSE', 'CME / Training Course', 'leave', true, false, 1, 0, true, 8),
   ('annual_leave', 'Annual Leave', 'Planned annual leave quota for Medical Officers and staff', 'leave', true, false, 14, 14, true, 10),
   ('preferred_off', 'Preferred Day Off', 'Preferred non-duty rest day request', 'shift_preference', true, false, 2, 7, true, 20),
   ('cme_leave', 'CME / Conference Leave', 'Approved continuous medical education, courses or exams', 'leave', true, false, 7, 14, true, 30),

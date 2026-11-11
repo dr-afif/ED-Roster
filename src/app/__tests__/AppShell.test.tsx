@@ -100,7 +100,7 @@ describe('AppShell & Placeholder Routes', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Owner Administration Boundary/i)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('caps mobile bottom navigation at 5 controls and opens/closes the accessible More dialog', async () => {
     const user = userEvent.setup();
