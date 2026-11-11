@@ -47,16 +47,22 @@ export function useRosterPeriodQuery(year: string, month: string) {
   });
 }
 
-export function useShiftDefinitionsQuery() {
+export function useShiftDefinitionsQuery(includeInactive = false) {
   return useQuery({
-    queryKey: queryKeys.rosters.shiftDefinitions(),
+    queryKey: includeInactive
+      ? ([...queryKeys.rosters.shiftDefinitions(), 'all'] as const)
+      : queryKeys.rosters.shiftDefinitions(),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shift_definitions')
         .select('*')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
+      if (!includeInactive) {
+        query = query.eq('is_active', true);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -504,6 +510,130 @@ export function useReopenRosterMutation(periodId: number) {
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.audit.all,
+      });
+    },
+  });
+}
+
+export interface UpdateShiftDefinitionPayload {
+  code: string;
+  label: string;
+  shortLabel: string;
+  colorToken: string;
+  sortOrder: number;
+  isActive: boolean;
+  semanticClass?: 'worked' | 'transparent' | 'reset' | 'unknown';
+  providesCoverage?: boolean;
+  nightPolicyBQualifying?: boolean;
+  displacesOffEarnsGoff?: boolean;
+}
+
+export interface CreateShiftDefinitionPayload {
+  code: string;
+  label: string;
+  shortLabel: string;
+  colorToken: string;
+  sortOrder: number;
+  isActive?: boolean;
+  semanticClass: 'worked' | 'transparent' | 'reset' | 'unknown';
+  providesCoverage: boolean;
+  nightPolicyBQualifying: boolean;
+  displacesOffEarnsGoff: boolean;
+}
+
+export function useUpdateShiftDefinitionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateShiftDefinitionPayload) => {
+      // 1. Update shift_definitions
+      const { error: defError } = await supabase
+        .from('shift_definitions')
+        .update({
+          label: payload.label.trim(),
+          short_label: payload.shortLabel.trim().toUpperCase(),
+          color_token: payload.colorToken,
+          sort_order: payload.sortOrder,
+          is_active: payload.isActive,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('code', payload.code);
+
+      if (defError) throw defError;
+
+      // 2. Upsert shift_semantics if provided
+      if (payload.semanticClass !== undefined) {
+        const { error: semError } = await supabase.from('shift_semantics').upsert({
+          shift_code: payload.code,
+          semantic_class: payload.semanticClass,
+          provides_coverage: payload.providesCoverage ?? false,
+          night_policy_b_qualifying: payload.nightPolicyBQualifying ?? false,
+          displaces_off_earns_goff: payload.displacesOffEarnsGoff ?? false,
+          updated_at: new Date().toISOString(),
+        });
+
+        if (semError) throw semError;
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.shiftDefinitions(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...queryKeys.rosters.shiftDefinitions(), 'all'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rules.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+    },
+  });
+}
+
+export function useCreateShiftDefinitionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: CreateShiftDefinitionPayload) => {
+      const code = payload.code.trim().toUpperCase();
+
+      // 1. Insert into shift_definitions
+      const { error: defError } = await supabase.from('shift_definitions').insert({
+        code,
+        label: payload.label.trim(),
+        short_label: payload.shortLabel.trim().toUpperCase(),
+        color_token: payload.colorToken,
+        sort_order: payload.sortOrder,
+        is_active: payload.isActive ?? true,
+      });
+
+      if (defError) throw defError;
+
+      // 2. Insert into shift_semantics
+      const { error: semError } = await supabase.from('shift_semantics').insert({
+        shift_code: code,
+        semantic_class: payload.semanticClass,
+        provides_coverage: payload.providesCoverage,
+        night_policy_b_qualifying: payload.nightPolicyBQualifying,
+        displaces_off_earns_goff: payload.displacesOffEarnsGoff,
+      });
+
+      if (semError) throw semError;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.shiftDefinitions(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...queryKeys.rosters.shiftDefinitions(), 'all'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rules.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
       });
     },
   });

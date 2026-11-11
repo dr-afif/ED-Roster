@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Calendar, CheckCircle2, Clock, Layers, Moon, ShieldCheck, Users } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Layers,
+  Moon,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { OwnerUxBoundary } from '@/platform/auth';
 import { PageHeader, StatusBadge, SurfaceCard } from '@/shared/ui';
 import {
@@ -11,14 +22,51 @@ import {
   useShiftSemanticsQuery,
   useStaffingThresholdsQuery,
 } from '../rosters/data/rosterQueries';
+import { EditShiftModal } from './components/EditShiftModal';
+import { getShiftColorClass } from './domain/shiftThemes';
 
 export function RulesAdminRoute() {
-  const [activeTab, setActiveTab] = useState<'policies' | 'thresholds' | 'semantics'>('policies');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'thresholds' || tabParam === 'semantics' ? tabParam : 'policies';
+  const [activeTab, setActiveTabState] = useState<'policies' | 'thresholds' | 'semantics'>(
+    initialTab,
+  );
+
+  const setActiveTab = (tab: 'policies' | 'thresholds' | 'semantics') => {
+    setActiveTabState(tab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'policies') {
+        next.delete('tab');
+      } else {
+        next.set('tab', tab);
+      }
+      return next;
+    });
+  };
 
   const { data: ruleVersion } = useRuleVersionQuery();
   const { data: thresholds = [] } = useStaffingThresholdsQuery(ruleVersion?.id);
-  const { data: shiftDefs = [] } = useShiftDefinitionsQuery();
+  const { data: shiftDefs = [] } = useShiftDefinitionsQuery(true);
   const { data: shiftSemantics = [] } = useShiftSemanticsQuery();
+
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{
+    def: ShiftDefinitionRow | null;
+    semantics: ShiftSemanticRow | null;
+  } | null>(null);
+
+  const handleOpenCreateShift = () => {
+    setSelectedShiftForEdit({ def: null, semantics: null });
+    setIsShiftModalOpen(true);
+  };
+
+  const handleOpenEditShift = (def: ShiftDefinitionRow) => {
+    const sem = shiftSemantics.find((semRow) => semRow.shift_code === def.code) ?? null;
+    setSelectedShiftForEdit({ def, semantics: sem });
+    setIsShiftModalOpen(true);
+  };
 
   const rawConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
   const weeklyOffPolicy = (rawConfig.weekly_off_policy as string) ?? 'policy_b';
@@ -214,28 +262,46 @@ export function RulesAdminRoute() {
         {/* TAB 3: SHIFT SEMANTICS */}
         {activeTab === 'semantics' && (
           <SurfaceCard variant="solid" className="space-y-4 p-5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-text-primary">Shift Definitions & Semantics</h3>
+                <h3 className="font-semibold text-text-primary">
+                  Shift Definitions, Timings & Semantics
+                </h3>
                 <p className="text-xs text-text-secondary">
-                  Deterministic classification of shifts into worked, transparent, and rest
-                  categories.
+                  Configure department shift timing hours, color badges, rest displacement and
+                  coverage semantics.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={handleOpenCreateShift}
+                className="inline-flex items-center gap-1.5 self-start rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-brand-primary-hover shadow-xs transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Shift Definition</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-border-default">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-border-default bg-surface-secondary/70">
                   <tr>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">Code</th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">Description</th>
+                    <th className="px-4 py-2.5 font-semibold text-text-primary">Shift</th>
+                    <th className="px-4 py-2.5 font-semibold text-text-primary">
+                      Timing & Description
+                    </th>
                     <th className="px-4 py-2.5 font-semibold text-text-primary">Semantic Class</th>
                     <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Provides Coverage
+                      Coverage
                     </th>
                     <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Policy-B Qualifying
+                      Policy-B Night
+                    </th>
+                    <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
+                      Status
+                    </th>
+                    <th className="px-4 py-2.5 font-semibold text-text-primary text-right">
+                      Action
                     </th>
                   </tr>
                 </thead>
@@ -244,13 +310,25 @@ export function RulesAdminRoute() {
                     const sem = shiftSemantics.find(
                       (semRow: ShiftSemanticRow) => semRow.shift_code === s.code,
                     );
+                    const colorClass = getShiftColorClass(s.color_token);
                     return (
                       <tr key={s.code} className="hover:bg-surface-secondary/30">
-                        <td className="px-4 py-2 font-bold font-mono text-text-primary">
-                          {s.code}
+                        <td className="px-4 py-2.5 font-mono">
+                          <div
+                            className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-xs font-bold border ${colorClass}`}
+                          >
+                            {s.code}
+                          </div>
                         </td>
-                        <td className="px-4 py-2 text-text-secondary">{s.label}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2.5">
+                          <div className="font-medium text-text-primary">{s.label}</div>
+                          {s.short_label && s.short_label !== s.code && (
+                            <div className="text-[11px] text-text-muted">
+                              Short: {s.short_label}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
                           <span
                             className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
                               sem?.semantic_class === 'worked'
@@ -263,19 +341,41 @@ export function RulesAdminRoute() {
                             {sem?.semantic_class ?? 'unknown'}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-4 py-2.5 text-center">
                           {sem?.provides_coverage ? (
                             <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                           ) : (
                             <span className="text-text-muted">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-4 py-2.5 text-center">
                           {sem?.night_policy_b_qualifying ? (
                             <CheckCircle2 className="mx-auto h-4 w-4 text-purple-600 dark:text-purple-400" />
                           ) : (
                             <span className="text-text-muted">—</span>
                           )}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {s.is_active ? (
+                            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="rounded-md bg-slate-500/15 px-2 py-0.5 text-[10px] font-bold text-text-muted">
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditShift(s)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-primary px-2.5 py-1 text-xs font-semibold text-text-primary hover:bg-surface-secondary transition-colors"
+                            aria-label={`Edit ${s.code}`}
+                          >
+                            <Pencil className="h-3 w-3 text-brand-primary" />
+                            <span>Edit</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -299,6 +399,14 @@ export function RulesAdminRoute() {
             fixtures before activation.
           </p>
         </SurfaceCard>
+
+        {/* Edit Shift Modal */}
+        <EditShiftModal
+          isOpen={isShiftModalOpen}
+          onClose={() => setIsShiftModalOpen(false)}
+          shiftDef={selectedShiftForEdit?.def}
+          semantics={selectedShiftForEdit?.semantics}
+        />
       </div>
     </OwnerUxBoundary>
   );
