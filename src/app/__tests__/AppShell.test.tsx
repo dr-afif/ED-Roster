@@ -78,7 +78,7 @@ describe('AppShell & Placeholder Routes', () => {
     expect(document.getElementById('main-content')).toHaveFocus();
     expect(router.state.location.pathname).toBe('/');
 
-    // Navigate to January 2027 Roster placeholder.
+    // Navigate to January 2027 Roster.
     await user.click(screen.getByRole('link', { name: /Open Jan 2027 Roster Shell/i }));
     expect(
       await screen.findByRole(
@@ -87,7 +87,7 @@ describe('AppShell & Placeholder Routes', () => {
         { timeout: 4000 },
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Send to My Telegram/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Comfortable/i })).toBeInTheDocument();
 
     // Navigate via desktop sidebar to Owner Admin -> Rules & Policies.
     const desktopSidebar = screen.getByLabelText(/Primary desktop navigation/i);
