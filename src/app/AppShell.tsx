@@ -9,6 +9,7 @@ import {
   FileSearch,
   FolderKanban,
   Home,
+  LogOut,
   Menu,
   Scale,
   Settings,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Suspense, useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAuthBoundary } from '@/platform/auth';
 import { useSupabaseMetadata } from '@/platform/supabase';
 import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
 import { StatusBadge } from '@/shared/ui';
@@ -88,6 +90,7 @@ function isNavItemActive(pathname: string, item: NavItem): boolean {
 
 export function AppShell() {
   const metadata = useSupabaseMetadata();
+  const { user, signOut } = useAuthBoundary();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(
     readInitialSidebarCollapsed,
@@ -297,6 +300,42 @@ export function AppShell() {
             })}
           </div>
         </nav>
+
+        {/* User Session & Sign Out in Desktop Sidebar */}
+        <div className="border-t border-border-subtle p-3">
+          <div className="flex items-center justify-between gap-2">
+            {!isSidebarCollapsed && user ? (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-text-primary">
+                  {user.displayName}
+                </p>
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <span
+                    className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                      user.role === 'owner'
+                        ? 'bg-brand-primary-soft text-brand-primary'
+                        : 'bg-teal-soft text-teal'
+                    }`}
+                  >
+                    {user.role}
+                  </span>
+                  {user.staffCode ? (
+                    <span className="truncate text-[11px] text-text-muted">{user.staffCode}</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={signOut}
+              title="Sign out of RESQ Workforce"
+              aria-label="Sign out of RESQ Workforce"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -313,9 +352,20 @@ export function AppShell() {
             <p className="text-[11px] text-text-secondary">Emergency Department</p>
           </div>
         </div>
-        {!metadata.isProduction ? (
-          <StatusBadge label={metadata.appEnv.toUpperCase()} tone="warning" icon={ShieldAlert} />
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          {!metadata.isProduction ? (
+            <StatusBadge label={metadata.appEnv.toUpperCase()} tone="warning" icon={ShieldAlert} />
+          ) : null}
+          <button
+            type="button"
+            onClick={signOut}
+            title="Sign out of RESQ Workforce"
+            aria-label="Sign out of RESQ Workforce"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
       </header>
 
       {/* Main content area */}
@@ -462,6 +512,30 @@ export function AppShell() {
                   );
                 })}
               </div>
+
+              {user ? (
+                <div className="border-t border-border-subtle pt-3">
+                  <div className="mb-2 px-2">
+                    <p className="truncate text-xs font-semibold text-text-primary">
+                      {user.displayName}
+                    </p>
+                    <p className="truncate text-[11px] text-text-secondary capitalize">
+                      {user.role} role {user.staffCode ? `· ${user.staffCode}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreOpenForPath(null);
+                      void signOut();
+                    }}
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-danger/20 bg-danger-soft/20 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger-soft/40"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

@@ -50,3 +50,14 @@ export function getSupabaseRuntimeBundle(): SupabaseRuntimeBundle {
 export function resetSupabaseRuntimeBundleForTests(): void {
   cachedBundle = null;
 }
+
+export const supabase: AppSupabaseClient = new Proxy({} as AppSupabaseClient, {
+  get(_target, prop, receiver) {
+    const client = getSupabaseRuntimeBundle().client;
+    const value = Reflect.get(client, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  },
+});

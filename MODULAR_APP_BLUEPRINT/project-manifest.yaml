@@ -32,7 +32,7 @@ systems:
         ref: hgrutigkgnrcjhcjxabs
         url: https://hgrutigkgnrcjhcjxabs.supabase.co
         purpose: development, testing, migration rehearsal, and UAT
-        management_access: pending additional approved accounts
+        management_access: connected for staging foundation work
       production:
         ref: bubvwijyaqfbugsaedxp
         url: https://bubvwijyaqfbugsaedxp.supabase.co
@@ -86,12 +86,10 @@ data_policy:
   roster_pdfs_are_immutable_snapshots: true
 
 open_inputs:
-  - add approved management accounts and coding-tool connections to both Supabase projects
-  - approved owner email
-  - complete approved-email list
+  - add approved management accounts and coding-tool connections to production before cutover
+  - complete approved-email list for staff
   - Google Drive Shared Drive availability
   - production Drive root folder ID
   - source spreadsheet IDs and tab inventory
-  - confirmed January 2027 cutover date
   - final GitHub Pages URL or custom domain
 

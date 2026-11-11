@@ -1,5 +1,13 @@
-export { useAuthBoundary, type AuthBootstrapStatus, type AuthBoundaryState } from './authContext';
+export {
+  useAuth,
+  useAuthBoundary,
+  type AuthBootstrapStatus,
+  type AuthBoundaryState,
+  type AuthenticatedUserContext,
+  type UnapprovedReason,
+} from './authContext';
 export { AuthProvider } from './AuthProvider';
+export { AuthErrorScreen, AuthLoadingScreen, SignInScreen, UnapprovedScreen } from './AuthScreens';
 export {
   inspectOAuthUrlState,
   sanitizeReturnToPath,

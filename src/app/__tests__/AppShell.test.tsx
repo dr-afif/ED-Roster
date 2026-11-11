@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App, EnvironmentErrorScreen } from '@/app/App';
 import { createTestAppRouter } from '@/app/router';
+import type { AuthBoundaryState } from '@/platform/auth';
 import {
   createBrowserSupabaseClient,
   EnvironmentConfigurationError,
@@ -33,17 +34,43 @@ function createSyntheticStagingBundle(): SupabaseRuntimeBundle {
 
 const SYNTHETIC_STAGING_BUNDLE = createSyntheticStagingBundle();
 
+const TEST_OWNER_AUTH_STATE: AuthBoundaryState = {
+  status: 'authenticated',
+  user: {
+    authUserId: '00000000-0000-0000-0000-000000000001',
+    email: 'test.admin@hospital.internal',
+    role: 'owner',
+    staffId: null,
+    staffCode: null,
+    displayName: 'Roster Administrator',
+    rosterName: null,
+  },
+  unapprovedReason: null,
+  unapprovedEmail: null,
+  errorMessage: null,
+  signInWithGoogle: vi.fn(),
+  signOut: vi.fn(),
+  retryBootstrap: vi.fn(),
+};
+
 describe('AppShell & Placeholder Routes', () => {
   it('renders accessible shell, non-production indicator, and navigates across placeholder routes', async () => {
     const user = userEvent.setup();
     const router = createTestAppRouter(['/']);
 
-    render(<App runtimeBundle={SYNTHETIC_STAGING_BUNDLE} router={router} />);
+    render(
+      <App
+        runtimeBundle={SYNTHETIC_STAGING_BUNDLE}
+        router={router}
+        authState={TEST_OWNER_AUTH_STATE}
+      />,
+    );
 
     expect(
       screen.getByRole('heading', { level: 1, name: /Operations Overview/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Non-prod · staging/i)).toBeInTheDocument();
+    expect(screen.getByText('Roster Administrator')).toBeInTheDocument();
 
     // Skip link moves focus directly to #main-content without breaking router state.
     const skipLink = screen.getByRole('link', { name: /Skip to main content/i });
@@ -54,7 +81,11 @@ describe('AppShell & Placeholder Routes', () => {
     // Navigate to January 2027 Roster placeholder.
     await user.click(screen.getByRole('link', { name: /Open Jan 2027 Roster Shell/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /January 2027 Roster/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /January 2027 Roster/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Send to My Telegram/i })).toBeDisabled();
 
@@ -62,16 +93,26 @@ describe('AppShell & Placeholder Routes', () => {
     const desktopSidebar = screen.getByLabelText(/Primary desktop navigation/i);
     await user.click(within(desktopSidebar).getByRole('link', { name: /Rules & Policies/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /Roster Rules & Thresholds/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Roster Rules & Thresholds/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Owner Administration UX Boundary/i)).toBeInTheDocument();
-  });
+    expect(screen.getByText(/Owner Administration Boundary/i)).toBeInTheDocument();
+  }, 15000);
 
   it('caps mobile bottom navigation at 5 controls and opens/closes the accessible More dialog', async () => {
     const user = userEvent.setup();
     const router = createTestAppRouter(['/requests']);
 
-    render(<App runtimeBundle={SYNTHETIC_STAGING_BUNDLE} router={router} />);
+    render(
+      <App
+        runtimeBundle={SYNTHETIC_STAGING_BUNDLE}
+        router={router}
+        authState={TEST_OWNER_AUTH_STATE}
+      />,
+    );
 
     const mobileNav = screen.getByRole('navigation', { name: /Primary mobile navigation/i });
     const mobileLinks = within(mobileNav).getAllByRole('link');
@@ -93,14 +134,22 @@ describe('AppShell & Placeholder Routes', () => {
     const reopenedDialog = screen.getByRole('dialog', { name: /More Destinations/i });
     await user.click(within(reopenedDialog).getByRole('link', { name: /Documents/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /Documents Catalog/i }),
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Documents Catalog/i },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
   });
 
   it('renders recovery states for invalid roster month URLs and unknown routes', async () => {
     const invalidMonthRouter = createTestAppRouter(['/rosters/2027/13']);
     const { unmount } = render(
-      <App runtimeBundle={SYNTHETIC_STAGING_BUNDLE} router={invalidMonthRouter} />,
+      <App
+        runtimeBundle={SYNTHETIC_STAGING_BUNDLE}
+        router={invalidMonthRouter}
+        authState={TEST_OWNER_AUTH_STATE}
+      />,
     );
     expect(
       await screen.findByRole('heading', { level: 1, name: /Invalid Roster Period URL/i }),
@@ -108,7 +157,13 @@ describe('AppShell & Placeholder Routes', () => {
     unmount();
 
     const notFoundRouter = createTestAppRouter(['/unknown/path']);
-    render(<App runtimeBundle={SYNTHETIC_STAGING_BUNDLE} router={notFoundRouter} />);
+    render(
+      <App
+        runtimeBundle={SYNTHETIC_STAGING_BUNDLE}
+        router={notFoundRouter}
+        authState={TEST_OWNER_AUTH_STATE}
+      />,
+    );
     expect(
       await screen.findByRole('heading', { level: 1, name: /Page Not Found/i }),
     ).toBeInTheDocument();

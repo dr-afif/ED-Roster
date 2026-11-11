@@ -15,19 +15,20 @@
 | D-009 | Roster PDFs are manual, immutable, versioned Drive snapshots. |
 | D-010 | Telegram sends only to the owner's private chat after archive. |
 | D-011 | Rules/settings are typed and versioned; no arbitrary executable formulas. |
-| D-012 | January 2027 is the intended first native period, subject to go/no-go gates. |
+| D-012 | `2027-01-01` (`January 2027`, `Asia/Kuala_Lumpur`) is confirmed and locked as the first Supabase-native roster period, subject to go/no-go gates. |
 | D-013 | Use `hgrutigkgnrcjhcjxabs` for staging/testing and reserve `bubvwijyaqfbugsaedxp` for production. |
 | D-014 | ADR-007: GitHub Pages SPA routing with HashRouter, Supabase PKCE OAuth, and parameterized base path. |
+| D-015 | Launch owner Google email confirmed by owner and seeded only in non-committed staging `public.allowed_users` (redacted from public repository). |
 
 ## Open questions — BLOCKS FOUNDATION
 
-- Add approved Supabase management accounts/tool connections before agents perform managed database work.
-- What is the owner's exact approved Google email?
+- [Resolved for staging] Approved Supabase management tool connection is active for staging (`hgrutigkgnrcjhcjxabs`); production management remains gated until reviewed deployment approval.
+- [Resolved] Owner's exact approved Google email provided and seeded in staging `public.allowed_users` (redacted from public repository).
 - What are the initial approved staff emails and staff identity mapping source?
 - What are the source spreadsheet IDs and authoritative tab inventory?
 - Does the institution provide a Shared Drive, and can a service account be added with least privilege?
 - If not, which dedicated Workspace user will authorize Drive access?
-- Is 2027-01-01 confirmed as the first Supabase-native roster period?
+- [Resolved] `2027-01-01` confirmed as the locked first Supabase-native roster period.
 
 ## Open questions — BLOCKS PRODUCTION INTEGRATION
 

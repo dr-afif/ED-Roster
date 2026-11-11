@@ -2,6 +2,7 @@ export {
   createBrowserSupabaseClient,
   getSupabaseRuntimeBundle,
   resetSupabaseRuntimeBundleForTests,
+  supabase,
   type AppSupabaseClient,
   type SupabaseRuntimeBundle,
 } from './client';
