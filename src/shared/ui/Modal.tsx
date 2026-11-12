@@ -60,14 +60,14 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-all duration-200 animate-in fade-in"
         aria-hidden="true"
         onClick={onClose}
       />
 
       {/* Dialog Surface */}
       <div
-        className={`relative z-10 w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl border border-border-subtle bg-surface-solid p-6 shadow-xl transition-all duration-200`}
+        className={`relative z-10 w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-200 animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-900`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-border-subtle">

@@ -251,19 +251,20 @@ export function RosterSnapshotBar({
 
         {/* Right: Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action 1: Preview PDF */}
+          {/* Action 1: Preview PDF / PDF Export */}
           <button
             type="button"
             onClick={() => setIsPdfModalOpen(true)}
             disabled={isPreviewing}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-primary px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-secondary shadow-xs transition-colors disabled:opacity-50"
+            aria-label="PDF Export / Preview PDF"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 hover:border-teal-500 shadow-2xs transition-all duration-150 cursor-pointer disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           >
             {isPreviewing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-primary" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-600" />
             ) : (
-              <Eye className="h-3.5 w-3.5 text-brand-primary" />
+              <Eye className="h-3.5 w-3.5 text-teal-600" />
             )}
-            <span>Preview PDF</span>
+            <span>PDF Export (Preview PDF)</span>
           </button>
 
           {/* Action 2: Archive Snapshot to Drive (Owner only) */}
@@ -337,7 +338,7 @@ export function RosterSnapshotBar({
           aria-modal="true"
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border-default bg-surface-primary p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 dark:border-slate-800 dark:bg-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border-subtle pb-3">
@@ -405,8 +406,8 @@ export function RosterSnapshotBar({
 
       {/* PDF Format Selector Modal */}
       {isPdfModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-border-default bg-surface-primary p-6 shadow-xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
               <div className="flex items-center gap-2">
                 <Eye className="h-5 w-5 text-brand-primary" />

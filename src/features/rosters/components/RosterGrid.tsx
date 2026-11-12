@@ -14,6 +14,42 @@ interface RosterGridProps {
   selectedCell?: { staffId: number; date: string } | null;
 }
 
+function getShiftBadgeStyle(shiftCode?: string): string {
+  if (!shiftCode) return 'text-slate-300 dark:text-slate-600 hover:text-slate-500';
+  const c = shiftCode.toUpperCase().trim();
+  if (c.includes('AM')) {
+    return 'bg-amber-50 text-amber-900 border border-amber-200/90 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/60 font-bold';
+  }
+  if (c.includes('PM')) {
+    return 'bg-sky-50 text-sky-900 border border-sky-200/90 dark:bg-sky-950/40 dark:text-sky-200 dark:border-sky-800/60 font-bold';
+  }
+  if (c.includes('ND') || c.includes('NIGHT')) {
+    return 'bg-indigo-50 text-indigo-950 border border-indigo-200/90 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800/60 font-bold';
+  }
+  if (c.includes('ON')) {
+    return 'bg-purple-50 text-purple-950 border border-purple-200/90 dark:bg-purple-950/40 dark:text-purple-200 dark:border-purple-800/60 font-bold';
+  }
+  if (c.includes('PN')) {
+    return 'bg-violet-50 text-violet-950 border border-violet-200/90 dark:bg-violet-950/40 dark:text-violet-200 dark:border-violet-800/60 font-bold';
+  }
+  if (c.includes('OFF') || c.includes('GOFF')) {
+    return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700 font-bold';
+  }
+  if (
+    c.includes('AL') ||
+    c.includes('EL') ||
+    c.includes('MC') ||
+    c.includes('HKA') ||
+    c.includes('GHKA')
+  ) {
+    return 'bg-emerald-50 text-emerald-950 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800/60 font-bold';
+  }
+  if (c.includes('COURSE') || c.includes('COURT')) {
+    return 'bg-blue-50 text-blue-950 border border-blue-200/90 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800/60 font-bold';
+  }
+  return 'bg-slate-50 text-slate-800 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 font-semibold';
+}
+
 export function RosterGrid({
   periodDates,
   staffList,
@@ -175,9 +211,6 @@ export function RosterGrid({
                       const shiftCode = assignment?.shiftCode;
                       const isSelected =
                         selectedCell?.staffId === staff.id && selectedCell?.date === date;
-                      const colorToken = shiftCode
-                        ? (colorMap.get(shiftCode.toUpperCase()) ?? 'default')
-                        : null;
 
                       return (
                         <td
@@ -187,34 +220,14 @@ export function RosterGrid({
                               onSelectCell(staff, date, shiftCode);
                             }
                           }}
-                          className={`border-l border-border-subtle p-0.5 text-center transition-colors ${
-                            isSelected ? 'ring-2 ring-brand-primary ring-inset z-10' : ''
-                          } ${isEditable ? 'cursor-pointer hover:bg-surface-secondary' : ''}`}
+                          className={`border-l border-slate-100 dark:border-slate-800 p-0.5 text-center transition-colors ${
+                            isSelected ? 'ring-2 ring-teal-600 ring-inset z-10' : ''
+                          } ${isEditable ? 'cursor-pointer hover:bg-teal-50/30 dark:hover:bg-teal-950/20' : ''}`}
                         >
                           <div
-                            className={`flex items-center justify-center rounded font-semibold ${
+                            className={`flex items-center justify-center rounded-lg font-semibold tracking-tight transition-transform ${
                               density === 'comfortable' ? 'h-8 text-xs' : 'h-6 text-[11px]'
-                            } ${
-                              shiftCode
-                                ? colorToken === 'am'
-                                  ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                                  : colorToken === 'pm'
-                                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                                    : colorToken === 'on'
-                                      ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                                      : colorToken === 'pn'
-                                        ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
-                                        : colorToken === 'off'
-                                          ? 'bg-slate-500/15 text-slate-700 dark:text-slate-300 font-bold'
-                                          : colorToken === 'goff'
-                                            ? 'bg-teal-500/15 text-teal-700 dark:text-teal-300'
-                                            : colorToken === 'al'
-                                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                              : colorToken === 'course'
-                                                ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                                                : 'bg-surface-secondary text-text-primary'
-                                : 'text-text-muted hover:text-text-primary'
-                            }`}
+                            } ${getShiftBadgeStyle(shiftCode)} ${isEditable ? 'hover:scale-[1.04] active:scale-[0.96]' : ''}`}
                             title={
                               shiftCode
                                 ? `${rosterName} on ${date}: ${shiftCode}`

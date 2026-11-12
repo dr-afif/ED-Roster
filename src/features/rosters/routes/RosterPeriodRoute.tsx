@@ -11,6 +11,7 @@ import {
   History,
   Layers,
   Lock,
+  Printer,
   ShieldAlert,
   Table,
   Unlock,
@@ -28,6 +29,7 @@ import { AmendmentHistoryList } from '../components/AmendmentHistoryList';
 import { AmendRosterModal } from '../components/AmendRosterModal';
 import { CloseReconcileModal } from '../components/CloseReconcileModal';
 import { RosterCalendarView } from '../components/RosterCalendarView';
+import { RosterExportModal } from '../components/RosterExportModal';
 import { RosterGrid } from '../components/RosterGrid';
 import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
 import { RosterSnapshotBar } from '../components/RosterSnapshotBar';
@@ -86,6 +88,7 @@ export function RosterPeriodRoute() {
   const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
 
   // Modal control states
+  const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
   const [isAmendModalOpen, setIsAmendModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [amendModalPrefill, setAmendModalPrefill] = useState<{
@@ -436,6 +439,18 @@ export function RosterPeriodRoute() {
               />
             )}
 
+            {/* Live-Aligned Top Toolbar PDF Export */}
+            <Button
+              variant="secondary"
+              onClick={() => setIsPdfExportModalOpen(true)}
+              className="gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
+              aria-label="PDF Export"
+              title="PDF Export & Print (Live App Format)"
+            >
+              <Printer className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+              <span>PDF Export</span>
+            </Button>
+
             {/* Owner Actions */}
             {isOwner && !isLegacyReadOnly && (
               <>
@@ -567,8 +582,8 @@ export function RosterPeriodRoute() {
         </div>
       )}
 
-      {/* Roster Snapshot Archive & Telegram Dispatch */}
-      {periodRow && isEnforced && (
+      {/* Roster Document Archive & Telegram Dispatch */}
+      {periodRow && (
         <RosterSnapshotBar
           periodId={periodRow.id}
           periodYear={yyyy}
@@ -851,6 +866,23 @@ export function RosterPeriodRoute() {
           initialStaffId={amendModalPrefill?.staffId}
           initialDate={amendModalPrefill?.date}
           initialShiftCode={amendModalPrefill?.shiftCode}
+        />
+      )}
+
+      {/* Roster PDF Export Modal */}
+      {isPdfExportModalOpen && periodRow && (
+        <RosterExportModal
+          isOpen={isPdfExportModalOpen}
+          onClose={() => setIsPdfExportModalOpen(false)}
+          periodYear={yyyy}
+          periodMonth={mm}
+          periodStart={periodRow.period_start}
+          periodRevision={periodRow.revision ?? 0}
+          staffList={staffList}
+          assignments={activeAssignments}
+          shiftDefinitions={shiftDefinitions}
+          epAssignments={epAssignments}
+          holidays={publicHolidays as PublicHolidayEntry[]}
         />
       )}
 

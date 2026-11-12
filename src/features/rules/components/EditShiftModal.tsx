@@ -166,7 +166,7 @@ function ShiftFormInner({ onClose, shiftDef, semantics }: ShiftFormInnerProps) {
 
   return (
     <div
-      className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border-default bg-surface-primary p-6 shadow-2xl transition-all"
+      className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all dark:border-slate-800 dark:bg-slate-900"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
@@ -526,7 +526,7 @@ export function EditShiftModal({ isOpen, onClose, shiftDef, semantics }: EditShi
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="shift-modal-title"
