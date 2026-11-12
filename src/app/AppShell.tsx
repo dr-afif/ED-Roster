@@ -398,9 +398,9 @@ export function AppShell() {
       {/* Mobile bottom navigation (strictly 5 destinations: Home, Roster, Requests, Records, More) */}
       <nav
         aria-label="Primary mobile navigation"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-[#18181B] text-stone-200 border-t border-stone-800/80 px-2 py-2 lg:hidden shadow-2xl"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-[#18181B] text-white border-t border-white/10 rounded-t-[32px] px-3 pt-2.5 pb-4 lg:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.35)]"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1.5">
+        <div className="mx-auto grid max-w-sm grid-cols-5 items-center justify-items-center">
           {MOBILE_PRIMARY_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = isNavItemActive(location.pathname, item);
@@ -408,15 +408,20 @@ export function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                title={item.label}
+                aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[11px] font-semibold transition-all duration-150 active:scale-[0.95] ${
+                className={`relative flex items-center justify-center transition-all duration-200 active:scale-[0.92] cursor-pointer ${
                   active
-                    ? 'bg-[#E06D53] text-white shadow-md'
-                    : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/50'
+                    ? 'h-12 w-12 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30'
+                    : 'h-12 w-12 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                <span className="truncate">{item.label}</span>
+                <Icon
+                  className={active ? 'h-5 w-5 stroke-[2.25]' : 'h-5 w-5 stroke-[1.75]'}
+                  aria-hidden="true"
+                />
+                <span className="sr-only">{item.label}</span>
               </NavLink>
             );
           })}
@@ -424,19 +429,28 @@ export function AppShell() {
           <button
             ref={moreTriggerRef}
             type="button"
+            title="More"
+            aria-label="More"
             aria-expanded={isMoreOpen}
             aria-controls="mobile-more-sheet"
             onClick={() =>
               setMoreOpenForPath((prev) => (prev === location.pathname ? null : location.pathname))
             }
-            className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[11px] font-semibold transition-all duration-150 active:scale-[0.95] ${
+            className={`relative flex items-center justify-center transition-all duration-200 active:scale-[0.92] cursor-pointer ${
               isMoreOpen || isMoreRouteActive
-                ? 'bg-[#E06D53] text-white shadow-md'
-                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/50'
+                ? 'h-12 w-12 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30'
+                : 'h-12 w-12 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Menu className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            <span>More</span>
+            <Menu
+              className={
+                isMoreOpen || isMoreRouteActive
+                  ? 'h-5 w-5 stroke-[2.25]'
+                  : 'h-5 w-5 stroke-[1.75]'
+              }
+              aria-hidden="true"
+            />
+            <span className="sr-only">More</span>
           </button>
         </div>
       </nav>
