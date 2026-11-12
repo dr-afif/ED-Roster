@@ -17,7 +17,7 @@ import { MigrationIdentityMappingTable } from './components/MigrationIdentityMap
 import { MigrationCutoverGate } from './components/MigrationCutoverGate';
 import { MigrationNewBatchModal } from './components/MigrationNewBatchModal';
 import { createSampleLegacyExport } from './domain/migrationEngine';
-import { Layers, Users, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { Layers, Users, ShieldCheck, ChevronLeft, AlertCircle } from 'lucide-react';
 
 export function MigrationAdminRoute() {
   const { data: batches = [] } = useMigrationBatchesQuery();
@@ -27,6 +27,7 @@ export function MigrationAdminRoute() {
   );
   const [isNewBatchOpen, setIsNewBatchOpen] = useState(false);
   const [isCreatingSample, setIsCreatingSample] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: batchDetails } = useMigrationBatchDetailsQuery(selectedBatchId);
   const { data: staffList = [] } = useStaffDirectoryQuery();
@@ -41,6 +42,7 @@ export function MigrationAdminRoute() {
   // Load realistic rehearsal batch
   const handleLoadSampleRehearsal = async () => {
     try {
+      setErrorMessage(null);
       setIsCreatingSample(true);
       const sample = createSampleLegacyExport();
 
@@ -70,6 +72,11 @@ export function MigrationAdminRoute() {
 
       setSelectedBatchId(sample.batchId);
       setActiveTab('reconciliation');
+    } catch (err) {
+      console.error('Failed to load sample rehearsal batch:', err);
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Failed to stage and reconcile rehearsal batch.',
+      );
     } finally {
       setIsCreatingSample(false);
     }
@@ -81,8 +88,14 @@ export function MigrationAdminRoute() {
     sourceLabel: string;
     notes?: string;
   }) => {
-    await createBatchMutation.mutateAsync(params);
-    setSelectedBatchId(params.batchId);
+    try {
+      setErrorMessage(null);
+      await createBatchMutation.mutateAsync(params);
+      setSelectedBatchId(params.batchId);
+    } catch (err) {
+      console.error('Failed to create batch:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create migration batch.');
+    }
   };
 
   const handleSaveMapping = async (
@@ -92,17 +105,23 @@ export function MigrationAdminRoute() {
     notes?: string,
   ) => {
     if (!selectedBatchId) return;
-    await saveMappingMutation.mutateAsync({
-      batchId: selectedBatchId,
-      sourceEntity: 'staff',
-      sourceTab: 'StaffDirectory',
-      sourceKey,
-      canonicalTable: 'staff_directory',
-      canonicalId,
-      canonicalLabel,
-      confidence: 'manual_approved',
-      notes,
-    });
+    try {
+      setErrorMessage(null);
+      await saveMappingMutation.mutateAsync({
+        batchId: selectedBatchId,
+        sourceEntity: 'staff',
+        sourceTab: 'StaffDirectory',
+        sourceKey,
+        canonicalTable: 'staff_directory',
+        canonicalId,
+        canonicalLabel,
+        confidence: 'manual_approved',
+        notes,
+      });
+    } catch (err) {
+      console.error('Failed to save mapping:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save staff mapping.');
+    }
   };
 
   const handleUpdateDisposition = async (
@@ -111,25 +130,43 @@ export function MigrationAdminRoute() {
     notes?: string,
   ) => {
     if (!selectedBatchId) return;
-    await updateDispositionMutation.mutateAsync({
-      resultId,
-      batchId: selectedBatchId,
-      disposition,
-      notes,
-    });
+    try {
+      setErrorMessage(null);
+      await updateDispositionMutation.mutateAsync({
+        resultId,
+        batchId: selectedBatchId,
+        disposition,
+        notes,
+      });
+    } catch (err) {
+      console.error('Failed to update disposition:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to update disposition.');
+    }
   };
 
   const handleRunTransform = async (dryRun: boolean) => {
     if (!selectedBatchId) return;
-    await executeTransformMutation.mutateAsync({
-      batchId: selectedBatchId,
-      dryRun,
-    });
+    try {
+      setErrorMessage(null);
+      await executeTransformMutation.mutateAsync({
+        batchId: selectedBatchId,
+        dryRun,
+      });
+    } catch (err) {
+      console.error('Failed to run transform:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to run migration transform.');
+    }
   };
 
   const handleRevertBatch = async () => {
     if (!selectedBatchId) return;
-    await revertMutation.mutateAsync({ batchId: selectedBatchId });
+    try {
+      setErrorMessage(null);
+      await revertMutation.mutateAsync({ batchId: selectedBatchId });
+    } catch (err) {
+      console.error('Failed to revert batch:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to revert migration batch.');
+    }
   };
 
   const staffCandidates = staffList.map((s) => ({
@@ -162,6 +199,23 @@ export function MigrationAdminRoute() {
             </p>
           </div>
         </div>
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-700 dark:text-rose-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-xs font-semibold hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Selected Batch View or Batches List */}
         {selectedBatchId && batchDetails ? (

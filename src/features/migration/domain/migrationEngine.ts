@@ -215,7 +215,7 @@ export function calculateRosterChecksum(
 /**
  * Generates sample rehearsal data representing a December 2026 legacy Google Sheets export.
  */
-export function createSampleLegacyExport(): {
+export function createSampleLegacyExport(customBatchId?: string): {
   readonly batchId: string;
   readonly spreadsheetId: string;
   readonly tabManifest: Array<{ tabName: string; rowCount: number; columnCount: number }>;
@@ -224,7 +224,9 @@ export function createSampleLegacyExport(): {
     Array<{ row_number: number; payload: Record<string, unknown> }>
   >;
 } {
-  const batchId = `REHEARSAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-001`;
+  const batchId =
+    customBatchId ??
+    `REHEARSAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
   const spreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
 
   const staffRows = [

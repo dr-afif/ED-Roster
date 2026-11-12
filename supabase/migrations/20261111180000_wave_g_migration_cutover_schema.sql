@@ -230,16 +230,18 @@ begin
 
   -- Audit log entry
   insert into public.audit_events (
-    actor_auth_user_id,
     action,
-    entity_name,
+    actor_auth_user_id,
+    entity_type,
     entity_id,
-    details
+    reason,
+    after_summary
   ) values (
-    auth.uid(),
     'MIGRATION_BATCH_CREATED',
+    auth.uid(),
     'legacy.import_batches',
     v_batch.batch_id,
+    'Migration batch staged',
     jsonb_build_object(
       'source_spreadsheet_id', v_batch.source_spreadsheet_id,
       'status', v_batch.status,
@@ -319,7 +321,11 @@ begin
     raise exception 'Access denied: owner role required' using errcode = '42501';
   end if;
 
-  select to_jsonb(b) into v_batch
+  select jsonb_set(
+    to_jsonb(b),
+    '{raw_row_count}',
+    to_jsonb(coalesce((select count(*) from legacy.raw_rows r where r.batch_id = p_batch_id), 0))
+  ) into v_batch
   from legacy.import_batches b
   where b.batch_id = p_batch_id;
 
@@ -330,14 +336,17 @@ begin
   -- Summarize tabs and row counts
   select jsonb_agg(
     jsonb_build_object(
-      'tab_name', tab_name,
-      'row_count', count(*)
-    ) order by tab_name
+      'tab_name', t.tab_name,
+      'row_count', t.row_count
+    ) order by t.tab_name
   )
   into v_tabs
-  from legacy.raw_rows
-  where batch_id = p_batch_id
-  group by tab_name;
+  from (
+    select tab_name, count(*) as row_count
+    from legacy.raw_rows
+    where batch_id = p_batch_id
+    group by tab_name
+  ) t;
 
   -- Get ID mappings
   select jsonb_agg(
@@ -503,16 +512,18 @@ begin
   where batch_id = p_batch_id;
 
   insert into public.audit_events (
-    actor_auth_user_id,
     action,
-    entity_name,
+    actor_auth_user_id,
+    entity_type,
     entity_id,
-    details
+    reason,
+    after_summary
   ) values (
-    auth.uid(),
     'MIGRATION_BATCH_REVERTED',
+    auth.uid(),
     'legacy.import_batches',
     p_batch_id,
+    'Migration batch reverted',
     jsonb_build_object(
       'reverted_periods', v_deleted_periods
     )
@@ -806,16 +817,18 @@ begin
 
   -- Audit log entry
   insert into public.audit_events (
-    actor_auth_user_id,
     action,
-    entity_name,
+    actor_auth_user_id,
+    entity_type,
     entity_id,
-    details
+    reason,
+    after_summary
   ) values (
-    auth.uid(),
     case when p_dry_run then 'MIGRATION_TRANSFORM_DRY_RUN' else 'MIGRATION_TRANSFORM_COMMITTED' end,
+    auth.uid(),
     'legacy.import_batches',
     p_batch_id,
+    case when p_dry_run then 'Dry-run transform simulation' else 'Canonical migration transform commit' end,
     jsonb_build_object(
       'dry_run', p_dry_run,
       'staff_matched', v_staff_matched_count,

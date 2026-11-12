@@ -72,8 +72,12 @@ export function MigrationBatchList({
             disabled={isCreatingSample}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-primary px-3 py-1.5 text-xs font-semibold text-text-primary shadow-2xs hover:bg-surface-secondary disabled:opacity-50"
           >
-            <Play className="h-3.5 w-3.5 text-brand-primary" />
-            {isCreatingSample ? 'Loading Rehearsal...' : 'Load Rehearsal Batch (Dec 2026)'}
+            {isCreatingSample ? (
+              <RefreshCw className="h-3.5 w-3.5 text-brand-primary animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5 text-brand-primary" />
+            )}
+            {isCreatingSample ? 'Loading Rehearsal Batch...' : 'Load Rehearsal Batch (Dec 2026)'}
           </button>
 
           <button
