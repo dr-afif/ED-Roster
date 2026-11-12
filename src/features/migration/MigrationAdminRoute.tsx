@@ -22,14 +22,29 @@ import { Layers, Users, ShieldCheck, ChevronLeft, AlertCircle } from 'lucide-rea
 function getErrorMessage(err: unknown, fallback: string): string {
   if (!err) return fallback;
   if (typeof err === 'string') return err;
-  if (err instanceof Error) return err.message;
+  if (err instanceof Error && err.message) return err.message;
   if (typeof err === 'object') {
-    const candidate = err as { message?: unknown; details?: unknown; hint?: unknown };
+    const candidate = err as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      error?: { message?: unknown; details?: unknown };
+      error_description?: unknown;
+    };
     if (typeof candidate.message === 'string' && candidate.message.trim()) {
       return candidate.message;
     }
     if (typeof candidate.details === 'string' && candidate.details.trim()) {
       return candidate.details;
+    }
+    if (typeof candidate.error?.message === 'string' && candidate.error.message.trim()) {
+      return candidate.error.message;
+    }
+    if (typeof candidate.error_description === 'string' && candidate.error_description.trim()) {
+      return candidate.error_description;
+    }
+    if (typeof candidate.hint === 'string' && candidate.hint.trim()) {
+      return candidate.hint;
     }
   }
   return fallback;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -25,7 +25,6 @@ import { rosterRouteParamsSchema } from '@/shared/validation';
 import { AmendmentHistoryList } from '../components/AmendmentHistoryList';
 import { AmendRosterModal } from '../components/AmendRosterModal';
 import { CloseReconcileModal } from '../components/CloseReconcileModal';
-import { PublishModal } from '../components/PublishModal';
 import { RosterCalendarView } from '../components/RosterCalendarView';
 import { RosterGrid } from '../components/RosterGrid';
 import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
@@ -44,6 +43,7 @@ import {
   useDraftAssignmentsQuery,
   usePlannedAssignmentsQuery,
   usePublicHolidaysQuery,
+  usePublishRosterMutation,
   useRosterEpAssignmentsQuery,
   useRosterPeriodQuery,
   useRosterStaffQuery,
@@ -84,7 +84,6 @@ export function RosterPeriodRoute() {
   const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
 
   // Modal control states
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isAmendModalOpen, setIsAmendModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [amendModalPrefill, setAmendModalPrefill] = useState<{
@@ -125,6 +124,7 @@ export function RosterPeriodRoute() {
   const deleteMutation = useDeleteDraftAssignmentMutation(periodId);
   const upsertEpMutation = useUpsertEpAssignmentMutation(periodId);
   const batchUpsertEpMutation = useBatchUpsertEpAssignmentsMutation(periodId);
+  const publishMutation = usePublishRosterMutation(periodId);
 
   const handleMonthChange = (newYyyy: string, newMm: string) => {
     navigate(`/rosters/${newYyyy}/${newMm}`);
@@ -290,6 +290,29 @@ export function RosterPeriodRoute() {
     batchUpsertEpMutation.mutate(payloads);
   };
 
+  const periodStartDate = `${yyyy}-${mm}-01`;
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const isMonthArrived = todayStr >= periodStartDate;
+
+  // Background auto-enforce effect:
+  // Once the target month arrives, if the roster is still marked 'draft' with assignments,
+  // promote it to published without requiring manual button clicks.
+  const autoPublishAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (
+      isOwner &&
+      isMonthArrived &&
+      periodRow?.status === 'draft' &&
+      periodRow?.id &&
+      draftAssignments.length > 0 &&
+      !publishMutation.isPending &&
+      !autoPublishAttemptedRef.current
+    ) {
+      autoPublishAttemptedRef.current = true;
+      publishMutation.mutate({ notes: 'Auto-enforced at month arrival' });
+    }
+  }, [isOwner, isMonthArrived, periodRow, draftAssignments.length, publishMutation]);
+
   if (!isPeriodValid) {
     const fallbackHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
     return (
@@ -313,24 +336,41 @@ export function RosterPeriodRoute() {
   }
 
   const isLegacyReadOnly = Boolean(periodRow?.legacy_read_only);
-  const periodStatus = isLegacyReadOnly ? 'legacy (read-only)' : (periodRow?.status ?? 'draft');
-  const isDraft = !isLegacyReadOnly && (periodRow?.status === 'draft' || !periodRow);
-  const isPublished =
-    !isLegacyReadOnly && (periodRow?.status === 'published' || periodRow?.status === 'amended');
   const isClosed = !isLegacyReadOnly && periodRow?.status === 'closed';
 
+  // Lifecycle state:
+  // - Legacy read-only: historical ingested roster (locked)
+  // - Closed: reconciled, completed period
+  // - Enforced (active/amended): target month has arrived (today >= periodStartDate) or explicitly finalized
+  // - Planning: pre-month drafting period where changes are direct shifts and not formal amendments
+  const isEnforced =
+    !isLegacyReadOnly &&
+    !isClosed &&
+    (isMonthArrived || periodRow?.status === 'published' || periodRow?.status === 'amended');
+  const isPlanning = !isLegacyReadOnly && !isClosed && !isEnforced;
+
+  const periodStatus = isLegacyReadOnly
+    ? 'legacy (read-only)'
+    : isClosed
+      ? 'closed'
+      : periodRow?.status === 'published' || periodRow?.status === 'amended'
+        ? periodRow.status
+        : isMonthArrived
+          ? 'active'
+          : 'planning';
+
   // Grid cell interactability:
-  // In draft mode: clicking cell opens ShiftPickerModal (for owner).
-  // In published/amended mode (current view): clicking cell opens AmendRosterModal (for owner).
+  // In planning mode: clicking cell opens ShiftPickerModal (for owner direct draft editing).
+  // In enforced mode (month arrived, current view): clicking cell opens AmendRosterModal (for owner).
   // In planned view, closed status, or legacy read-only mode: strictly read-only.
   const isGridInteractive =
-    !isLegacyReadOnly && isOwner && (isDraft || (isPublished && viewMode === 'current'));
+    !isLegacyReadOnly && isOwner && !isClosed && (isPlanning || viewMode === 'current');
 
   const handleCellSelect = (staff: StaffRosterIdentity, date: string, currentCode?: string) => {
-    if (isLegacyReadOnly) return;
-    if (isDraft) {
+    if (isLegacyReadOnly || isClosed) return;
+    if (isPlanning) {
       setSelectedCell({ staff, date, currentCode });
-    } else if (isPublished && viewMode === 'current') {
+    } else if (isEnforced && viewMode === 'current') {
       setAmendModalPrefill({
         staffId: staff.id,
         date,
@@ -348,8 +388,8 @@ export function RosterPeriodRoute() {
         description={
           isLegacyReadOnly
             ? `Historical legacy schedule ingested from Google Sheets (Batch: ${periodRow?.import_batch_id ?? 'Rehearsal'}). Locked for auditing.`
-            : isDraft
-              ? 'Interactive draft roster grid. Build and verify schedule assignments before official atomic publication.'
+            : isPlanning
+              ? 'Pre-month planning schedule. Direct roster drafting without amendment overhead until the month arrives.'
               : isClosed
                 ? 'Closed operational period. Reconciled and sealed with immutable audit trail.'
                 : 'Live operational schedule with active amendment overlay and GOFF compensatory rest tracking.'
@@ -361,18 +401,18 @@ export function RosterPeriodRoute() {
               tone={
                 isLegacyReadOnly
                   ? 'warning'
-                  : periodStatus === 'published' || periodStatus === 'amended'
+                  : isEnforced
                     ? 'success'
-                    : periodStatus === 'closed'
+                    : isClosed
                       ? 'neutral'
                       : 'brand'
               }
               icon={
                 isLegacyReadOnly
                   ? ShieldAlert
-                  : periodStatus === 'published' || periodStatus === 'amended'
+                  : isEnforced
                     ? CheckCircle2
-                    : periodStatus === 'closed'
+                    : isClosed
                       ? Lock
                       : CalendarRange
               }
@@ -397,19 +437,7 @@ export function RosterPeriodRoute() {
             {/* Owner Actions */}
             {isOwner && !isLegacyReadOnly && (
               <>
-                {isDraft && (
-                  <Button
-                    variant="primary"
-                    onClick={() => setIsPublishModalOpen(true)}
-                    disabled={draftAssignments.length === 0}
-                    className="gap-1.5"
-                  >
-                    <Lock className="h-4 w-4" />
-                    Publish Roster
-                  </Button>
-                )}
-
-                {isPublished && (
+                {isEnforced && (
                   <>
                     <Button
                       variant="primary"
@@ -538,7 +566,7 @@ export function RosterPeriodRoute() {
       )}
 
       {/* Roster Snapshot Archive & Telegram Dispatch */}
-      {periodRow && !isDraft && (
+      {periodRow && isEnforced && (
         <RosterSnapshotBar
           periodId={periodRow.id}
           periodYear={yyyy}
@@ -554,8 +582,8 @@ export function RosterPeriodRoute() {
         />
       )}
 
-      {/* Operational View Switcher (for Published/Amended/Closed periods) */}
-      {!isDraft && (
+      {/* Operational View Switcher (for Enforced / Active / Amended / Closed periods) */}
+      {isEnforced && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3">
           <div className="inline-flex rounded-xl border border-border-default bg-surface-primary p-1 text-xs">
             <button
@@ -690,7 +718,7 @@ export function RosterPeriodRoute() {
       )}
 
       {/* Main Content Area */}
-      {isPeriodLoading || isStaffLoading || (isPublished && isPlannedLoading) ? (
+      {isPeriodLoading || isStaffLoading || (isEnforced && isPlannedLoading) ? (
         <SurfaceCard variant="solid" className="p-8 text-center text-sm text-text-muted">
           Loading roster workspace for {periodLabel}...
         </SurfaceCard>
@@ -775,8 +803,8 @@ export function RosterPeriodRoute() {
         </>
       )}
 
-      {/* Shift Picker Modal (Draft Mode Only) */}
-      {selectedCell && isDraft && (
+      {/* Shift Picker Modal (Pre-Month Planning Mode Only) */}
+      {selectedCell && isPlanning && (
         <ShiftPickerModal
           isOpen={Boolean(selectedCell)}
           staff={selectedCell.staff}
@@ -798,22 +826,6 @@ export function RosterPeriodRoute() {
               staffId: selectedCell.staff.id,
               dutyDate: selectedCell.date,
             });
-          }}
-        />
-      )}
-
-      {/* Publish Modal */}
-      {isPublishModalOpen && (
-        <PublishModal
-          isOpen={isPublishModalOpen}
-          onClose={() => setIsPublishModalOpen(false)}
-          periodLabel={periodLabel}
-          periodId={periodId}
-          assignmentCount={draftAssignments.length}
-          issueCount={rulesOutput?.issues.length ?? 0}
-          ruleVersion={ruleVersionRow?.version ?? 1}
-          onPublished={() => {
-            setViewMode('current');
           }}
         />
       )}

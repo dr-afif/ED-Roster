@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Award, Check, Paintbrush, Search, X } from 'lucide-react';
+import { Award, Check, Edit3, Paintbrush, Search, X } from 'lucide-react';
 import type { EpAssignmentRow } from '../data/rosterQueries';
 import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
 
@@ -35,6 +35,7 @@ export function RosterCalendarView({
   onBatchUpdateEpAssignments,
 }: RosterCalendarViewProps) {
   const [filterQuery, setFilterQuery] = useState('');
+  const [isEpEditMode, setIsEpEditMode] = useState(false);
   const [activeEpStamp, setActiveEpStamp] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{
     dutyDate: string;
@@ -127,7 +128,7 @@ export function RosterCalendarView({
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const handleCellClick = (dutyDate: string, slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL') => {
-    if (!isEditable) return;
+    if (!isEditable || !isEpEditMode) return;
 
     if (activeEpStamp) {
       // Direct stamp application
@@ -178,9 +179,9 @@ export function RosterCalendarView({
 
   return (
     <div className="space-y-4">
-      {/* EP Painter Toolbar (When Editable) */}
-      {isEditable && (
-        <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50/90 via-emerald-50/80 to-teal-50/90 p-3 shadow-xs dark:border-teal-900/60 dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-teal-950/40">
+      {/* EP Painter Toolbar (When in Active EP Edit Mode) */}
+      {isEditable && isEpEditMode && (
+        <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50/90 via-emerald-50/80 to-teal-50/90 p-3 shadow-xs dark:border-teal-900/60 dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-teal-950/40 animate-fadeIn">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-200/60 pb-2.5 dark:border-teal-800/40">
             <div className="flex items-center gap-2">
               <Paintbrush className="h-4 w-4 text-teal-700 dark:text-teal-400" />
@@ -251,7 +252,7 @@ export function RosterCalendarView({
         </div>
       )}
 
-      {/* Filter / Search Bar */}
+      {/* Filter / Search Bar & EP Edit Mode Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex items-center">
           <Search className="absolute left-3 h-3.5 w-3.5 text-text-muted" />
@@ -263,8 +264,42 @@ export function RosterCalendarView({
             className="h-9 w-72 rounded-lg border border-border-default bg-surface-primary pl-9 pr-3 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none"
           />
         </div>
-        <div className="text-xs text-text-secondary">
-          📅 Showing {periodDates.length} days (Medical Officer & Emergency Physician Coverage)
+
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block text-xs text-text-secondary">
+            📅 Showing {periodDates.length} days (MO &amp; EP Coverage)
+          </div>
+
+          {isEditable && (
+            <button
+              type="button"
+              data-testid="toggle-edit-ep-mode"
+              onClick={() => {
+                setIsEpEditMode((prev) => !prev);
+                if (isEpEditMode) {
+                  setEditingCell(null);
+                  setActiveEpStamp(null);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition shadow-2xs ${
+                isEpEditMode
+                  ? 'bg-teal-600 text-white hover:bg-teal-700'
+                  : 'border border-border-default bg-surface-secondary/70 text-text-primary hover:bg-surface-secondary hover:border-teal-500/50'
+              }`}
+            >
+              {isEpEditMode ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Done Editing EP
+                </>
+              ) : (
+                <>
+                  <Edit3 className="h-3.5 w-3.5 text-teal-600" />
+                  Edit EP Schedule
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -455,10 +490,12 @@ export function RosterCalendarView({
                     <td
                       onClick={() => handleCellClick(dateStr, 'EP_OFFICE_HOUR')}
                       className={`border-r border-border-subtle p-1.5 align-middle ${
-                        isEditable ? 'cursor-pointer hover:bg-teal-500/10' : ''
+                        isEditable && isEpEditMode ? 'cursor-pointer hover:bg-teal-500/10' : ''
                       }`}
                       title={
-                        isEditable ? 'Click to assign or stamp Emergency Physician' : undefined
+                        isEditable && isEpEditMode
+                          ? 'Click to assign or stamp Emergency Physician'
+                          : undefined
                       }
                     >
                       {editingCell?.dutyDate === dateStr &&
@@ -509,7 +546,7 @@ export function RosterCalendarView({
                         </div>
                       ) : (
                         <span className="text-text-muted text-[11px] italic">
-                          {isEditable ? '+ Assign EP' : '-'}
+                          {isEditable && isEpEditMode ? '+ Assign EP' : '-'}
                         </span>
                       )}
                     </td>
@@ -518,10 +555,12 @@ export function RosterCalendarView({
                     <td
                       onClick={() => handleCellClick(dateStr, 'EP_ONCALL')}
                       className={`p-1.5 align-middle ${
-                        isEditable ? 'cursor-pointer hover:bg-teal-500/10' : ''
+                        isEditable && isEpEditMode ? 'cursor-pointer hover:bg-teal-500/10' : ''
                       }`}
                       title={
-                        isEditable ? 'Click to assign or stamp Emergency Physician' : undefined
+                        isEditable && isEpEditMode
+                          ? 'Click to assign or stamp Emergency Physician'
+                          : undefined
                       }
                     >
                       {editingCell?.dutyDate === dateStr &&
@@ -572,7 +611,7 @@ export function RosterCalendarView({
                         </div>
                       ) : (
                         <span className="text-text-muted text-[11px] italic">
-                          {isEditable ? '+ Assign EP' : '-'}
+                          {isEditable && isEpEditMode ? '+ Assign EP' : '-'}
                         </span>
                       )}
                     </td>

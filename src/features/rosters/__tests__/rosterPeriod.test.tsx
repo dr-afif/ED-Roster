@@ -325,7 +325,7 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
     renderRosterWorkspace('owner');
 
     expect(screen.getByRole('heading', { level: 1, name: /January 2027 Roster/i })).toBeDefined();
-    expect(screen.getByText('DRAFT')).toBeDefined();
+    expect(screen.getByText('PLANNING')).toBeDefined();
     expect(screen.getByText(/Policy B \(Nights: 1 OFF \/ No Nights: 2 OFFs\)/i)).toBeDefined();
     expect(screen.getByText('Dr Afif')).toBeDefined();
     expect(screen.getByText('Dr Siti')).toBeDefined();
@@ -376,18 +376,10 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
     });
   });
 
-  it('renders Publish Roster button for owner in draft mode and opens PublishModal', () => {
+  it('does not render a manual Publish Roster button in planning mode as roster auto-enforces upon month arrival', () => {
     renderRosterWorkspace('owner');
 
-    const publishBtn = screen.getByRole('button', { name: /Publish Roster/i });
-    expect(publishBtn).toBeDefined();
-
-    fireEvent.click(publishBtn);
-
-    expect(screen.getByRole('dialog')).toBeDefined();
-    expect(
-      screen.getByRole('heading', { level: 2, name: /Publish January 2027 Roster/i }),
-    ).toBeDefined();
-    expect(screen.getByText(/Atomic Publication Invariant/i)).toBeDefined();
+    const publishBtn = screen.queryByRole('button', { name: /Publish Roster/i });
+    expect(publishBtn).toBeNull();
   });
 });

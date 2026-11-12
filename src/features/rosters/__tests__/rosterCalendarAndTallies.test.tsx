@@ -85,7 +85,7 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
     expect(screen.getByText("New Year's Day")).toBeInTheDocument();
   });
 
-  it('renders EP painter toolbar in editable mode and applies stamps', () => {
+  it('requires entering Edit EP mode before showing toolbar or applying stamps', () => {
     const mockUpdate = vi.fn();
     const mockBatchUpdate = vi.fn();
 
@@ -102,6 +102,13 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
       />,
     );
 
+    // In default view mode, painter toolbar is NOT visible
+    expect(screen.queryByText(/Emergency Physician Quick Stamp & Painter/i)).toBeNull();
+
+    // Enter Edit EP Mode
+    const editEpBtn = screen.getByRole('button', { name: /Edit EP Schedule/i });
+    fireEvent.click(editEpBtn);
+
     expect(screen.getByText(/Emergency Physician Quick Stamp & Painter/i)).toBeInTheDocument();
 
     // Select Dr Afif stamp
@@ -115,6 +122,11 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
     fireEvent.click(fillWeekdaysBtn);
 
     expect(mockBatchUpdate).toHaveBeenCalledTimes(1);
+
+    // Done editing exits edit mode
+    const doneBtn = screen.getByRole('button', { name: /Done Editing EP/i });
+    fireEvent.click(doneBtn);
+    expect(screen.queryByText(/Emergency Physician Quick Stamp & Painter/i)).toBeNull();
   });
 });
 
