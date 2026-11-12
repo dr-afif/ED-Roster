@@ -17,6 +17,7 @@ export type ShiftDefinitionRow = Database['public']['Tables']['shift_definitions
 export type ShiftSemanticRow = Database['public']['Tables']['shift_semantics']['Row'];
 export type DraftAssignmentRow = Database['public']['Tables']['roster_draft_assignments']['Row'];
 export type StaffingThresholdRow = Database['public']['Tables']['staffing_thresholds']['Row'];
+export type RuleVersionRow = Database['public']['Tables']['rule_versions']['Row'];
 export type PlannedAssignmentRow =
   Database['public']['Tables']['roster_planned_assignments']['Row'];
 export type PublicationRow = Database['public']['Tables']['roster_publications']['Row'];
@@ -542,6 +543,9 @@ export interface UpdateShiftDefinitionPayload {
   colorToken: string;
   sortOrder: number;
   isActive: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  durationHours?: number | null;
   semanticClass?: 'worked' | 'transparent' | 'reset' | 'unknown';
   providesCoverage?: boolean;
   nightPolicyBQualifying?: boolean;
@@ -555,6 +559,9 @@ export interface CreateShiftDefinitionPayload {
   colorToken: string;
   sortOrder: number;
   isActive?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  durationHours?: number | null;
   semanticClass: 'worked' | 'transparent' | 'reset' | 'unknown';
   providesCoverage: boolean;
   nightPolicyBQualifying: boolean;
@@ -575,6 +582,9 @@ export function useUpdateShiftDefinitionMutation() {
           color_token: payload.colorToken,
           sort_order: payload.sortOrder,
           is_active: payload.isActive,
+          start_time: payload.startTime ?? null,
+          end_time: payload.endTime ?? null,
+          duration_hours: payload.durationHours ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq('code', payload.code);
@@ -627,6 +637,9 @@ export function useCreateShiftDefinitionMutation() {
         color_token: payload.colorToken,
         sort_order: payload.sortOrder,
         is_active: payload.isActive ?? true,
+        start_time: payload.startTime ?? null,
+        end_time: payload.endTime ?? null,
+        duration_hours: payload.durationHours ?? null,
       });
 
       if (defError) throw defError;
@@ -649,6 +662,88 @@ export function useCreateShiftDefinitionMutation() {
       void queryClient.invalidateQueries({
         queryKey: [...queryKeys.rosters.shiftDefinitions(), 'all'],
       });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rules.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+    },
+  });
+}
+
+export interface UpdateRuleVersionPayload {
+  id: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  config: Database['public']['Tables']['rule_versions']['Update']['config'];
+  changeSummary: string;
+}
+
+export function useUpdateRuleVersionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateRuleVersionPayload) => {
+      const { error } = await supabase
+        .from('rule_versions')
+        .update({
+          effective_from: payload.effectiveFrom,
+          effective_to: payload.effectiveTo,
+          config: payload.config,
+          change_summary: payload.changeSummary,
+        })
+        .eq('id', payload.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rules.all,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.all,
+      });
+    },
+  });
+}
+
+export interface StaffingThresholdInput {
+  id?: number;
+  day_type: 'weekday' | 'weekend' | 'holiday';
+  shift_bucket: 'am' | 'pm' | 'night' | 'total';
+  min_staff: number;
+  target_staff: number;
+}
+
+export function useUpdateStaffingThresholdsMutation(ruleVersionId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (thresholds: StaffingThresholdInput[]) => {
+      for (const t of thresholds) {
+        if (t.id) {
+          const { error } = await supabase
+            .from('staffing_thresholds')
+            .update({
+              min_staff: t.min_staff,
+              target_staff: t.target_staff,
+            })
+            .eq('id', t.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('staffing_thresholds').upsert({
+            rule_version_id: ruleVersionId,
+            day_type: t.day_type,
+            shift_bucket: t.shift_bucket,
+            min_staff: t.min_staff,
+            target_staff: t.target_staff,
+          });
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.rules.all,
       });

@@ -290,10 +290,10 @@ export function SettingsAdminRoute() {
                 scheduling semantics.
               </p>
               <Link
-                to="/rules?tab=semantics"
+                to="/admin/rules?tab=shifts"
                 className="inline-flex items-center justify-center gap-1.5 w-full rounded-xl border border-border-default bg-surface-secondary/60 px-3 py-2 text-xs font-semibold text-text-primary hover:bg-surface-secondary transition-colors"
               >
-                <span>Manage Shift Definitions &amp; Hours</span>
+                <span>Manage Shifts &amp; Timings</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </SurfaceCard>

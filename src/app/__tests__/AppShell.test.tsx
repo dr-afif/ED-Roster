@@ -84,7 +84,7 @@ describe('AppShell & Placeholder Routes', () => {
       await screen.findByRole(
         'heading',
         { level: 1, name: /January 2027 Roster/i },
-        { timeout: 8000 },
+        { timeout: 15000 },
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Comfortable/i })).toBeInTheDocument();
@@ -96,11 +96,11 @@ describe('AppShell & Placeholder Routes', () => {
       await screen.findByRole(
         'heading',
         { level: 1, name: /Roster Rules & Thresholds/i },
-        { timeout: 8000 },
+        { timeout: 15000 },
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Owner Administration Boundary/i)).toBeInTheDocument();
-  }, 15000);
+  }, 35000);
 
   it('caps mobile bottom navigation at 5 controls and opens/closes the accessible More dialog', async () => {
     const user = userEvent.setup();

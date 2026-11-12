@@ -6,8 +6,10 @@ import type * as RosterQueriesModule from '../../rosters/data/rosterQueries';
 import { RulesAdminRoute } from '../RulesAdminRoute';
 import { AuthContext, type AuthBoundaryState } from '@/platform/auth/authContext';
 
-const mockMutateUpdate = vi.fn().mockResolvedValue({});
-const mockMutateCreate = vi.fn().mockResolvedValue({});
+const mockMutateUpdateShift = vi.fn().mockResolvedValue({});
+const mockMutateCreateShift = vi.fn().mockResolvedValue({});
+const mockMutateUpdateRuleVersion = vi.fn().mockResolvedValue({});
+const mockMutateUpdateStaffingThresholds = vi.fn().mockResolvedValue({});
 
 vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
   const actual = await importOriginal<typeof RosterQueriesModule>();
@@ -20,11 +22,13 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
         version: 1,
         status: 'active',
         effective_from: '2026-01-01',
+        effective_to: null,
         config: {
           weekly_off_policy: 'policy_b',
           max_consecutive_days: 6,
           min_rest_hours_after_night: 24,
         },
+        change_summary: 'Baseline emergency department policy.',
       },
       isLoading: false,
     }),
@@ -34,9 +38,9 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
           id: 1,
           rule_version_id: 1,
           day_type: 'weekday',
-          shift_bucket: 'AM',
-          min_staff: 3,
-          target_staff: 4,
+          shift_bucket: 'am',
+          min_staff: 6,
+          target_staff: 8,
         },
       ],
       isLoading: false,
@@ -50,6 +54,9 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
           color_token: 'am',
           sort_order: 10,
           is_active: true,
+          start_time: '08:00:00',
+          end_time: '16:00:00',
+          duration_hours: 8.0,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T00:00:00Z',
         },
@@ -60,6 +67,9 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
           color_token: 'pm',
           sort_order: 20,
           is_active: true,
+          start_time: '16:00:00',
+          end_time: '23:00:00',
+          duration_hours: 7.0,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T00:00:00Z',
         },
@@ -70,6 +80,9 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
           color_token: 'on',
           sort_order: 30,
           is_active: true,
+          start_time: '23:00:00',
+          end_time: '08:00:00',
+          duration_hours: 9.0,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T00:00:00Z',
         },
@@ -112,11 +125,19 @@ vi.mock('../../rosters/data/rosterQueries', async (importOriginal) => {
       isLoading: false,
     }),
     useUpdateShiftDefinitionMutation: () => ({
-      mutateAsync: mockMutateUpdate,
+      mutateAsync: mockMutateUpdateShift,
       isPending: false,
     }),
     useCreateShiftDefinitionMutation: () => ({
-      mutateAsync: mockMutateCreate,
+      mutateAsync: mockMutateCreateShift,
+      isPending: false,
+    }),
+    useUpdateRuleVersionMutation: () => ({
+      mutateAsync: mockMutateUpdateRuleVersion,
+      isPending: false,
+    }),
+    useUpdateStaffingThresholdsMutation: () => ({
+      mutateAsync: mockMutateUpdateStaffingThresholds,
       isPending: false,
     }),
   };
@@ -167,15 +188,15 @@ describe('RulesAdminRoute & Shift Timings Management', () => {
     expect(screen.getByText('Roster Rules & Thresholds')).toBeInTheDocument();
     expect(screen.getByText('Scheduling Policies & Limits')).toBeInTheDocument();
     expect(screen.getByText('Staffing Minimums')).toBeInTheDocument();
-    expect(screen.getByText(/Shift Semantics/)).toBeInTheDocument();
+    expect(screen.getByText(/Shifts & Timings/)).toBeInTheDocument();
   });
 
-  it('switches to Shift Semantics tab and lists shift definitions with timings', () => {
+  it('switches to Shifts & Timings tab and lists shift definitions with working hours', () => {
     renderWithProviders();
-    const semanticsTabBtn = screen.getByText(/Shift Semantics/);
-    fireEvent.click(semanticsTabBtn);
+    const shiftsTabBtn = screen.getByText(/Shifts & Timings/);
+    fireEvent.click(shiftsTabBtn);
 
-    expect(screen.getByText('Shift Definitions, Timings & Semantics')).toBeInTheDocument();
+    expect(screen.getByText('Shift Definitions, Hours & Timings')).toBeInTheDocument();
     expect(screen.getByText('Morning Shift (08:00 - 16:00)')).toBeInTheDocument();
     expect(screen.getByText('Evening Shift (16:00 - 23:00)')).toBeInTheDocument();
     expect(screen.getByText('Night Duty (23:00 - 08:00)')).toBeInTheDocument();
@@ -183,13 +204,13 @@ describe('RulesAdminRoute & Shift Timings Management', () => {
   });
 
   it('opens edit modal pre-filled with shift details and submits timing changes', async () => {
-    renderWithProviders('/rules?tab=semantics');
+    renderWithProviders('/rules?tab=shifts');
 
     // Click Edit button for AM shift
     const editAmBtn = screen.getByRole('button', { name: 'Edit AM' });
     fireEvent.click(editAmBtn);
 
-    expect(screen.getByText('Edit Shift Definition: AM')).toBeInTheDocument();
+    expect(screen.getByText('Edit Shift: AM')).toBeInTheDocument();
 
     const labelInput = screen.getByLabelText(/Shift Timing Window & Full Description/i);
     expect(labelInput).toHaveValue('Morning Shift (08:00 - 16:00)');
@@ -203,8 +224,8 @@ describe('RulesAdminRoute & Shift Timings Management', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockMutateUpdate).toHaveBeenCalledTimes(1);
-      expect(mockMutateUpdate).toHaveBeenCalledWith(
+      expect(mockMutateUpdateShift).toHaveBeenCalledTimes(1);
+      expect(mockMutateUpdateShift).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'AM',
           label: 'Morning Shift (07:30 - 15:30)',
@@ -213,13 +234,13 @@ describe('RulesAdminRoute & Shift Timings Management', () => {
     });
   });
 
-  it('opens create modal and creates a new shift definition', async () => {
-    renderWithProviders('/rules?tab=semantics');
+  it('opens create modal and creates a new shift definition with start/end time', async () => {
+    renderWithProviders('/rules?tab=shifts');
 
     const addBtn = screen.getByRole('button', { name: /Add Shift Definition/i });
     fireEvent.click(addBtn);
 
-    expect(screen.getByText('Create New Shift Definition')).toBeInTheDocument();
+    expect(screen.getByText('Create New Shift & Timings')).toBeInTheDocument();
 
     const codeInput = screen.getByLabelText(/Shift Code/i);
     const labelInput = screen.getByLabelText(/Shift Timing Window & Full Description/i);
@@ -233,14 +254,57 @@ describe('RulesAdminRoute & Shift Timings Management', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockMutateCreate).toHaveBeenCalledTimes(1);
-      expect(mockMutateCreate).toHaveBeenCalledWith(
+      expect(mockMutateCreateShift).toHaveBeenCalledTimes(1);
+      expect(mockMutateCreateShift).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'CLINIC',
           label: 'Specialist Clinic (08:00 - 17:00)',
           shortLabel: 'CLN',
         }),
       );
+    });
+  });
+
+  it('opens edit policy modal and updates fatigue limit and active duration', async () => {
+    renderWithProviders('/rules?tab=policies');
+
+    const editPolicyBtn = screen.getByRole('button', { name: /Edit Policies & Duration/i });
+    fireEvent.click(editPolicyBtn);
+
+    expect(screen.getByText('Edit Scheduling Policies & Limits')).toBeInTheDocument();
+
+    const consecutiveInput = screen.getByLabelText(/Max Consecutive Days/i);
+    fireEvent.change(consecutiveInput, { target: { value: '5' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Save Policy & Duration/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockMutateUpdateRuleVersion).toHaveBeenCalledTimes(1);
+      expect(mockMutateUpdateRuleVersion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          config: expect.objectContaining({
+            max_consecutive_days: 5,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('opens edit staffing minimums modal and updates bucket targets', async () => {
+    renderWithProviders('/rules?tab=thresholds');
+
+    const editThresholdsBtn = screen.getByRole('button', { name: /Edit Staffing Minimums/i });
+    fireEvent.click(editThresholdsBtn);
+
+    expect(screen.getByText('Edit Staffing Minimums & Targets')).toBeInTheDocument();
+
+    const submitBtn = screen.getByRole('button', { name: /Save Staffing Minimums/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockMutateUpdateStaffingThresholds).toHaveBeenCalledTimes(1);
     });
   });
 });
