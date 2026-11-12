@@ -73,6 +73,28 @@ vi.mock('../useRequests', () => ({
     isLoading: false,
     error: null,
   }),
+  useRequestShiftDefinitionsQuery: () => ({
+    data: [
+      { code: 'AM', is_active: true },
+      { code: 'PM', is_active: true },
+      { code: 'ON', is_active: true },
+      { code: 'ON1', is_active: true },
+      { code: 'ON2', is_active: true },
+      { code: 'NIGHT', is_active: true },
+      { code: 'ND', is_active: true },
+      { code: 'PN', is_active: true },
+      { code: 'OFF', is_active: true },
+      { code: 'GOFF', is_active: true },
+      { code: 'AL', is_active: true },
+      { code: 'MC', is_active: true },
+      { code: 'EL', is_active: true },
+      { code: 'HKA', is_active: true },
+      { code: 'GHKA', is_active: true },
+      { code: 'COURSE', is_active: true },
+    ],
+    isLoading: false,
+    error: null,
+  }),
   useSubmitRequestMutation: () => ({
     mutateAsync: mockSubmitMutateAsync,
     isPending: false,
@@ -177,6 +199,11 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
 
     expect(screen.getByRole('heading', { level: 3, name: /Add a Request/i })).toBeInTheDocument();
     expect(screen.getByText(/Submit on behalf of:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Admin Mode: Full Shift Catalog/i)).toBeInTheDocument();
+
+    // Verify admin has access to extra departmental shift options like MC and GOFF
+    expect(screen.getByRole('button', { name: /^MC/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^GOFF/i })).toBeInTheDocument();
 
     // Choose PM shift
     const pmButton = screen.getByRole('button', { name: /^PM/i });

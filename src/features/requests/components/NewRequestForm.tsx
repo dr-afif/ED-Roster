@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ADMIN_ALL_SHIFT_TYPES,
   DEFAULT_LIMIT_GROUPS,
   DEFAULT_MONTHLY_LIMIT,
   DEFAULT_MONTHLY_WEEKEND_LIMIT,
@@ -12,7 +13,9 @@ import {
   getMonthlyWeekendRequestCount,
   toIsoDate,
   type RequestRecord,
+  type ShiftTypeDefinition,
 } from '../domain/quota';
+import { useRequestShiftDefinitionsQuery } from '../useRequests';
 
 export interface NewRequestFormProps {
   selectedName: string;
@@ -53,10 +56,33 @@ export function NewRequestForm({
   onSubmit,
   isSubmitting = false,
 }: NewRequestFormProps) {
+  const { data: dbShiftDefs = [] } = useRequestShiftDefinitionsQuery();
+
+  // If user is owner/admin, provide full catalog of departmental shifts.
+  // Regular doctors are constrained to standard requestable types (DEFAULT_SHIFT_TYPES).
+  const availableShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
+    if (!isOwner) {
+      return DEFAULT_SHIFT_TYPES;
+    }
+    if (dbShiftDefs.length > 0) {
+      return dbShiftDefs
+        .filter((s) => s.is_active)
+        .map((s) => ({
+          ID: s.code,
+          Name: s.code,
+          GroupID: ['OFF', 'AL', 'MC', 'EL', 'HKA', 'GOFF'].includes(s.code.toUpperCase())
+            ? 'OFF'
+            : null,
+          IsPublic: true,
+        }));
+    }
+    return ADMIN_ALL_SHIFT_TYPES;
+  }, [isOwner, dbShiftDefs]);
+
   const limitGroupById = useMemo(() => buildLimitGroupById(DEFAULT_LIMIT_GROUPS), []);
   const limitGroupIdByShiftType = useMemo(
-    () => buildLimitGroupIdByShiftType(DEFAULT_SHIFT_TYPES),
-    [],
+    () => buildLimitGroupIdByShiftType(availableShiftTypes),
+    [availableShiftTypes],
   );
 
   const usageByDateAndGroup = useMemo(() => {
@@ -269,11 +295,18 @@ export function NewRequestForm({
           </div>
         )}
 
-        {/* Shift Type 4-column Grid */}
+        {/* Shift Type Grid */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold text-slate-700">Request Type</span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-700">Request Type</span>
+            {isOwner && (
+              <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                Admin Mode: Full Shift Catalog ({availableShiftTypes.length} choices)
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-4 gap-2">
-            {DEFAULT_SHIFT_TYPES.map((st) => {
+            {availableShiftTypes.map((st) => {
               const status = getLimitStatusForType({
                 type: st.Name,
                 date: selectedDateKey,

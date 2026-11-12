@@ -128,6 +128,25 @@ export function useRequestTypesMapQuery() {
   });
 }
 
+export function useRequestShiftDefinitionsQuery() {
+  return useQuery({
+    queryKey: ['shift_definitions', 'request_catalog'] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shift_definitions')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to load shift definitions: ${error.message}`);
+      }
+      return data ?? [];
+    },
+    staleTime: 300_000,
+  });
+}
+
 export function useSubmitRequestMutation() {
   const queryClient = useQueryClient();
 

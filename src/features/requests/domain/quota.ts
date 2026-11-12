@@ -73,6 +73,25 @@ export const DEFAULT_SHIFT_TYPES: ShiftTypeDefinition[] = [
   { ID: 'COURSE', Name: 'COURSE', GroupID: null, IsPublic: true },
 ];
 
+export const ADMIN_ALL_SHIFT_TYPES: ShiftTypeDefinition[] = [
+  { ID: 'AM', Name: 'AM', GroupID: null, IsPublic: true },
+  { ID: 'PM', Name: 'PM', GroupID: null, IsPublic: true },
+  { ID: 'ON', Name: 'ON', GroupID: null, IsPublic: true },
+  { ID: 'ON1', Name: 'ON1', GroupID: null, IsPublic: false },
+  { ID: 'ON2', Name: 'ON2', GroupID: null, IsPublic: false },
+  { ID: 'NIGHT', Name: 'NIGHT', GroupID: null, IsPublic: false },
+  { ID: 'ND', Name: 'ND', GroupID: null, IsPublic: false },
+  { ID: 'PN', Name: 'PN', GroupID: null, IsPublic: false },
+  { ID: 'OFF', Name: 'OFF', GroupID: 'OFF', IsPublic: true },
+  { ID: 'GOFF', Name: 'GOFF', GroupID: 'OFF', IsPublic: false },
+  { ID: 'AL', Name: 'AL', GroupID: 'OFF', IsPublic: true },
+  { ID: 'MC', Name: 'MC', GroupID: 'OFF', IsPublic: false },
+  { ID: 'EL', Name: 'EL', GroupID: 'OFF', IsPublic: false },
+  { ID: 'HKA', Name: 'HKA', GroupID: 'OFF', IsPublic: true },
+  { ID: 'GHKA', Name: 'GHKA', GroupID: null, IsPublic: true },
+  { ID: 'COURSE', Name: 'COURSE', GroupID: null, IsPublic: true },
+];
+
 export function toIsoDate(dateLike: Date | string | null | undefined): string {
   if (!dateLike) return '';
   if (typeof dateLike === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateLike.trim())) {
