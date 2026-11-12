@@ -24,6 +24,7 @@ values
   ('2025-08-31', 'National Day', 'federal_and_selangor', false),
   ('2025-09-01', 'National Day Replacement', 'federal_and_selangor', false),
   ('2025-09-05', 'Maulidur Rasul', 'federal_and_selangor', false),
+  ('2025-09-15', 'Hari Kelepasan Am Tambahan (Hari Malaysia Replacement)', 'federal_and_selangor', false),
   ('2025-09-16', 'Malaysia Day', 'federal_and_selangor', false),
   ('2025-10-20', 'Deepavali', 'federal_and_selangor', false),
   ('2025-12-11', 'Sultan of Selangor''s Birthday', 'federal_and_selangor', true),
@@ -48,7 +49,9 @@ values
   ('2026-06-17', 'Awal Muharram', 'federal_and_selangor', false),
   ('2026-08-25', 'Maulidur Rasul', 'federal_and_selangor', false),
   ('2026-08-31', 'National Day', 'federal_and_selangor', false),
+  ('2026-09-01', 'Cuti Peristiwa Khas SUKMA 2026', 'selangor', true),
   ('2026-09-16', 'Malaysia Day', 'federal_and_selangor', false),
+  ('2026-10-25', 'Cuti Peristiwa Jubli Perak 25 Tahun Sultan Selangor', 'selangor', true),
   ('2026-11-08', 'Deepavali', 'federal_and_selangor', false),
   ('2026-11-09', 'Deepavali Holiday', 'federal_and_selangor', false),
   ('2026-12-11', 'Sultan of Selangor''s Birthday', 'federal_and_selangor', true)

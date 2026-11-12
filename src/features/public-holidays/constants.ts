@@ -17,12 +17,13 @@ export const BUILT_IN_HOLIDAYS: Record<string, string> = {
   '2025-08-31': 'National Day',
   '2025-09-01': 'National Day Replacement',
   '2025-09-05': 'Maulidur Rasul',
+  '2025-09-15': 'Hari Kelepasan Am Tambahan (Hari Malaysia Replacement)',
   '2025-09-16': 'Malaysia Day',
   '2025-10-20': 'Deepavali',
   '2025-12-11': "Sultan of Selangor's Birthday",
   '2025-12-25': 'Christmas Day',
 
-  // 2026 Selangor Public Holidays
+  // 2026 Selangor Public Holidays & Gazetted Ad-Hoc Declarations
   '2026-01-01': "New Year's Day",
   '2026-02-01': 'Thaipusam',
   '2026-02-02': 'Thaipusam Holiday',
@@ -41,7 +42,9 @@ export const BUILT_IN_HOLIDAYS: Record<string, string> = {
   '2026-06-17': 'Awal Muharram',
   '2026-08-25': 'Maulidur Rasul',
   '2026-08-31': 'National Day',
+  '2026-09-01': 'Cuti Peristiwa Khas SUKMA 2026',
   '2026-09-16': 'Malaysia Day',
+  '2026-10-25': 'Cuti Peristiwa Jubli Perak 25 Tahun Sultan Selangor',
   '2026-11-08': 'Deepavali',
   '2026-11-09': 'Deepavali Holiday',
   '2026-12-11': "Sultan of Selangor's Birthday",
