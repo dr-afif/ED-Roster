@@ -22,6 +22,17 @@ import { useAuthBoundary } from '@/platform/auth';
 import { generateGhkaMemoDocx } from './ghkaMemoExport';
 import { usePublicHolidayTracker } from './usePublicHolidayTracker';
 
+function getDoctorShortLabel(name?: string): string {
+  if (!name) return '';
+  const trimmed = name.trim();
+  const parts = trimmed.split(/\s+/);
+  const first = parts[0];
+  if (first && /^dr\.?$/i.test(first) && parts.length > 1 && parts[1]) {
+    return `Dr ${parts[1]}`;
+  }
+  return first || trimmed;
+}
+
 export function PublicHolidayTrackerRoute() {
   const { user } = useAuthBoundary();
   const isOwner = user?.role === 'owner';
@@ -887,26 +898,26 @@ export function PublicHolidayTrackerRoute() {
               </h3>
             </div>
             <div className="overflow-x-auto p-0 no-scrollbar border-b border-slate-100">
-              <table className="w-full text-left text-[10px] table-fixed">
+              <table className="w-full text-left text-[10px]">
                 <thead className="bg-white shadow-sm">
                   <tr className="text-slate-400 uppercase tracking-wider">
-                    <th className="py-2 px-3 font-bold w-24 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] z-10 border-b border-slate-100">
+                    <th className="py-2 px-3 font-bold w-28 min-w-[110px] sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] z-10 border-b border-slate-100">
                       Metric
                     </th>
                     {activeStaffList.map((doc) => (
                       <th
                         key={doc.id}
-                        className="py-2 px-1 font-bold text-center border-b border-slate-100 truncate"
+                        className="py-2 px-1 font-bold text-center border-b border-slate-100 min-w-[76px] w-[76px] text-slate-700"
                         title={doc.name}
                       >
-                        {doc.name.split(' ')[0]}
+                        <span className="block truncate">{getDoctorShortLabel(doc.name)}</span>
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-50 font-mono">
                   <tr className="hover:bg-slate-50 transition">
-                    <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <td className="py-1.5 px-3 font-bold font-sans text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] min-w-[110px]">
                       Opening
                     </td>
                     {activeStaffList.map((doc) => {
@@ -916,7 +927,7 @@ export function PublicHolidayTrackerRoute() {
                       return (
                         <td
                           key={doc.id}
-                          className="py-1.5 px-1 text-center font-semibold text-slate-500"
+                          className="py-1.5 px-1 text-center font-semibold text-slate-500 min-w-[76px] tabular-nums"
                         >
                           {s.openingBalance}
                         </td>
@@ -924,7 +935,7 @@ export function PublicHolidayTrackerRoute() {
                     })}
                   </tr>
                   <tr className="hover:bg-slate-50 transition">
-                    <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <td className="py-1.5 px-3 font-bold font-sans text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] min-w-[110px]">
                       PH Worked
                     </td>
                     {activeStaffList.map((doc) => {
@@ -932,7 +943,7 @@ export function PublicHolidayTrackerRoute() {
                       return (
                         <td
                           key={doc.id}
-                          className="py-1.5 px-1 text-center font-semibold text-indigo-600"
+                          className="py-1.5 px-1 text-center font-semibold text-indigo-600 min-w-[76px] tabular-nums"
                         >
                           {s.phWorked}
                         </td>
@@ -940,7 +951,7 @@ export function PublicHolidayTrackerRoute() {
                     })}
                   </tr>
                   <tr className="hover:bg-slate-50 transition">
-                    <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <td className="py-1.5 px-3 font-bold font-sans text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] min-w-[110px]">
                       GHKA Used
                     </td>
                     {activeStaffList.map((doc) => {
@@ -948,7 +959,7 @@ export function PublicHolidayTrackerRoute() {
                       return (
                         <td
                           key={doc.id}
-                          className="py-1.5 px-1 text-center font-semibold text-emerald-600"
+                          className="py-1.5 px-1 text-center font-semibold text-emerald-600 min-w-[76px] tabular-nums"
                         >
                           {s.ghkaUsed}
                         </td>
@@ -956,15 +967,15 @@ export function PublicHolidayTrackerRoute() {
                     })}
                   </tr>
                   <tr className="hover:bg-slate-50 transition">
-                    <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <td className="py-1.5 px-3 font-bold font-sans text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] min-w-[110px]">
                       Outstanding
                     </td>
                     {activeStaffList.map((doc) => {
                       const s = summaries.find((x) => x.staffId === doc.id) || { outstanding: 0 };
                       return (
-                        <td key={doc.id} className="py-1.5 px-1 text-center">
+                        <td key={doc.id} className="py-1.5 px-1 text-center min-w-[76px]">
                           <span
-                            className={`inline-block px-1.5 py-0.5 rounded-md font-bold ${
+                            className={`inline-block px-1.5 py-0.5 rounded-md font-bold tabular-nums ${
                               s.outstanding > 0
                                 ? 'bg-amber-100 text-amber-700'
                                 : 'bg-slate-100 text-slate-400'
@@ -977,7 +988,7 @@ export function PublicHolidayTrackerRoute() {
                     })}
                   </tr>
                   <tr className="hover:bg-slate-50 transition">
-                    <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <td className="py-1.5 px-3 font-bold font-sans text-slate-500 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] min-w-[110px]">
                       Excess
                     </td>
                     {activeStaffList.map((doc) => {
@@ -985,9 +996,9 @@ export function PublicHolidayTrackerRoute() {
                         excessGhkaUsed: 0,
                       };
                       return (
-                        <td key={doc.id} className="py-1.5 px-1 text-center">
+                        <td key={doc.id} className="py-1.5 px-1 text-center min-w-[76px]">
                           {s.excessGhkaUsed > 0 ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded-md font-bold bg-rose-100 text-rose-700">
+                            <span className="inline-block px-1.5 py-0.5 rounded-md font-bold bg-rose-100 text-rose-700 tabular-nums">
                               {s.excessGhkaUsed}
                             </span>
                           ) : (
@@ -1032,19 +1043,19 @@ export function PublicHolidayTrackerRoute() {
                   <p className="text-sm font-bold">No public holidays found for {activeYear}.</p>
                 </div>
               ) : (
-                <table className="w-full text-left border-separate border-spacing-0 table-fixed">
+                <table className="w-full text-left border-separate border-spacing-0">
                   <thead>
                     <tr className="bg-slate-50/80">
-                      <th className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-md py-2 px-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 border-r w-24 md:w-32 truncate">
+                      <th className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-md py-2 px-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 border-r w-28 md:w-36 min-w-[120px] truncate">
                         Holiday
                       </th>
                       {activeStaffList.map((doc) => (
                         <th
                           key={doc.id}
-                          className="py-2 px-1 text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-center truncate"
+                          className="py-2 px-1 text-[9px] font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center min-w-[76px] w-[76px]"
                           title={doc.name}
                         >
-                          {doc.name.split(' ')[0]}
+                          <span className="block truncate">{getDoctorShortLabel(doc.name)}</span>
                         </th>
                       ))}
                     </tr>
@@ -1059,7 +1070,7 @@ export function PublicHolidayTrackerRoute() {
                       return (
                         <tr key={row.date} className="hover:bg-slate-50/50 transition">
                           <td
-                            className="sticky left-0 z-10 bg-white py-1.5 px-2 border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate"
+                            className="sticky left-0 z-10 bg-white py-1.5 px-2 border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate min-w-[120px]"
                             title={row.name}
                           >
                             <p className="text-[10px] font-bold text-slate-800 truncate">
@@ -1078,7 +1089,7 @@ export function PublicHolidayTrackerRoute() {
                                 return (
                                   <td
                                     key={doc.id}
-                                    className="py-1 px-1 text-center align-middle border-b border-slate-100"
+                                    className="py-1 px-1 text-center align-middle border-b border-slate-100 min-w-[76px]"
                                   >
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
                                       HKA
@@ -1094,7 +1105,7 @@ export function PublicHolidayTrackerRoute() {
                                 return (
                                   <td
                                     key={doc.id}
-                                    className="py-1 px-1 text-center align-middle border-b border-slate-100"
+                                    className="py-1 px-1 text-center align-middle border-b border-slate-100 min-w-[76px]"
                                   >
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
                                       MC
@@ -1105,7 +1116,7 @@ export function PublicHolidayTrackerRoute() {
                               return (
                                 <td
                                   key={doc.id}
-                                  className="py-1.5 px-1 bg-slate-50/30 text-center border-b border-slate-100"
+                                  className="py-1.5 px-1 bg-slate-50/30 text-center border-b border-slate-100 min-w-[76px]"
                                 >
                                   <span className="text-[10px] text-slate-300 font-medium">—</span>
                                 </td>
@@ -1142,7 +1153,7 @@ export function PublicHolidayTrackerRoute() {
                             return (
                               <td
                                 key={doc.id}
-                                className={`py-1 px-1 text-center align-top border-b border-slate-100 ${
+                                className={`py-1 px-1 text-center align-top border-b border-slate-100 min-w-[76px] ${
                                   isUsed && isMemoEditMode
                                     ? 'cursor-pointer hover:bg-slate-100/50'
                                     : ''

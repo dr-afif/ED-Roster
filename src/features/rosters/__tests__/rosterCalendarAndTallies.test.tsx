@@ -169,7 +169,7 @@ describe('RosterTallyTables (Daily Coverage & Member Tallies)', () => {
       />,
     );
 
-    expect(screen.getByText('📊 Shift Distribution Tally')).toBeInTheDocument();
+    expect(screen.getByText(/Shift Distribution Tally/i)).toBeInTheDocument();
     expect(screen.getByText(/AM Shift/i)).toBeInTheDocument();
     expect(screen.getByText(/PM Shift/i)).toBeInTheDocument();
     expect(screen.getByText(/Night Duty/i)).toBeInTheDocument();

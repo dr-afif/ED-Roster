@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Settings2, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Moon,
+  Palmtree,
+  Settings2,
+  SlidersHorizontal,
+  Sun,
+  Sunset,
+  Users,
+} from 'lucide-react';
 import type { Assignment, StaffRosterIdentity } from '../domain/types';
 
 export interface TallyThresholds {
@@ -110,7 +123,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       <div className="overflow-hidden rounded-xl border border-border-default bg-surface-primary shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-default bg-surface-secondary/60 px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-text-primary">📊 Shift Distribution Tally</span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <BarChart3 className="h-4 w-4 text-teal-600" />
+              <span>Shift Distribution Tally</span>
+            </span>
             <span className="text-[11px] text-text-secondary">
               (Daily duty staffing totals & alert guidance)
             </span>
@@ -118,7 +134,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-primary px-2.5 py-1 text-xs font-semibold text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+            className="flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-primary px-2.5 py-1 text-xs font-semibold text-text-secondary hover:bg-surface-secondary hover:text-text-primary cursor-pointer"
           >
             <Settings2 className="h-3.5 w-3.5" />
             Alert Thresholds
@@ -128,8 +144,9 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
         {/* Optional Thresholds Config Panel */}
         {showSettings && (
           <div className="border-b border-border-default bg-amber-500/5 p-3 text-xs">
-            <div className="mb-2 font-semibold text-text-primary">
-              ⚙️ Shift Coverage Guidance Thresholds:
+            <div className="mb-2 inline-flex items-center gap-1.5 font-semibold text-text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+              <span>Shift Coverage Guidance Thresholds:</span>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <label className="flex flex-col gap-1">
@@ -221,7 +238,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               {/* Row AM */}
               <tr>
                 <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-amber-700 dark:text-amber-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  🌅 AM Shift
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sun className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>AM Shift</span>
+                  </span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.am ?? 0;
@@ -238,7 +258,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                     >
                       {count}
                       {isBelow && (
-                        <span className="text-[9px] text-amber-600 block leading-none">⚠️</span>
+                        <AlertTriangle className="h-2.5 w-2.5 text-amber-600 mx-auto mt-0.5" />
                       )}
                     </td>
                   );
@@ -248,7 +268,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               {/* Row PM */}
               <tr>
                 <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-sky-700 dark:text-sky-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  🌇 PM Shift
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sunset className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                    <span>PM Shift</span>
+                  </span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.pm ?? 0;
@@ -265,7 +288,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                     >
                       {count}
                       {isBelow && (
-                        <span className="text-[9px] text-amber-600 block leading-none">⚠️</span>
+                        <AlertTriangle className="h-2.5 w-2.5 text-amber-600 mx-auto mt-0.5" />
                       )}
                     </td>
                   );
@@ -275,7 +298,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               {/* Row Night */}
               <tr>
                 <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-indigo-700 dark:text-indigo-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  🌙 Night Duty (ND)
+                  <span className="inline-flex items-center gap-1.5">
+                    <Moon className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                    <span>Night Duty (ND)</span>
+                  </span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.night ?? 0;
@@ -300,7 +326,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                     >
                       {count}
                       {isAlert && (
-                        <span className="text-[9px] text-rose-600 block leading-none">⚠️</span>
+                        <AlertTriangle className="h-2.5 w-2.5 text-rose-600 mx-auto mt-0.5" />
                       )}
                     </td>
                   );
@@ -310,7 +336,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               {/* Row Total Leave */}
               <tr>
                 <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-medium text-emerald-700 dark:text-emerald-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  🏖️ Total Leave
+                  <span className="inline-flex items-center gap-1.5">
+                    <Palmtree className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span>Total Leave</span>
+                  </span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.leave ?? 0;
@@ -331,7 +360,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                     >
                       {count}
                       {isAbove && (
-                        <span className="text-[9px] text-rose-600 block leading-none">⚠️</span>
+                        <AlertTriangle className="h-2.5 w-2.5 text-rose-600 mx-auto mt-0.5" />
                       )}
                     </td>
                   );
@@ -341,7 +370,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               {/* Row Empty */}
               <tr>
                 <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans text-text-muted shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  ⚪ Unassigned
+                  <span className="inline-flex items-center gap-1.5">
+                    <Circle className="h-3 w-3 text-slate-400 shrink-0" />
+                    <span>Unassigned</span>
+                  </span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.empty ?? 0;
@@ -375,8 +407,9 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
             ) : (
               <ChevronRight className="h-4 w-4 text-text-muted" />
             )}
-            <span className="text-sm font-bold text-text-primary">
-              👤 Individual Member Shift Tally
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <Users className="h-4 w-4 text-teal-600 shrink-0" />
+              <span>Individual Member Shift Tally</span>
             </span>
             <span className="text-xs text-text-muted">
               ({staffList.length} members · Monthly workload distribution)

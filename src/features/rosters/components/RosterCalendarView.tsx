@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Award, Check, Edit3, Paintbrush, Search, X } from 'lucide-react';
+import { Award, Calendar, Check, Edit3, Paintbrush, Search, Stethoscope, UserCheck, X, Zap } from 'lucide-react';
 import type { EpAssignmentRow } from '../data/rosterQueries';
 import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
 
@@ -212,16 +212,18 @@ export function RosterCalendarView({
                 <button
                   type="button"
                   onClick={() => handleBatchFill('weekdays', 'EP_OFFICE_HOUR')}
-                  className="rounded-lg border border-teal-300 bg-white px-2.5 py-1 font-semibold text-teal-800 shadow-2xs hover:bg-teal-50 dark:border-teal-700 dark:bg-teal-900/40 dark:text-teal-200"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-2.5 py-1 font-semibold text-teal-800 shadow-2xs hover:bg-teal-50 cursor-pointer dark:border-teal-700 dark:bg-teal-900/40 dark:text-teal-200"
                 >
-                  ⚡ Fill Weekdays (Office Hour)
+                  <Zap className="h-3 w-3 text-teal-600 dark:text-teal-400" />
+                  <span>Fill Weekdays (Office Hour)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleBatchFill('weekends', 'EP_ONCALL')}
-                  className="rounded-lg border border-teal-300 bg-white px-2.5 py-1 font-semibold text-teal-800 shadow-2xs hover:bg-teal-50 dark:border-teal-700 dark:bg-teal-900/40 dark:text-teal-200"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-2.5 py-1 font-semibold text-teal-800 shadow-2xs hover:bg-teal-50 cursor-pointer dark:border-teal-700 dark:bg-teal-900/40 dark:text-teal-200"
                 >
-                  ⚡ Fill Weekends (On Call)
+                  <Zap className="h-3 w-3 text-teal-600 dark:text-teal-400" />
+                  <span>Fill Weekends (On Call)</span>
                 </button>
               </div>
             )}
@@ -266,8 +268,9 @@ export function RosterCalendarView({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-xs text-text-secondary">
-            📅 Showing {periodDates.length} days (MO &amp; EP Coverage)
+          <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-text-secondary">
+            <Calendar className="h-3.5 w-3.5 text-teal-600" />
+            <span>Showing {periodDates.length} days (MO &amp; EP Coverage)</span>
           </div>
 
           {isEditable && (
@@ -326,13 +329,19 @@ export function RosterCalendarView({
                   colSpan={3}
                   className="border-r border-slate-700 bg-slate-750 px-3 py-2 font-bold uppercase tracking-wider text-xs"
                 >
-                  👨‍⚕️ MEDICAL OFFICER (ON DUTY)
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    <UserCheck className="h-4 w-4 text-teal-400" />
+                    <span>MEDICAL OFFICER (ON DUTY)</span>
+                  </span>
                 </th>
                 <th
                   colSpan={2}
                   className="bg-teal-800 px-3 py-2 font-bold uppercase tracking-wider text-xs dark:bg-teal-900"
                 >
-                  🩺 EMERGENCY PHYSICIAN (SPECIALIST)
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    <Stethoscope className="h-4 w-4 text-teal-300" />
+                    <span>EMERGENCY PHYSICIAN (SPECIALIST)</span>
+                  </span>
                 </th>
               </tr>
 

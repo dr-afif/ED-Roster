@@ -148,8 +148,8 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
     expect(
       screen.getByText(/Displaying active requests made by team members/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /📅 Calendar View/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /📊 Table View/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Calendar View/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Table View/i })).toBeInTheDocument();
     expect(screen.getByText(/Roster Calendar/i)).toBeInTheDocument();
   });
 
@@ -157,13 +157,13 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
     renderStaffRequests();
 
     // Switch to Table View
-    fireEvent.click(screen.getByRole('button', { name: /📊 Table View/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Table View/i }));
     expect(screen.getByText(/Roster Table View/i)).toBeInTheDocument();
     expect(screen.getByText(/Dr Afif/i)).toBeInTheDocument();
     expect(screen.getByText(/Dr Sarah/i)).toBeInTheDocument();
 
     // Switch back to Calendar View
-    fireEvent.click(screen.getByRole('button', { name: /📅 Calendar View/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Calendar View/i }));
     expect(screen.getByText(/Roster Calendar/i)).toBeInTheDocument();
   });
 

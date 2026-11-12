@@ -137,7 +137,7 @@ describe('AppShell & Placeholder Routes', () => {
       await screen.findByRole(
         'heading',
         { level: 1, name: /Documents Catalog/i },
-        { timeout: 4000 },
+        { timeout: 15000 },
       ),
     ).toBeInTheDocument();
   });

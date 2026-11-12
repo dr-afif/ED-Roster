@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Calendar,
   CalendarDays,
   CalendarRange,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Layers,
   Lock,
   ShieldAlert,
+  Table,
   Unlock,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -646,13 +648,14 @@ export function RosterPeriodRoute() {
               id="tab-btn-calendar"
               data-testid="tab-btn-calendar"
               onClick={() => setViewFormat('calendar')}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition -mb-px ${
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-semibold transition -mb-px cursor-pointer ${
                 viewFormat === 'calendar'
                   ? 'border-brand-primary text-brand-primary'
                   : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
               }`}
             >
-              <span>📅 Calendar View</span>
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
+              <span>Calendar View</span>
               <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
                 (Duty Timetable &amp; EP)
               </span>
@@ -662,13 +665,14 @@ export function RosterPeriodRoute() {
               id="tab-btn-table"
               data-testid="tab-btn-table"
               onClick={() => setViewFormat('table')}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition -mb-px ${
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-semibold transition -mb-px cursor-pointer ${
                 viewFormat === 'table'
                   ? 'border-brand-primary text-brand-primary'
                   : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
               }`}
             >
-              <span>📊 Table View</span>
+              <Table className="h-3.5 w-3.5 shrink-0" />
+              <span>Table View</span>
               <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
                 (Spreadsheet &amp; Tallies)
               </span>
