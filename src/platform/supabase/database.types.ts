@@ -1742,6 +1742,23 @@ export type Database = {
           year: number;
         };
       };
+      admin_upsert_public_holiday: {
+        Args: {
+          p_holiday_date: string;
+          p_is_state_specific?: boolean;
+          p_jurisdiction?: string;
+          p_name: string;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          holiday_date: string;
+          id: number;
+          is_state_specific: boolean;
+          jurisdiction: string;
+          name: string;
+        };
+      };
       toggle_ph_memo_status: {
         Args: {
           p_holiday_date?: string | null;

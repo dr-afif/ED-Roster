@@ -178,6 +178,47 @@ export function usePublicHolidayTracker(yearFilter?: string) {
     },
   });
 
+  const upsertHolidayMutation = useMutation({
+    mutationFn: async ({
+      holidayDate,
+      name,
+      jurisdiction = 'federal_and_selangor',
+      isStateSpecific = false,
+    }: {
+      holidayDate: string;
+      name: string;
+      jurisdiction?: string;
+      isStateSpecific?: boolean;
+    }) => {
+      const { data, error } = await supabase.rpc('admin_upsert_public_holiday', {
+        p_holiday_date: holidayDate,
+        p_name: name,
+        p_jurisdiction: jurisdiction,
+        p_is_state_specific: isStateSpecific,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['public-holidays', 'calendar'] });
+    },
+  });
+
+  const deleteHolidayMutation = useMutation({
+    mutationFn: async (holidayDate: string) => {
+      const { error } = await supabase
+        .from('public_holidays')
+        .delete()
+        .eq('holiday_date', holidayDate);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['public-holidays', 'calendar'] });
+    },
+  });
+
   // Data processing
   const holidaysMap = useMemo(() => {
     return mergeHolidays(holidaysQuery.data || []);
@@ -313,7 +354,10 @@ export function usePublicHolidayTracker(yearFilter?: string) {
     matrixRows,
     totals,
     memoSubmissionsMap,
+    holidaysList: holidaysQuery.data || [],
     upsertOpeningBalanceMutation,
     toggleMemoStatusMutation,
+    upsertHolidayMutation,
+    deleteHolidayMutation,
   };
 }

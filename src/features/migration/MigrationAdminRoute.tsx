@@ -19,6 +19,22 @@ import { MigrationNewBatchModal } from './components/MigrationNewBatchModal';
 import { createSampleLegacyExport } from './domain/migrationEngine';
 import { Layers, Users, ShieldCheck, ChevronLeft, AlertCircle } from 'lucide-react';
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object') {
+    const candidate = err as { message?: unknown; details?: unknown; hint?: unknown };
+    if (typeof candidate.message === 'string' && candidate.message.trim()) {
+      return candidate.message;
+    }
+    if (typeof candidate.details === 'string' && candidate.details.trim()) {
+      return candidate.details;
+    }
+  }
+  return fallback;
+}
+
 export function MigrationAdminRoute() {
   const { data: batches = [] } = useMigrationBatchesQuery();
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -74,9 +90,7 @@ export function MigrationAdminRoute() {
       setActiveTab('reconciliation');
     } catch (err) {
       console.error('Failed to load sample rehearsal batch:', err);
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to stage and reconcile rehearsal batch.',
-      );
+      setErrorMessage(getErrorMessage(err, 'Failed to stage and reconcile rehearsal batch.'));
     } finally {
       setIsCreatingSample(false);
     }
@@ -94,7 +108,7 @@ export function MigrationAdminRoute() {
       setSelectedBatchId(params.batchId);
     } catch (err) {
       console.error('Failed to create batch:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to create migration batch.');
+      setErrorMessage(getErrorMessage(err, 'Failed to create migration batch.'));
     }
   };
 
@@ -120,7 +134,7 @@ export function MigrationAdminRoute() {
       });
     } catch (err) {
       console.error('Failed to save mapping:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to save staff mapping.');
+      setErrorMessage(getErrorMessage(err, 'Failed to save staff mapping.'));
     }
   };
 
@@ -140,7 +154,7 @@ export function MigrationAdminRoute() {
       });
     } catch (err) {
       console.error('Failed to update disposition:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to update disposition.');
+      setErrorMessage(getErrorMessage(err, 'Failed to update disposition.'));
     }
   };
 
@@ -154,7 +168,7 @@ export function MigrationAdminRoute() {
       });
     } catch (err) {
       console.error('Failed to run transform:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to run migration transform.');
+      setErrorMessage(getErrorMessage(err, 'Failed to run migration transform.'));
     }
   };
 
@@ -165,7 +179,7 @@ export function MigrationAdminRoute() {
       await revertMutation.mutateAsync({ batchId: selectedBatchId });
     } catch (err) {
       console.error('Failed to revert batch:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to revert migration batch.');
+      setErrorMessage(getErrorMessage(err, 'Failed to revert migration batch.'));
     }
   };
 
