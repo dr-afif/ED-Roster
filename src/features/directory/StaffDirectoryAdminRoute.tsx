@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Shield, UserCheck, UserPlus, UserX } from 'lucide-react';
+import { Edit2, Plus, Search, Shield, UserCheck, UserPlus, UserX } from 'lucide-react';
 import { useAuth, OwnerUxBoundary } from '@/platform/auth';
 import { Button, Modal, PageHeader, StatusBadge, SurfaceCard } from '@/shared/ui';
 import { FormField } from '@/shared/forms';
@@ -7,6 +7,7 @@ import {
   useStaffDirectoryQuery,
   useCreateStaffMemberMutation,
   useUpdateAllowlistStatusMutation,
+  useUpdateStaffMemberMutation,
   type DirectoryStaffMember,
 } from './useDirectoryAdmin';
 
@@ -15,6 +16,7 @@ export function StaffDirectoryAdminRoute() {
   const { data: staffList = [], isLoading, error } = useStaffDirectoryQuery();
   const createMutation = useCreateStaffMemberMutation();
   const updateStatusMutation = useUpdateAllowlistStatusMutation();
+  const updateStaffMutation = useUpdateStaffMemberMutation();
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +26,7 @@ export function StaffDirectoryAdminRoute() {
 
   // Modals state
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<DirectoryStaffMember | null>(null);
   const [statusActionTarget, setStatusActionTarget] = useState<{
     member: DirectoryStaffMember;
     action: 'active' | 'suspended' | 'revoked';
@@ -42,6 +45,20 @@ export function StaffDirectoryAdminRoute() {
     registration_number: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Edit staff form state
+  const [editForm, setEditForm] = useState({
+    staff_code: '',
+    roster_name: '',
+    display_name: '',
+    staff_group: 'Medical Officer',
+    email: '',
+    role: 'staff' as 'owner' | 'staff',
+    active: true,
+    phone: '',
+    registration_number: '',
+  });
+  const [editFormError, setEditFormError] = useState<string | null>(null);
 
   // Filtered members
   const filteredStaff = staffList.filter((m) => {
@@ -115,6 +132,59 @@ export function StaffDirectoryAdminRoute() {
       setIsInviteOpen(false);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to register staff member.');
+    }
+  }
+
+  function handleOpenEdit(member: DirectoryStaffMember) {
+    setEditFormError(null);
+    setEditingMember(member);
+    setEditForm({
+      staff_code: member.staff_code,
+      roster_name: member.roster_name,
+      display_name: member.display_name,
+      staff_group: member.staff_group,
+      email: member.allowed_user?.email ?? '',
+      role: (member.allowed_user?.role as 'owner' | 'staff') ?? 'staff',
+      active: member.active,
+      phone: member.staff_profile?.phone ?? '',
+      registration_number: member.staff_profile?.registration_number ?? '',
+    });
+  }
+
+  async function handleUpdateStaff(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingMember) return;
+    setEditFormError(null);
+
+    if (!editForm.staff_code.trim()) {
+      setEditFormError('Staff code is required.');
+      return;
+    }
+    if (!editForm.roster_name.trim()) {
+      setEditFormError('Roster short name is required.');
+      return;
+    }
+    if (!editForm.display_name.trim()) {
+      setEditFormError('Display name is required.');
+      return;
+    }
+
+    try {
+      await updateStaffMutation.mutateAsync({
+        staff_id: editingMember.id,
+        staff_code: editForm.staff_code.trim(),
+        roster_name: editForm.roster_name.trim(),
+        display_name: editForm.display_name.trim(),
+        staff_group: editForm.staff_group,
+        phone: editForm.phone.trim() || undefined,
+        registration_number: editForm.registration_number.trim() || undefined,
+        email: editForm.email.trim() || undefined,
+        role: editForm.role,
+        active: editForm.active,
+      });
+      setEditingMember(null);
+    } catch (err) {
+      setEditFormError(err instanceof Error ? err.message : 'Failed to update staff member.');
     }
   }
 
@@ -315,47 +385,61 @@ export function StaffDirectoryAdminRoute() {
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {member.allowed_user && !isOwnerRole ? (
-                            <div className="flex items-center justify-end gap-1.5">
-                              {status === 'active' ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusActionTarget({ member, action: 'suspended' })
-                                  }
-                                  className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning-soft focus-visible:outline-brand-primary"
-                                >
-                                  Suspend
-                                </button>
-                              ) : status === 'suspended' ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusActionTarget({ member, action: 'active' })
-                                  }
-                                  className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-success hover:bg-success-soft focus-visible:outline-brand-primary"
-                                >
-                                  Activate
-                                </button>
-                              ) : null}
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(member)}
+                              className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-border-default bg-surface-solid px-2.5 py-1 text-xs font-semibold text-text-primary hover:bg-surface-muted transition"
+                              title="Edit staff member"
+                            >
+                              <Edit2 className="h-3 w-3 text-brand-primary" />
+                              <span>Edit</span>
+                            </button>
 
-                              {status !== 'revoked' && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusActionTarget({ member, action: 'revoked' })
-                                  }
-                                  className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger-soft focus-visible:outline-brand-primary"
-                                >
-                                  Revoke
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-text-secondary italic">
-                              {isSelf ? '(Current Session)' : 'Protected'}
-                            </span>
-                          )}
+                            {member.allowed_user && !isOwnerRole && (
+                              <>
+                                {status === 'active' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setStatusActionTarget({ member, action: 'suspended' })
+                                    }
+                                    className="inline-flex min-h-8 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning-soft transition"
+                                  >
+                                    Suspend
+                                  </button>
+                                ) : status === 'suspended' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setStatusActionTarget({ member, action: 'active' })
+                                    }
+                                    className="inline-flex min-h-8 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-success hover:bg-success-soft transition"
+                                  >
+                                    Activate
+                                  </button>
+                                ) : null}
+
+                                {status !== 'revoked' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setStatusActionTarget({ member, action: 'revoked' })
+                                    }
+                                    className="inline-flex min-h-8 items-center justify-center rounded-lg px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger-soft transition"
+                                  >
+                                    Revoke
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {isSelf && (
+                              <span className="text-[11px] text-text-secondary italic ml-1">
+                                (You)
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -509,6 +593,174 @@ export function StaffDirectoryAdminRoute() {
               </Button>
               <Button variant="primary" type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Registering...' : 'Invite & Authorize'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Edit Staff Member Modal */}
+        <Modal
+          isOpen={editingMember !== null}
+          onClose={() => setEditingMember(null)}
+          title={`Edit Staff: ${editingMember?.display_name ?? ''}`}
+          description="Update roster short name, display name, clinical grade, staff code, and account details."
+          maxWidth="md"
+        >
+          <form onSubmit={handleUpdateStaff} className="space-y-4">
+            {editFormError && (
+              <div
+                className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger"
+                role="alert"
+              >
+                {editFormError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                id="edit-roster-name"
+                label="Roster Short Name"
+                required
+                hint="Used on grid cells & duty tallies (e.g. Dr Sarah)"
+              >
+                <input
+                  id="edit-roster-name"
+                  type="text"
+                  required
+                  value={editForm.roster_name}
+                  onChange={(e) => setEditForm({ ...editForm, roster_name: e.target.value })}
+                  placeholder="Dr Sarah"
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+
+              <FormField
+                id="edit-display-name"
+                label="Full Display Name"
+                required
+                hint="Full official name (e.g. Dr Sarah Jenkins)"
+              >
+                <input
+                  id="edit-display-name"
+                  type="text"
+                  required
+                  value={editForm.display_name}
+                  onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
+                  placeholder="Dr Sarah Jenkins"
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                id="edit-code"
+                label="Staff Code"
+                required
+                hint="Unique identifier (e.g. MO-105)"
+              >
+                <input
+                  id="edit-code"
+                  type="text"
+                  required
+                  value={editForm.staff_code}
+                  onChange={(e) => setEditForm({ ...editForm, staff_code: e.target.value })}
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+
+              <FormField id="edit-group" label="Staff Group / Grade" required>
+                <select
+                  id="edit-group"
+                  value={editForm.staff_group}
+                  onChange={(e) => setEditForm({ ...editForm, staff_group: e.target.value })}
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                >
+                  <option value="Medical Officer">Medical Officer (MO)</option>
+                  <option value="Emergency Physician">Emergency Physician</option>
+                  <option value="Specialist">Specialist</option>
+                  <option value="Clinical Fellow">Clinical Fellow</option>
+                  <option value="House Officer">House Officer</option>
+                </select>
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField id="edit-email" label="Google Account Email" hint="Authorized OAuth email">
+                <input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  placeholder="staff@upm.edu.my or gmail"
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+
+              <FormField id="edit-role" label="Application Role" required>
+                <select
+                  id="edit-role"
+                  value={editForm.role}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, role: e.target.value as 'owner' | 'staff' })
+                  }
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                >
+                  <option value="staff">Staff (Medical Officer)</option>
+                  <option value="owner">Owner (Administrator)</option>
+                </select>
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField id="edit-phone" label="Contact Phone" hint="e.g. +60123456789">
+                <input
+                  id="edit-phone"
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="+60123456789"
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+
+              <FormField
+                id="edit-mmc"
+                label="MMC Registration No."
+                hint="Malaysian Medical Council #"
+              >
+                <input
+                  id="edit-mmc"
+                  type="text"
+                  value={editForm.registration_number}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, registration_number: e.target.value })
+                  }
+                  placeholder="MMC 12345"
+                  className="w-full rounded-xl border border-border-subtle bg-surface-solid px-3.5 py-2.5 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+                />
+              </FormField>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="edit-active"
+                type="checkbox"
+                checked={editForm.active}
+                onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
+                className="h-4 w-4 rounded border-border-subtle text-brand-primary focus:ring-brand-primary"
+              />
+              <label htmlFor="edit-active" className="text-xs font-medium text-text-primary">
+                Active clinical staff member (eligible for schedule assignments)
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border-subtle">
+              <Button variant="secondary" onClick={() => setEditingMember(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" disabled={updateStaffMutation.isPending}>
+                {updateStaffMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </form>

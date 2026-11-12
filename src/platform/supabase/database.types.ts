@@ -1624,6 +1624,21 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      admin_update_staff_member: {
+        Args: {
+          p_active?: boolean;
+          p_display_name: string;
+          p_email?: string;
+          p_phone?: string;
+          p_registration_number?: string;
+          p_role?: string;
+          p_roster_name: string;
+          p_staff_code: string;
+          p_staff_group: string;
+          p_staff_id: number;
+        };
+        Returns: boolean;
+      };
       bootstrap_my_session: {
         Args: never;
         Returns: {

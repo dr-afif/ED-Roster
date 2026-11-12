@@ -157,3 +157,46 @@ export function useUpdateAllowlistStatusMutation() {
     },
   });
 }
+
+export type UpdateStaffPayload = {
+  staff_id: number;
+  staff_code: string;
+  roster_name: string;
+  display_name: string;
+  staff_group: string;
+  phone?: string;
+  registration_number?: string;
+  email?: string;
+  role?: 'owner' | 'staff';
+  active?: boolean;
+};
+
+export function useUpdateStaffMemberMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateStaffPayload) => {
+      const { data, error } = await supabase.rpc('admin_update_staff_member', {
+        p_staff_id: payload.staff_id,
+        p_staff_code: payload.staff_code,
+        p_roster_name: payload.roster_name,
+        p_display_name: payload.display_name,
+        p_staff_group: payload.staff_group,
+        p_phone: payload.phone || undefined,
+        p_registration_number: payload.registration_number || undefined,
+        p_email: payload.email || undefined,
+        p_role: payload.role || undefined,
+        p_active: payload.active ?? true,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff_directory'] });
+      queryClient.invalidateQueries({ queryKey: ['rosters'] });
+    },
+  });
+}

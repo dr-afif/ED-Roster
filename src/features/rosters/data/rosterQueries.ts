@@ -47,6 +47,26 @@ export function useRosterPeriodQuery(year: string, month: string) {
   });
 }
 
+export function useAllRosterPeriodsQuery() {
+  return useQuery({
+    queryKey: ['roster_periods', 'all_periods'] as const,
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('roster_periods')
+          .select('*')
+          .order('period_start', { ascending: false });
+
+        if (error) return [];
+        return data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
 export function useShiftDefinitionsQuery(includeInactive = false) {
   return useQuery({
     queryKey: includeInactive

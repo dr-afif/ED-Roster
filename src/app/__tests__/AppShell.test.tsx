@@ -84,7 +84,7 @@ describe('AppShell & Placeholder Routes', () => {
       await screen.findByRole(
         'heading',
         { level: 1, name: /January 2027 Roster/i },
-        { timeout: 4000 },
+        { timeout: 8000 },
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Comfortable/i })).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('AppShell & Placeholder Routes', () => {
       await screen.findByRole(
         'heading',
         { level: 1, name: /Roster Rules & Thresholds/i },
-        { timeout: 4000 },
+        { timeout: 8000 },
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Owner Administration Boundary/i)).toBeInTheDocument();

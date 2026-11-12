@@ -67,6 +67,10 @@ vi.mock('../useDirectoryAdmin', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useUpdateStaffMemberMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 function renderWithProviders(ui: React.ReactElement, isOwner = true) {
@@ -123,6 +127,21 @@ describe('StaffDirectoryAdminRoute', () => {
     expect(screen.getByLabelText(/google account email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/staff code/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/roster short name/i)).toBeInTheDocument();
+  });
+
+  it('opens edit staff modal when clicking edit button', () => {
+    renderWithProviders(<StaffDirectoryAdminRoute />);
+
+    const [firstEditBtn] = screen.getAllByRole('button', { name: /edit/i });
+    expect(firstEditBtn).toBeDefined();
+    if (!firstEditBtn) throw new Error('Edit button not found');
+    fireEvent.click(firstEditBtn);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/edit staff: dr muhammad afif/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Dr Afif')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Dr Muhammad Afif')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('MO-ADMIN')).toBeInTheDocument();
   });
 
   it('filters staff by search query', () => {

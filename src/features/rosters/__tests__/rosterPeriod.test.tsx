@@ -21,6 +21,19 @@ vi.mock('../data/rosterQueries', () => ({
     isLoading: false,
     error: null,
   }),
+  useAllRosterPeriodsQuery: () => ({
+    data: [
+      {
+        id: 1,
+        period_start: '2027-01-01',
+        period_end: '2027-01-31',
+        status: 'draft',
+        revision: 3,
+        legacy_read_only: false,
+      },
+    ],
+    isLoading: false,
+  }),
   useRosterStaffQuery: () => ({
     data: [
       {

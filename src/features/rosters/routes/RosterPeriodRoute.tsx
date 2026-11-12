@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  CalendarDays,
   CalendarRange,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   FileEdit,
   History,
   Layers,
@@ -10,7 +13,7 @@ import {
   ShieldAlert,
   Unlock,
 } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/platform/auth';
 import {
   FIRST_NATIVE_ROSTER_PERIOD,
@@ -34,6 +37,7 @@ import {
   type PlannedAssignmentRow,
   type ShiftSemanticRow,
   type StaffingThresholdRow,
+  useAllRosterPeriodsQuery,
   useAmendmentEventsQuery,
   useBatchUpsertEpAssignmentsMutation,
   useDeleteDraftAssignmentMutation,
@@ -64,6 +68,7 @@ import type {
 } from '../domain/types';
 
 export function RosterPeriodRoute() {
+  const navigate = useNavigate();
   const params = useParams();
   const parsed = rosterRouteParamsSchema.safeParse(params);
   const isPeriodValid = parsed.success && isValidRosterYearMonth(parsed.data.yyyy, parsed.data.mm);
@@ -97,6 +102,7 @@ export function RosterPeriodRoute() {
 
   // Queries
   const { data: periodRow, isLoading: isPeriodLoading } = useRosterPeriodQuery(yyyy, mm);
+  const { data: allPeriods = [] } = useAllRosterPeriodsQuery();
   const { data: staffList = [], isLoading: isStaffLoading } = useRosterStaffQuery();
   const { data: shiftDefinitions = [] } = useShiftDefinitionsQuery();
   const { data: shiftSemanticsRows = [] } = useShiftSemanticsQuery();
@@ -119,6 +125,26 @@ export function RosterPeriodRoute() {
   const deleteMutation = useDeleteDraftAssignmentMutation(periodId);
   const upsertEpMutation = useUpsertEpAssignmentMutation(periodId);
   const batchUpsertEpMutation = useBatchUpsertEpAssignmentsMutation(periodId);
+
+  const handleMonthChange = (newYyyy: string, newMm: string) => {
+    navigate(`/rosters/${newYyyy}/${newMm}`);
+  };
+
+  const handlePrevMonth = () => {
+    const curDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+    curDate.setMonth(curDate.getMonth() - 1);
+    const prevY = String(curDate.getFullYear());
+    const prevM = String(curDate.getMonth() + 1).padStart(2, '0');
+    handleMonthChange(prevY, prevM);
+  };
+
+  const handleNextMonth = () => {
+    const curDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+    curDate.setMonth(curDate.getMonth() + 1);
+    const nextY = String(curDate.getFullYear());
+    const nextM = String(curDate.getMonth() + 1).padStart(2, '0');
+    handleMonthChange(nextY, nextM);
+  };
 
   // Compute period dates
   const periodDates = useMemo(() => {
@@ -286,18 +312,22 @@ export function RosterPeriodRoute() {
     );
   }
 
-  const periodStatus = periodRow?.status ?? 'draft';
-  const isDraft = periodStatus === 'draft';
-  const isPublished = periodStatus === 'published' || periodStatus === 'amended';
-  const isClosed = periodStatus === 'closed';
+  const isLegacyReadOnly = Boolean(periodRow?.legacy_read_only);
+  const periodStatus = isLegacyReadOnly ? 'legacy (read-only)' : (periodRow?.status ?? 'draft');
+  const isDraft = !isLegacyReadOnly && (periodRow?.status === 'draft' || !periodRow);
+  const isPublished =
+    !isLegacyReadOnly && (periodRow?.status === 'published' || periodRow?.status === 'amended');
+  const isClosed = !isLegacyReadOnly && periodRow?.status === 'closed';
 
   // Grid cell interactability:
   // In draft mode: clicking cell opens ShiftPickerModal (for owner).
   // In published/amended mode (current view): clicking cell opens AmendRosterModal (for owner).
-  // In planned view or closed status: strictly read-only.
-  const isGridInteractive = isOwner && (isDraft || (isPublished && viewMode === 'current'));
+  // In planned view, closed status, or legacy read-only mode: strictly read-only.
+  const isGridInteractive =
+    !isLegacyReadOnly && isOwner && (isDraft || (isPublished && viewMode === 'current'));
 
   const handleCellSelect = (staff: StaffRosterIdentity, date: string, currentCode?: string) => {
+    if (isLegacyReadOnly) return;
     if (isDraft) {
       setSelectedCell({ staff, date, currentCode });
     } else if (isPublished && viewMode === 'current') {
@@ -316,48 +346,56 @@ export function RosterPeriodRoute() {
         eyebrow={`Roster Workspace · ${yyyy}-${mm}`}
         title={`${periodLabel} Roster`}
         description={
-          isDraft
-            ? 'Interactive draft roster grid. Build and verify schedule assignments before official atomic publication.'
-            : isClosed
-              ? 'Closed operational period. Reconciled and sealed with immutable audit trail.'
-              : 'Live operational schedule with active amendment overlay and GOFF compensatory rest tracking.'
+          isLegacyReadOnly
+            ? `Historical legacy schedule ingested from Google Sheets (Batch: ${periodRow?.import_batch_id ?? 'Rehearsal'}). Locked for auditing.`
+            : isDraft
+              ? 'Interactive draft roster grid. Build and verify schedule assignments before official atomic publication.'
+              : isClosed
+                ? 'Closed operational period. Reconciled and sealed with immutable audit trail.'
+                : 'Live operational schedule with active amendment overlay and GOFF compensatory rest tracking.'
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge
               label={periodStatus.toUpperCase()}
               tone={
-                periodStatus === 'published' || periodStatus === 'amended'
-                  ? 'success'
-                  : periodStatus === 'closed'
-                    ? 'neutral'
-                    : 'brand'
+                isLegacyReadOnly
+                  ? 'warning'
+                  : periodStatus === 'published' || periodStatus === 'amended'
+                    ? 'success'
+                    : periodStatus === 'closed'
+                      ? 'neutral'
+                      : 'brand'
               }
               icon={
-                periodStatus === 'published' || periodStatus === 'amended'
-                  ? CheckCircle2
-                  : periodStatus === 'closed'
-                    ? Lock
-                    : CalendarRange
+                isLegacyReadOnly
+                  ? ShieldAlert
+                  : periodStatus === 'published' || periodStatus === 'amended'
+                    ? CheckCircle2
+                    : periodStatus === 'closed'
+                      ? Lock
+                      : CalendarRange
               }
             />
 
-            <SaveStatusBar
-              state={
-                isDraftFetching || upsertMutation.isPending || deleteMutation.isPending
-                  ? 'saving'
-                  : 'saved'
-              }
-              label={
-                rulesOutput
-                  ? `Checksum ${rulesOutput.checksum.slice(0, 8)} · Rule v${ruleVersionRow?.version ?? 1}`
-                  : 'Ready'
-              }
-              revision={periodRow?.revision ?? 0}
-            />
+            {!isLegacyReadOnly && (
+              <SaveStatusBar
+                state={
+                  isDraftFetching || upsertMutation.isPending || deleteMutation.isPending
+                    ? 'saving'
+                    : 'saved'
+                }
+                label={
+                  rulesOutput
+                    ? `Checksum ${rulesOutput.checksum.slice(0, 8)} · Rule v${ruleVersionRow?.version ?? 1}`
+                    : 'Ready'
+                }
+                revision={periodRow?.revision ?? 0}
+              />
+            )}
 
             {/* Owner Actions */}
-            {isOwner && (
+            {isOwner && !isLegacyReadOnly && (
               <>
                 {isDraft && (
                   <Button
@@ -410,6 +448,94 @@ export function RosterPeriodRoute() {
           </div>
         }
       />
+
+      {/* Month Navigator Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-primary p-3 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrevMonth}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default bg-surface-secondary/70 text-text-primary hover:bg-surface-secondary transition"
+            title="Previous Month"
+            aria-label="Previous Month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <div className="flex items-center gap-2 rounded-xl border border-border-default bg-surface-secondary/40 px-3 py-1">
+            <CalendarDays className="h-4 w-4 text-brand-primary shrink-0" />
+            <input
+              type="month"
+              value={`${yyyy}-${mm}`}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                const [targetYear, targetMonth] = e.target.value.split('-');
+                if (targetYear && targetMonth) {
+                  handleMonthChange(targetYear, targetMonth);
+                }
+              }}
+              className="bg-transparent font-semibold text-xs text-text-primary focus:outline-none cursor-pointer"
+              title="Select Roster Month"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default bg-surface-secondary/70 text-text-primary hover:bg-surface-secondary transition"
+            title="Next Month"
+            aria-label="Next Month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Existing Roster Periods Shortcut Chips */}
+        {allPeriods.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-0.5">
+            <span className="text-[11px] font-medium text-text-muted shrink-0">Periods:</span>
+            {allPeriods.map((p) => {
+              const [pYear, pMonth] = p.period_start.split('-');
+              if (!pYear || !pMonth) return null;
+              const isSelected = pYear === yyyy && pMonth === mm;
+              return (
+                <button
+                  key={p.period_start}
+                  type="button"
+                  onClick={() => handleMonthChange(pYear, pMonth)}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    isSelected
+                      ? 'bg-brand-primary text-white shadow-2xs'
+                      : 'bg-surface-secondary/60 text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <span>{formatRosterPeriodLabel(pYear, pMonth)}</span>
+                  {p.legacy_read_only && (
+                    <span className="rounded bg-amber-500/20 px-1 text-[9px] font-bold text-amber-900 dark:text-amber-200">
+                      Legacy
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Legacy Read-Only Historical Banner */}
+      {isLegacyReadOnly && (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-2xs dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="flex-1">
+            <p className="font-bold">Historical Google Sheets Roster (Read-Only Audit Archive)</p>
+            <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-400">
+              This schedule was ingested from legacy Google Sheets workbook (
+              {periodRow?.import_batch_id ?? 'Rehearsal'}). It is preserved in read-only mode to
+              safeguard historical audit evidence (ADR-002).
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Roster Snapshot Archive & Telegram Dispatch */}
       {periodRow && !isDraft && (
