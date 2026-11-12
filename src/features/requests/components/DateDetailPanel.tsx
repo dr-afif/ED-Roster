@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
 import { NewRequestForm } from './NewRequestForm';
 
@@ -160,11 +161,11 @@ export function DateDetailPanel({
           </div>
           <button
             type="button"
-            className="date-panel__close-btn"
+            className="date-panel__close-btn inline-flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full p-1 transition-colors"
             onClick={handleClose}
             aria-label="Close panel"
           >
-            ✕
+            <X className="h-5 w-5 text-slate-500" />
           </button>
         </div>
 

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 
 :root {
@@ -16,12 +17,12 @@
   --color-text-muted: #94a3b8;
   --color-text-inverse: #ffffff;
 
-  /* Brand & focus tokens */
-  --color-brand-primary: #4338ca;
-  --color-brand-primary-hover: #3730a3;
-  --color-brand-primary-soft: #eef2ff;
-  --color-brand-secondary: #0f766e;
-  --color-brand-secondary-soft: #f0fdfa;
+  /* Premium clinical brand tokens (Medical Deep Teal & Health Cyan) */
+  --color-brand-primary: #0f766e;
+  --color-brand-primary-hover: #115e59;
+  --color-brand-primary-soft: #f0fdfa;
+  --color-brand-secondary: #0891b2;
+  --color-brand-secondary-soft: #ecfeff;
 
   /* Semantic state tokens (always paired with icon + text, never color alone) */
   --color-success: #047857;
@@ -87,14 +88,17 @@
   --color-border-strong: var(--color-border-strong);
 
   --font-sans:
-    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
+    'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @layer base {
   html {
     font-size: 16px;
     font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+    letter-spacing: -0.012em;
     background-color: var(--color-surface-canvas);
     color: var(--color-text-primary);
   }

@@ -196,7 +196,7 @@ export function AppShell() {
           <div className="flex items-center gap-2.5 overflow-hidden">
             <span
               aria-hidden="true"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-primary text-sm font-bold text-text-inverse"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 text-sm font-extrabold text-white shadow-xs ring-1 ring-black/5"
             >
               RQ
             </span>
@@ -260,10 +260,10 @@ export function AppShell() {
                   to={item.to}
                   title={isSidebarCollapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
                     active
-                      ? 'bg-brand-primary text-text-inverse'
-                      : 'text-text-secondary hover:bg-surface-muted hover:text-text-primary'
+                      ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   } ${isSidebarCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -289,10 +289,10 @@ export function AppShell() {
                   to={item.to}
                   title={isSidebarCollapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
                     active
-                      ? 'bg-brand-primary text-text-inverse'
-                      : 'text-text-secondary hover:bg-surface-muted hover:text-text-primary'
+                      ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   } ${isSidebarCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -346,7 +346,7 @@ export function AppShell() {
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary text-xs font-bold text-text-inverse"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-emerald-800 text-xs font-bold text-white shadow-xs ring-1 ring-black/5"
           >
             RQ
           </span>
@@ -478,9 +478,9 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
                         active
-                          ? 'bg-brand-primary text-text-inverse'
+                          ? 'bg-teal-700 text-white shadow-xs'
                           : 'text-text-primary hover:bg-surface-muted'
                       }`}
                     >
@@ -503,9 +503,9 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
                         active
-                          ? 'bg-brand-primary text-text-inverse'
+                          ? 'bg-teal-700 text-white shadow-xs'
                           : 'text-text-primary hover:bg-surface-muted'
                       }`}
                     >

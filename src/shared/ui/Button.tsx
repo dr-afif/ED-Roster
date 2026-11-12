@@ -8,9 +8,12 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const VARIANT_STYLES: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-primary text-text-inverse border-transparent hover:bg-brand-primary-hover',
-  secondary: 'bg-surface-solid text-text-primary border-border-subtle hover:bg-surface-muted',
-  danger: 'bg-danger text-text-inverse border-transparent hover:opacity-95',
+  primary:
+    'bg-brand-primary text-text-inverse border-transparent hover:bg-brand-primary-hover shadow-xs active:scale-[0.98] cursor-pointer font-semibold transition-all duration-150',
+  secondary:
+    'bg-surface-solid text-text-primary border-border-default/80 hover:bg-surface-muted hover:text-text-primary shadow-2xs active:scale-[0.98] cursor-pointer font-semibold transition-all duration-150',
+  danger:
+    'bg-danger text-text-inverse border-transparent hover:opacity-95 shadow-xs active:scale-[0.98] cursor-pointer font-semibold transition-all duration-150',
 };
 
 /**
