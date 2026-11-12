@@ -2,27 +2,34 @@
 @import 'tailwindcss';
 
 :root {
-  /* Semantic surfaces (08_FRONTEND_UX.md) */
-  --color-surface-canvas: #f8fafc;
-  --color-surface-canvas-subtle: #f1f5f9;
+  /* Semantic surfaces (Warm Editorial Bento) */
+  --color-surface-canvas: #faf8f5;
+  --color-surface-canvas-subtle: #f4efe6;
   --color-surface-primary: #ffffff;
-  --color-surface-secondary: #f8fafc;
-  --color-surface-glass: rgba(255, 255, 255, 0.96);
+  --color-surface-secondary: #faf8f5;
+  --color-surface-glass: rgba(255, 255, 255, 0.92);
   --color-surface-solid: #ffffff;
-  --color-surface-muted: #f1f5f9;
+  --color-surface-muted: #f4efe6;
 
-  /* Semantic typography colors (WCAG 2.2 AA verified >= 4.5:1) */
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  /* Obsidian Dock surfaces */
+  --color-surface-dock: #18181b;
+  --color-surface-dock-pill: #27272a;
+  --color-surface-dock-hover: #3f3f46;
+
+  /* Semantic typography colors (WCAG 2.2 AA verified >= 4.5:1 on warm canvas) */
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #57534e;
+  --color-text-muted: #a8a29e;
   --color-text-inverse: #ffffff;
 
-  /* Premium clinical brand tokens (Medical Deep Teal & Health Cyan) */
+  /* Premium clinical brand tokens (Medical Deep Teal & Warm Terracotta Accent) */
   --color-brand-primary: #0f766e;
   --color-brand-primary-hover: #115e59;
   --color-brand-primary-soft: #f0fdfa;
   --color-brand-secondary: #0891b2;
   --color-brand-secondary-soft: #ecfeff;
+  --color-brand-accent: #e06d53;
+  --color-brand-accent-soft: #fff7ed;
 
   /* Semantic state tokens (always paired with icon + text, never color alone) */
   --color-success: #047857;
@@ -38,11 +45,13 @@
   --color-danger-border: #fecaca;
 
   /* Structural borders & elevation */
-  --color-border-subtle: #e2e8f0;
-  --color-border-default: #cbd5e1;
-  --color-border-strong: #94a3b8;
-  --shadow-glass: 0 8px 24px -12px rgba(15, 23, 42, 0.12);
-  --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.07);
+  --color-border-subtle: #e7e5e4;
+  --color-border-default: #d6d3d1;
+  --color-border-strong: #a8a29e;
+  --shadow-glass: 0 8px 24px -12px rgba(28, 25, 23, 0.08);
+  --shadow-card: 0 4px 20px -4px rgba(28, 25, 23, 0.05), 0 2px 6px -1px rgba(28, 25, 23, 0.03);
+  --shadow-bento: 0 12px 32px -6px rgba(28, 25, 23, 0.06), 0 4px 12px -2px rgba(28, 25, 23, 0.03);
+  --shadow-dock: 0 20px 40px -10px rgba(0, 0, 0, 0.35), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
 @supports ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
@@ -70,6 +79,12 @@
   --color-brand-primary-soft: var(--color-brand-primary-soft);
   --color-brand-secondary: var(--color-brand-secondary);
   --color-brand-secondary-soft: var(--color-brand-secondary-soft);
+  --color-brand-accent: var(--color-brand-accent);
+  --color-brand-accent-soft: var(--color-brand-accent-soft);
+
+  --color-surface-dock: var(--color-surface-dock);
+  --color-surface-dock-pill: var(--color-surface-dock-pill);
+  --color-surface-dock-hover: var(--color-surface-dock-hover);
 
   --color-success: var(--color-success);
   --color-success-soft: var(--color-success-soft);
@@ -172,6 +187,30 @@
   background-color: var(--color-surface-solid);
   border: 1px solid var(--color-border-subtle);
   box-shadow: var(--shadow-card);
+}
+
+/* Luxury Obsidian Dock utility (Desktop sidebar & Mobile floating bottom bar) */
+.surface-dock {
+  background-color: var(--color-surface-dock);
+  color: #f4f4f5;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-dock);
+}
+
+/* Warm Bento Card container */
+.surface-bento {
+  background-color: var(--color-surface-solid);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-bento);
+  border-radius: 1.5rem;
+}
+
+/* Tactile micro-press feedback */
+.pressable {
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {

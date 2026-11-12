@@ -19,6 +19,10 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     plugins: [tailwindcss(), react()],
+    server: {
+      host: true,
+      allowedHosts: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),

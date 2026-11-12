@@ -188,22 +188,22 @@ export function AppShell() {
       {/* Desktop collapsible sidebar */}
       <aside
         aria-label="Primary desktop navigation"
-        className={`surface-frosted hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:shrink-0 lg:flex-col lg:border-r lg:border-border-subtle ${
+        className={`hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:shrink-0 lg:flex-col bg-[#18181B] text-stone-200 border-r border-[#27272A] shadow-xl ${
           isSidebarCollapsed ? 'lg:w-20' : 'lg:w-68'
-        } transition-[width] duration-200`}
+        } transition-[width] duration-200 z-30`}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-3.5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#27272A] px-4 py-3.5">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <span
               aria-hidden="true"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 text-sm font-extrabold text-white shadow-xs ring-1 ring-black/5"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-600 text-sm font-extrabold text-white shadow-md ring-1 ring-white/10"
             >
               RQ
             </span>
             {!isSidebarCollapsed ? (
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-text-primary">RESQ Workforce</p>
-                <p className="truncate text-xs text-text-secondary">Emergency Department</p>
+                <p className="truncate text-sm font-bold text-white tracking-tight">RESQ Workforce</p>
+                <p className="truncate text-xs text-stone-400">Emergency Department</p>
               </div>
             ) : null}
           </div>
@@ -215,7 +215,7 @@ export function AppShell() {
             aria-label={
               isSidebarCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'
             }
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-text-primary"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-800 hover:text-white transition-colors"
           >
             {isSidebarCollapsed ? (
               <ChevronRight className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
@@ -226,11 +226,11 @@ export function AppShell() {
         </div>
 
         {!metadata.isProduction ? (
-          <div className="border-b border-border-subtle px-3 py-2.5">
+          <div className="border-b border-[#27272A] px-3 py-2.5">
             {isSidebarCollapsed ? (
               <span
                 title={`Non-production environment: ${metadata.appEnv} (${metadata.projectRef})`}
-                className="flex items-center justify-center rounded-lg bg-warning-soft py-1.5 text-[11px] font-semibold text-warning uppercase"
+                className="flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 py-1.5 text-[11px] font-semibold uppercase ring-1 ring-amber-500/20"
               >
                 {metadata.appEnv.slice(0, 3)}
               </span>
@@ -247,7 +247,7 @@ export function AppShell() {
         <nav aria-label="Workspace sections" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
           <div className="space-y-1">
             {!isSidebarCollapsed ? (
-              <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-text-secondary uppercase">
+              <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-stone-400 uppercase">
                 Operations
               </p>
             ) : null}
@@ -260,10 +260,10 @@ export function AppShell() {
                   to={item.to}
                   title={isSidebarCollapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+                  className={`flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
                     active
-                      ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                      ? 'bg-teal-700 text-white shadow-md ring-1 ring-white/10'
+                      : 'text-stone-300 hover:bg-stone-800/80 hover:text-white'
                   } ${isSidebarCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -274,9 +274,9 @@ export function AppShell() {
             })}
           </div>
 
-          <div className="space-y-1 border-t border-border-subtle pt-4">
+          <div className="space-y-1 border-t border-[#27272A] pt-4">
             {!isSidebarCollapsed ? (
-              <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-text-secondary uppercase">
+              <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-stone-400 uppercase">
                 Owner Admin
               </p>
             ) : null}
@@ -289,10 +289,10 @@ export function AppShell() {
                   to={item.to}
                   title={isSidebarCollapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+                  className={`flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
                     active
-                      ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                      ? 'bg-teal-700 text-white shadow-md ring-1 ring-white/10'
+                      : 'text-stone-300 hover:bg-stone-800/80 hover:text-white'
                   } ${isSidebarCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -305,25 +305,25 @@ export function AppShell() {
         </nav>
 
         {/* User Session & Sign Out in Desktop Sidebar */}
-        <div className="border-t border-border-subtle p-3">
+        <div className="border-t border-[#27272A] p-3">
           <div className="flex items-center justify-between gap-2">
             {!isSidebarCollapsed && user ? (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-text-primary">
+                <p className="truncate text-xs font-semibold text-white">
                   {user.displayName}
                 </p>
                 <div className="flex items-center gap-1.5 pt-0.5">
                   <span
-                    className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                    className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
                       user.role === 'owner'
-                        ? 'bg-brand-primary-soft text-brand-primary'
-                        : 'bg-teal-soft text-teal'
+                        ? 'bg-teal-900/60 text-teal-300 ring-1 ring-teal-500/30'
+                        : 'bg-stone-800 text-stone-300'
                     }`}
                   >
                     {user.role}
                   </span>
                   {user.staffCode ? (
-                    <span className="truncate text-[11px] text-text-muted">{user.staffCode}</span>
+                    <span className="truncate text-[11px] text-stone-400">{user.staffCode}</span>
                   ) : null}
                 </div>
               </div>
@@ -333,7 +333,7 @@ export function AppShell() {
               onClick={signOut}
               title="Sign out of RESQ Workforce"
               aria-label="Sign out of RESQ Workforce"
-              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-800 hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary transition-colors"
             >
               <LogOut className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             </button>
@@ -398,9 +398,9 @@ export function AppShell() {
       {/* Mobile bottom navigation (strictly 5 destinations: Home, Roster, Requests, Records, More) */}
       <nav
         aria-label="Primary mobile navigation"
-        className="surface-frosted fixed right-0 bottom-0 left-0 z-30 border-t border-border-subtle px-2 py-1 lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-[#18181B] text-stone-200 border-t border-stone-800/80 px-2 py-2 lg:hidden shadow-2xl"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1.5">
           {MOBILE_PRIMARY_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = isNavItemActive(location.pathname, item);
@@ -409,8 +409,10 @@ export function AppShell() {
                 key={item.to}
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium ${
-                  active ? 'bg-brand-primary-soft text-brand-primary' : 'text-text-secondary'
+                className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[11px] font-semibold transition-all duration-150 active:scale-[0.95] ${
+                  active
+                    ? 'bg-[#E06D53] text-white shadow-md'
+                    : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/50'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -427,10 +429,10 @@ export function AppShell() {
             onClick={() =>
               setMoreOpenForPath((prev) => (prev === location.pathname ? null : location.pathname))
             }
-            className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium ${
+            className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[11px] font-semibold transition-all duration-150 active:scale-[0.95] ${
               isMoreOpen || isMoreRouteActive
-                ? 'bg-brand-primary-soft text-brand-primary'
-                : 'text-text-secondary'
+                ? 'bg-[#E06D53] text-white shadow-md'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/50'
             }`}
           >
             <Menu className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -441,17 +443,17 @@ export function AppShell() {
 
       {/* Accessible mobile More sheet */}
       {isMoreOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-text-primary/35 lg:hidden">
+        <div className="fixed inset-0 z-40 flex items-end bg-black/60 backdrop-blur-xs lg:hidden animate-in">
           <div
             id="mobile-more-sheet"
             ref={moreDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={moreSheetTitleId}
-            className="surface-frosted max-h-[82dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border-subtle p-4 pb-8"
+            className="bg-[#18181B] text-stone-200 border-t border-stone-800 max-h-[82dvh] w-full overflow-y-auto rounded-t-3xl p-5 pb-10 shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-              <h2 id={moreSheetTitleId} className="text-base font-semibold text-text-primary">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <h2 id={moreSheetTitleId} className="text-base font-bold text-white tracking-tight">
                 More Destinations
               </h2>
               <button
@@ -459,7 +461,7 @@ export function AppShell() {
                 type="button"
                 aria-label="Close more navigation menu"
                 onClick={() => setMoreOpenForPath(null)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-text-primary"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-800 hover:text-white transition-colors"
               >
                 <X className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
               </button>
@@ -467,7 +469,7 @@ export function AppShell() {
 
             <div className="mt-4 space-y-4">
               <div className="space-y-1">
-                <p className="px-2 text-xs font-semibold text-text-secondary uppercase">
+                <p className="px-2 text-xs font-bold text-stone-400 uppercase tracking-wider">
                   Staff Workspace
                 </p>
                 {MOBILE_MORE_STAFF_ITEMS.map((item) => {
@@ -478,10 +480,10 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
+                      className={`flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
                         active
-                          ? 'bg-teal-700 text-white shadow-xs'
-                          : 'text-text-primary hover:bg-surface-muted'
+                          ? 'bg-[#E06D53] text-white shadow-sm'
+                          : 'text-stone-300 hover:bg-stone-800/80 hover:text-white'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -491,8 +493,8 @@ export function AppShell() {
                 })}
               </div>
 
-              <div className="space-y-1 border-t border-border-subtle pt-3">
-                <p className="px-2 text-xs font-semibold text-text-secondary uppercase">
+              <div className="space-y-1 border-t border-stone-800 pt-3">
+                <p className="px-2 text-xs font-bold text-stone-400 uppercase tracking-wider">
                   Owner Administration
                 </p>
                 {ADMIN_NAV_ITEMS.map((item) => {
@@ -503,10 +505,10 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
+                      className={`flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
                         active
-                          ? 'bg-teal-700 text-white shadow-xs'
-                          : 'text-text-primary hover:bg-surface-muted'
+                          ? 'bg-teal-700 text-white shadow-sm'
+                          : 'text-stone-300 hover:bg-stone-800/80 hover:text-white'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -517,12 +519,12 @@ export function AppShell() {
               </div>
 
               {user ? (
-                <div className="border-t border-border-subtle pt-3">
+                <div className="border-t border-stone-800 pt-3">
                   <div className="mb-2 px-2">
-                    <p className="truncate text-xs font-semibold text-text-primary">
+                    <p className="truncate text-xs font-semibold text-white">
                       {user.displayName}
                     </p>
-                    <p className="truncate text-[11px] text-text-secondary capitalize">
+                    <p className="truncate text-[11px] text-stone-400 capitalize">
                       {user.role} role {user.staffCode ? `· ${user.staffCode}` : ''}
                     </p>
                   </div>
@@ -532,7 +534,7 @@ export function AppShell() {
                       setMoreOpenForPath(null);
                       void signOut();
                     }}
-                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-danger/20 bg-danger-soft/20 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger-soft/40"
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-rose-300 hover:bg-red-500/20 transition-colors"
                   >
                     <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
                     <span>Sign Out</span>
