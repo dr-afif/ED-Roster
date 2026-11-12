@@ -33,6 +33,18 @@ export const appChildRoutes: RouteObject[] = [
     }),
   },
   {
+    path: 'holidays',
+    lazy: async () => ({
+      Component: (await import('@/features/public-holidays')).PublicHolidayTrackerRoute,
+    }),
+  },
+  {
+    path: 'ph-tracker',
+    lazy: async () => ({
+      Component: (await import('@/features/public-holidays')).PublicHolidayTrackerRoute,
+    }),
+  },
+  {
     path: 'documents',
     lazy: async () => ({
       Component: (await import('@/features/documents')).DocumentsCatalogRoute,

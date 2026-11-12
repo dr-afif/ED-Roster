@@ -468,6 +468,91 @@ export type Database = {
           },
         ];
       };
+      ph_opening_balances: {
+        Row: {
+          id: number;
+          staff_id: number;
+          year: number;
+          opening_balance: number;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: never;
+          staff_id: number;
+          year: number;
+          opening_balance?: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: never;
+          staff_id?: number;
+          year?: number;
+          opening_balance?: number;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ph_opening_balances_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      ph_memo_submissions: {
+        Row: {
+          id: number;
+          staff_id: number;
+          holiday_date: string | null;
+          replacement_date: string;
+          memo_month: string;
+          is_submitted: boolean;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: never;
+          staff_id: number;
+          holiday_date?: string | null;
+          replacement_date: string;
+          memo_month?: string;
+          is_submitted?: boolean;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: never;
+          staff_id?: number;
+          holiday_date?: string | null;
+          replacement_date?: string;
+          memo_month?: string;
+          is_submitted?: boolean;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ph_memo_submissions_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       public_holidays: {
         Row: {
           created_at: string;
@@ -1638,6 +1723,44 @@ export type Database = {
           p_staff_id: number;
         };
         Returns: boolean;
+      };
+      admin_upsert_ph_opening_balance: {
+        Args: {
+          p_balance: number;
+          p_note?: string | null;
+          p_staff_id: number;
+          p_year: number;
+        };
+        Returns: {
+          created_at: string;
+          id: number;
+          note: string | null;
+          opening_balance: number;
+          staff_id: number;
+          updated_at: string;
+          updated_by: string | null;
+          year: number;
+        };
+      };
+      toggle_ph_memo_status: {
+        Args: {
+          p_holiday_date?: string | null;
+          p_is_submitted?: boolean;
+          p_memo_month?: string;
+          p_replacement_date: string;
+          p_staff_id: number;
+        };
+        Returns: {
+          created_at: string;
+          holiday_date: string | null;
+          id: number;
+          is_submitted: boolean;
+          memo_month: string;
+          replacement_date: string;
+          staff_id: number;
+          submitted_at: string | null;
+          updated_at: string;
+        };
       };
       bootstrap_my_session: {
         Args: never;

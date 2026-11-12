@@ -14,6 +14,7 @@ import {
   Scale,
   Settings,
   ShieldAlert,
+  Sparkles,
   UserCircle2,
   Users,
   X,
@@ -41,6 +42,7 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { label: 'Roster', to: DEFAULT_ROSTER_PATH, icon: CalendarDays, matchPrefix: '/rosters/' },
   { label: 'Requests', to: '/requests', icon: ClipboardList },
   { label: 'Records', to: '/records', icon: BookOpenCheck },
+  { label: 'Public Holidays', to: '/holidays', icon: Sparkles },
   { label: 'Documents', to: '/documents', icon: FolderKanban },
   { label: 'Updates', to: '/updates', icon: Bell },
   { label: 'My Profile', to: '/profile/me', icon: UserCircle2 },
@@ -65,6 +67,7 @@ const MOBILE_PRIMARY_ITEMS: readonly NavItem[] = [
 ];
 
 const MOBILE_MORE_STAFF_ITEMS: readonly NavItem[] = [
+  { label: 'Public Holidays', to: '/holidays', icon: Sparkles },
   { label: 'Documents', to: '/documents', icon: FolderKanban },
   { label: 'Updates', to: '/updates', icon: Bell },
   { label: 'My Profile', to: '/profile/me', icon: UserCircle2 },
