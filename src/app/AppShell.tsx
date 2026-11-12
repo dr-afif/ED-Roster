@@ -342,31 +342,36 @@ export function AppShell() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="surface-frosted sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-2.5 lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-stone-200/80 bg-[#FAF8F5]/90 px-4 py-2 backdrop-blur-md lg:hidden">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-emerald-800 text-xs font-bold text-white shadow-xs ring-1 ring-black/5"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-600 text-xs font-black text-white shadow-xs ring-1 ring-white/10"
           >
             RQ
           </span>
           <div>
-            <p className="text-sm font-semibold text-text-primary">RESQ Workforce</p>
-            <p className="text-[11px] text-text-secondary">Emergency Department</p>
+            <p className="text-sm font-extrabold text-stone-900 tracking-tight">RESQ Workforce</p>
+            <p className="text-[10px] font-semibold text-stone-500">Emergency Department</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {!metadata.isProduction ? (
-            <StatusBadge label={metadata.appEnv.toUpperCase()} tone="warning" icon={ShieldAlert} />
+            <span
+              title={`Environment: ${metadata.appEnv}`}
+              className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 ring-1 ring-amber-500/20"
+            >
+              {metadata.appEnv.toUpperCase()}
+            </span>
           ) : null}
           <button
             type="button"
             onClick={signOut}
             title="Sign out of RESQ Workforce"
             aria-label="Sign out of RESQ Workforce"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:text-rose-600 transition-colors shadow-2xs"
           >
-            <LogOut className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -376,7 +381,7 @@ export function AppShell() {
         id="main-content"
         ref={mainRef}
         tabIndex={-1}
-        className="flex-1 px-4 py-6 pb-24 focus:outline-none sm:px-6 lg:px-8 lg:py-8 lg:pb-8"
+        className="flex-1 px-3.5 py-4 pb-28 focus:outline-none sm:px-6 sm:py-6 lg:px-8 lg:py-8 lg:pb-12 max-w-full overflow-x-hidden"
       >
         <div className="mx-auto max-w-6xl">
           <Suspense

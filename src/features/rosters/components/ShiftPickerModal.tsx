@@ -30,9 +30,12 @@ export function ShiftPickerModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="shift-picker-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs transition-opacity"
     >
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="w-full max-w-md rounded-t-[28px] sm:rounded-2xl border border-stone-200/80 bg-white p-5 sm:p-6 shadow-2xl space-y-4 dark:border-slate-800 dark:bg-slate-900 pb-8 sm:pb-6">
+        {/* Mobile sheet drag handle */}
+        <div className="mx-auto -mt-1 h-1 w-10 rounded-full bg-stone-300 sm:hidden" />
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <div>

@@ -52,7 +52,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -67,9 +67,11 @@ export function Modal({
 
       {/* Dialog Surface */}
       <div
-        className={`relative z-10 w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-200 animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-900`}
+        className={`relative z-10 w-full ${MAX_WIDTHS[maxWidth]} rounded-t-[28px] sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto transition-all duration-200 animate-in slide-in-from-bottom sm:zoom-in-95 dark:border-slate-800 dark:bg-slate-900`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile drag handle indicator */}
+        <div className="mx-auto -mt-2 mb-3 h-1 w-10 rounded-full bg-stone-300 sm:hidden" />
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-border-subtle">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-text-primary">

@@ -94,20 +94,20 @@ export function RosterGrid({
   return (
     <div className="space-y-3">
       {/* Search / Filter toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <input
             type="search"
             placeholder="Search staff by name or code..."
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
-            className="h-9 w-64 rounded-lg border border-border-default bg-surface-primary px-3 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none"
+            className="h-9 w-full sm:w-64 rounded-xl border border-border-default bg-surface-primary px-3 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none"
           />
           {filterQuery && (
             <button
               type="button"
               onClick={() => setFilterQuery('')}
-              className="text-xs text-text-muted hover:text-text-primary"
+              className="text-xs text-text-muted hover:text-text-primary shrink-0"
             >
               Clear
             </button>
@@ -126,7 +126,7 @@ export function RosterGrid({
               {/* Sticky Staff Header */}
               <th
                 scope="col"
-                className="sticky left-0 z-20 min-w-44 bg-surface-secondary px-3 py-2.5 font-semibold text-text-primary shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
+                className="sticky left-0 z-20 min-w-28 sm:min-w-44 bg-surface-secondary px-3 py-2.5 font-semibold text-text-primary shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
               >
                 Staff Member
               </th>
@@ -196,10 +196,10 @@ export function RosterGrid({
                     {/* Sticky Staff Name Cell */}
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 bg-surface-primary px-3 py-2 font-normal shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
+                      className="sticky left-0 z-10 min-w-28 sm:min-w-44 max-w-[130px] sm:max-w-none bg-surface-primary px-3 py-2 font-normal shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
                     >
-                      <div className="font-semibold text-text-primary">{rosterName}</div>
-                      <div className="text-[10px] text-text-muted">
+                      <div className="font-semibold text-text-primary truncate">{rosterName}</div>
+                      <div className="text-[10px] text-text-muted truncate">
                         {staffCode ? `${staffCode} · ` : ''}
                         {staffGroup}
                       </div>

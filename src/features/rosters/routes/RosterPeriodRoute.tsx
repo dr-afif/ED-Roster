@@ -495,7 +495,7 @@ export function RosterPeriodRoute() {
       />
 
       {/* Month Navigator Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-primary p-3 shadow-2xs">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-primary p-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -537,8 +537,10 @@ export function RosterPeriodRoute() {
 
         {/* Existing Roster Periods Shortcut Chips */}
         {allPeriods.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-0.5">
-            <span className="text-[11px] font-medium text-text-muted shrink-0">Periods:</span>
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-1 scrollbar-none max-w-full">
+            <span className="text-[11px] font-bold text-stone-400 shrink-0 uppercase tracking-wider">
+              Periods:
+            </span>
             {allPeriods.map((p) => {
               const [pYear, pMonth] = p.period_start.split('-');
               if (!pYear || !pMonth) return null;
@@ -548,15 +550,15 @@ export function RosterPeriodRoute() {
                   key={p.period_start}
                   type="button"
                   onClick={() => handleMonthChange(pYear, pMonth)}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition ${
                     isSelected
-                      ? 'bg-brand-primary text-white shadow-2xs'
-                      : 'bg-surface-secondary/60 text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+                      ? 'bg-stone-900 text-white shadow-xs'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
                   }`}
                 >
                   <span>{formatRosterPeriodLabel(pYear, pMonth)}</span>
                   {p.legacy_read_only && (
-                    <span className="rounded bg-amber-500/20 px-1 text-[9px] font-bold text-amber-900 dark:text-amber-200">
+                    <span className="rounded-full bg-amber-500/20 px-1.5 text-[9px] font-bold text-amber-900">
                       Legacy
                     </span>
                   )}
@@ -601,15 +603,15 @@ export function RosterPeriodRoute() {
 
       {/* Operational View Switcher (for Enforced / Active / Amended / Closed periods) */}
       {isEnforced && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3">
-          <div className="inline-flex rounded-xl border border-border-default bg-surface-primary p-1 text-xs">
+        <div className="flex flex-col gap-2 border-b border-border-subtle pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex overflow-x-auto scrollbar-none rounded-2xl border border-stone-200/80 bg-stone-100/80 p-1 text-xs">
             <button
               type="button"
               onClick={() => setViewMode('current')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
                 viewMode === 'current'
-                  ? 'bg-brand-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-white text-stone-900 shadow-xs'
+                  : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               <Layers className="h-3.5 w-3.5" />
@@ -618,10 +620,10 @@ export function RosterPeriodRoute() {
             <button
               type="button"
               onClick={() => setViewMode('planned')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
                 viewMode === 'planned'
-                  ? 'bg-brand-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-white text-stone-900 shadow-xs'
+                  : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               <Lock className="h-3.5 w-3.5" />
@@ -630,18 +632,18 @@ export function RosterPeriodRoute() {
             <button
               type="button"
               onClick={() => setViewMode('changes')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
                 viewMode === 'changes'
-                  ? 'bg-brand-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-white text-stone-900 shadow-xs'
+                  : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               <History className="h-3.5 w-3.5" />
-              Changes & Audit ({amendmentEvents.length})
+              Changes &amp; Audit ({amendmentEvents.length})
             </button>
           </div>
 
-          <div className="text-xs text-text-muted">
+          <div className="text-xs text-stone-500 hidden sm:block">
             {viewMode === 'current' &&
               (isOwner
                 ? 'Showing live duty truth with active amendments. Click any cell to submit an amendment.'
@@ -656,23 +658,23 @@ export function RosterPeriodRoute() {
 
       {/* View Format Switcher: Calendar View vs Table View */}
       {viewMode !== 'changes' && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-1 select-none">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border-subtle pb-2 select-none">
           <div className="flex items-center gap-1">
             <button
               type="button"
               id="tab-btn-calendar"
               data-testid="tab-btn-calendar"
               onClick={() => setViewFormat('calendar')}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-semibold transition -mb-px cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                 viewFormat === 'calendar'
-                  ? 'border-brand-primary text-brand-primary'
-                  : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
               }`}
             >
               <Calendar className="h-3.5 w-3.5 shrink-0" />
               <span>Calendar View</span>
-              <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
-                (Duty Timetable &amp; EP)
+              <span className="text-[10px] font-normal text-stone-300 hidden sm:inline">
+                (Duty Timetable)
               </span>
             </button>
             <button
@@ -680,30 +682,30 @@ export function RosterPeriodRoute() {
               id="tab-btn-table"
               data-testid="tab-btn-table"
               onClick={() => setViewFormat('table')}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-semibold transition -mb-px cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                 viewFormat === 'table'
-                  ? 'border-brand-primary text-brand-primary'
-                  : 'border-transparent text-text-secondary hover:border-border-default hover:text-text-primary'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
               }`}
             >
               <Table className="h-3.5 w-3.5 shrink-0" />
               <span>Table View</span>
-              <span className="text-[10px] font-normal text-text-muted hidden sm:inline">
-                (Spreadsheet &amp; Tallies)
+              <span className="text-[10px] font-normal text-stone-300 hidden sm:inline">
+                (Spreadsheet)
               </span>
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {viewFormat === 'table' && (
-              <div className="inline-flex rounded-lg border border-border-default bg-surface-primary p-0.5 text-xs">
+              <div className="inline-flex rounded-full border border-stone-200 bg-white p-0.5 text-xs shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setDensity('comfortable')}
-                  className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  className={`rounded-full px-3 py-1 font-semibold transition-colors ${
                     density === 'comfortable'
-                      ? 'bg-brand-primary text-text-inverse'
-                      : 'text-text-secondary hover:text-text-primary'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'text-stone-500 hover:text-stone-900'
                   }`}
                 >
                   Comfortable
@@ -711,10 +713,10 @@ export function RosterPeriodRoute() {
                 <button
                   type="button"
                   onClick={() => setDensity('compact')}
-                  className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  className={`rounded-full px-3 py-1 font-semibold transition-colors ${
                     density === 'compact'
-                      ? 'bg-brand-primary text-text-inverse'
-                      : 'text-text-secondary hover:text-text-primary'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'text-stone-500 hover:text-stone-900'
                   }`}
                 >
                   Compact
@@ -723,8 +725,8 @@ export function RosterPeriodRoute() {
             )}
 
             {rulesOutput && (
-              <div className="flex items-center gap-2 text-xs text-text-secondary">
-                <span className="font-mono text-text-muted">
+              <div className="flex items-center gap-2 text-xs text-stone-500 hidden md:flex">
+                <span className="font-mono text-stone-400">
                   Policy:{' '}
                   {ruleConfig.weeklyOffPolicy === 'policy_b'
                     ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'

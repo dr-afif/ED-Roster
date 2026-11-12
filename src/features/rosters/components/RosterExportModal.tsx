@@ -292,9 +292,12 @@ export function RosterExportModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="roster-pdf-export-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in"
     >
-      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-xl rounded-t-[28px] sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl space-y-5 dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto">
+        {/* Mobile drag handle */}
+        <div className="mx-auto -mt-1 h-1 w-10 rounded-full bg-stone-300 sm:hidden" />
+
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
