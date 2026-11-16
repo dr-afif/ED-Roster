@@ -403,7 +403,7 @@ export function AppShell() {
       {/* Mobile bottom navigation (strictly 5 destinations: Home, Roster, Requests, Records, More) */}
       <nav
         aria-label="Primary mobile navigation"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-[#18181B] text-white border-t border-white/10 rounded-t-[32px] px-3 pt-2.5 pb-4 lg:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.35)]"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-[#18181B] text-white border-t border-white/10 rounded-t-[30px] px-2.5 pt-2 pb-3.5 lg:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.35)]"
       >
         <div className="mx-auto grid max-w-sm grid-cols-5 items-center justify-items-center">
           {MOBILE_PRIMARY_ITEMS.map((item) => {
@@ -416,17 +416,19 @@ export function AppShell() {
                 title={item.label}
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
-                className={`relative flex items-center justify-center transition-all duration-200 active:scale-[0.92] cursor-pointer ${
+                className={`relative flex flex-col items-center justify-center gap-0.5 transition-all duration-200 active:scale-[0.92] cursor-pointer ${
                   active
-                    ? 'h-12 w-12 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30'
-                    : 'h-12 w-12 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
+                    ? 'h-12 w-14 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30 -translate-y-0.5'
+                    : 'h-12 w-14 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Icon
-                  className={active ? 'h-5 w-5 stroke-[2.25]' : 'h-5 w-5 stroke-[1.75]'}
+                  className={active ? 'h-4.5 w-4.5 stroke-[2.25]' : 'h-4.5 w-4.5 stroke-[1.75]'}
                   aria-hidden="true"
                 />
-                <span className="sr-only">{item.label}</span>
+                <span className="text-[9.5px] font-extrabold leading-none tracking-tight">
+                  {item.label}
+                </span>
               </NavLink>
             );
           })}
@@ -441,21 +443,21 @@ export function AppShell() {
             onClick={() =>
               setMoreOpenForPath((prev) => (prev === location.pathname ? null : location.pathname))
             }
-            className={`relative flex items-center justify-center transition-all duration-200 active:scale-[0.92] cursor-pointer ${
+            className={`relative flex flex-col items-center justify-center gap-0.5 transition-all duration-200 active:scale-[0.92] cursor-pointer ${
               isMoreOpen || isMoreRouteActive
-                ? 'h-12 w-12 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30'
-                : 'h-12 w-12 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
+                ? 'h-12 w-14 rounded-[18px] bg-[#E06D53] text-[#18181B] shadow-md shadow-[#E06D53]/30 -translate-y-0.5'
+                : 'h-12 w-14 rounded-2xl text-stone-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <Menu
               className={
                 isMoreOpen || isMoreRouteActive
-                  ? 'h-5 w-5 stroke-[2.25]'
-                  : 'h-5 w-5 stroke-[1.75]'
+                  ? 'h-4.5 w-4.5 stroke-[2.25]'
+                  : 'h-4.5 w-4.5 stroke-[1.75]'
               }
               aria-hidden="true"
             />
-            <span className="sr-only">More</span>
+            <span className="text-[9.5px] font-extrabold leading-none tracking-tight">More</span>
           </button>
         </div>
       </nav>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Award, Calendar, Check, Edit3, Paintbrush, Search, Stethoscope, UserCheck, X, Zap } from 'lucide-react';
 import type { EpAssignmentRow } from '../data/rosterQueries';
 import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
@@ -42,6 +42,38 @@ export function RosterCalendarView({
     slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
   } | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 639px)').matches
+      : false,
+  );
+  const [mobilePane, setMobilePane] = useState<'feed' | 'month'>('feed');
+  const [selectedMobileDate, setSelectedMobileDate] = useState<string>('');
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const touchStartX = useRef<number>(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = (e: MediaQueryListEvent) => setIsMobileViewport(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const activeMobileDate =
+    selectedMobileDate && periodDates.includes(selectedMobileDate)
+      ? selectedMobileDate
+      : (periodDates[0] ?? '');
+
+  useEffect(() => {
+    if (mobilePane !== 'feed' || !stripRef.current) return;
+    const strip = stripRef.current;
+    const activeEl = strip.querySelector<HTMLElement>('[data-active-date="true"]');
+    if (activeEl) {
+      strip.scrollLeft =
+        activeEl.offsetLeft - strip.clientWidth / 2 + activeEl.offsetWidth / 2;
+    }
+  }, [activeMobileDate, mobilePane]);
 
   // Map staffId to StaffRosterIdentity for quick name lookup
   const staffMap = useMemo(() => {
@@ -306,7 +338,291 @@ export function RosterCalendarView({
         </div>
       </div>
 
-      {/* 📊 Finalized Monthly Table Card (Calendar View) */}
+      {/* 📱 Mobile-First Daily Card Feed ↔ Whole Month View (Fits mobile width cleanly) */}
+      {isMobileViewport ? (
+      <div
+        className="space-y-2.5"
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0]?.clientX ?? 0;
+        }}
+        onTouchEnd={(e) => {
+          const endX = e.changedTouches[0]?.clientX ?? 0;
+          const dx = endX - touchStartX.current;
+          if (dx < -48 && mobilePane === 'feed') setMobilePane('month');
+          else if (dx > 48 && mobilePane === 'month') setMobilePane('feed');
+        }}
+      >
+        {/* Slide-Sideways Switcher */}
+        <div className="relative grid grid-cols-2 rounded-full bg-[#EAE4DA] p-0.5 select-none">
+          <div
+            className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-[#18181B] shadow-xs transition-transform duration-200 ${
+              mobilePane === 'month' ? 'translate-x-full' : 'translate-x-0'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => setMobilePane('feed')}
+            className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+              mobilePane === 'feed' ? 'text-white' : 'text-stone-600'
+            }`}
+          >
+            Daily Card Feed
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobilePane('month')}
+            className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+              mobilePane === 'month' ? 'text-white' : 'text-stone-600'
+            }`}
+          >
+            Whole Month View
+          </button>
+        </div>
+
+        {mobilePane === 'feed' ? (
+          <div className="space-y-2">
+            {/* Auto-Centering Date Strip */}
+            <div
+              ref={stripRef}
+              className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5"
+            >
+              {periodDates.map((dateStr) => {
+                const dayNum = parseInt(dateStr.slice(8, 10), 10);
+                const d = new Date(dateStr + 'T00:00:00Z');
+                const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
+                const isActive = dateStr === activeMobileDate;
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    data-active-date={isActive ? 'true' : 'false'}
+                    onClick={() => setSelectedMobileDate(dateStr)}
+                    className={`shrink-0 w-11 py-1.5 rounded-2xl border text-center transition cursor-pointer ${
+                      isActive
+                        ? 'bg-[#18181B] text-white border-[#18181B] shadow-xs'
+                        : 'bg-white text-stone-800 border-stone-200'
+                    }`}
+                  >
+                    <div className="text-[9px] font-bold opacity-70">{dayName}</div>
+                    <div className="text-sm font-extrabold leading-tight">{dayNum}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const dayData = calendarDailyMap.get(activeMobileDate) ?? {
+                am: [],
+                pm: [],
+                night: [],
+              };
+              const holiday = holidays.find((h) => h.date === activeMobileDate);
+              const epOfficeHour = epMap.get(`${activeMobileDate}:EP_OFFICE_HOUR`) ?? '';
+              const epOnCall = epMap.get(`${activeMobileDate}:EP_ONCALL`) ?? '';
+
+              return (
+                <div className="space-y-2">
+                  {holiday && (
+                    <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-extrabold text-rose-700">
+                      Public Holiday: {holiday.name}
+                    </div>
+                  )}
+
+                  {/* AM Card */}
+                  <div className="rounded-2xl border border-stone-200/80 bg-white p-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="rounded-full bg-[#E5EED8] border border-[#C6D8B6] px-2.5 py-0.5 text-[10px] font-extrabold text-[#2D4A22]">
+                        AM · 08:00–16:00
+                      </span>
+                      <span className="text-[10.5px] font-bold text-stone-400">
+                        {dayData.am.length} MOs
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dayData.am.length > 0 ? (
+                        dayData.am.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="rounded-xl bg-[#E5EED8]/70 border border-[#C6D8B6] px-2.5 py-1 text-[11px] font-bold text-[#2D4A22]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-stone-400">No AM assignments</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* PM Card */}
+                  <div className="rounded-2xl border border-stone-200/80 bg-white p-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="rounded-full bg-[#DCE7F9] border border-[#B8CEF2] px-2.5 py-0.5 text-[10px] font-extrabold text-[#1E3A8A]">
+                        PM · 16:00–23:00
+                      </span>
+                      <span className="text-[10.5px] font-bold text-stone-400">
+                        {dayData.pm.length} MOs
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dayData.pm.length > 0 ? (
+                        dayData.pm.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="rounded-xl bg-[#DCE7F9]/70 border border-[#B8CEF2] px-2.5 py-1 text-[11px] font-bold text-[#1E3A8A]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-stone-400">No PM assignments</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ON1 / ON2 Card */}
+                  <div className="rounded-2xl border border-stone-200/80 bg-white p-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="rounded-full bg-[#FCE7F1] border border-[#F8B9D4] px-2.5 py-0.5 text-[10px] font-extrabold text-[#9D174D]">
+                        ON1 / ON2 · 23:00–08:00
+                      </span>
+                      <span className="text-[10.5px] font-bold text-stone-400">
+                        {dayData.night.length} MOs
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dayData.night.length > 0 ? (
+                        dayData.night.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="rounded-xl bg-[#FCE7F1]/70 border border-[#F8B9D4] px-2.5 py-1 text-[11px] font-bold text-[#9D174D]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-stone-400">No overnight assignments</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* EP Specialist 2-Column Split */}
+                  <div className="rounded-2xl border border-stone-200/80 bg-white p-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="rounded-full bg-[#FEF3C7] border border-[#FDE047] px-2.5 py-0.5 text-[10px] font-extrabold text-[#854D0E]">
+                        EP SPECIALIST
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-stone-200/70 bg-[#FAF8F5] px-2.5 py-1.5">
+                        <div className="text-[9px] font-extrabold uppercase text-[#854D0E]">
+                          Office Hour
+                        </div>
+                        <div className="text-[11px] font-extrabold text-stone-900 truncate">
+                          {epOfficeHour || '—'}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-stone-200/70 bg-[#FAF8F5] px-2.5 py-1.5">
+                        <div className="text-[9px] font-extrabold uppercase text-[#854D0E]">
+                          On-Call
+                        </div>
+                        <div className="text-[11px] font-extrabold text-stone-900 truncate">
+                          {epOnCall || '—'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        ) : (
+          /* Whole Month View — Fit-to-Mobile Width, Stacked Separate Lines */
+          <div className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs">
+            <table className="w-full table-fixed border-collapse text-center">
+              <thead>
+                <tr className="bg-[#18181B] text-[#FAF8F5] text-[8.5px] font-extrabold tracking-wide">
+                  <th className="w-[12%] py-2 border-r border-white/10">DAY</th>
+                  <th className="w-[22%] py-2 border-r border-white/10">AM</th>
+                  <th className="w-[22%] py-2 border-r border-white/10">PM</th>
+                  <th className="w-[20%] py-2 border-r border-white/10">ON1/2</th>
+                  <th className="w-[24%] py-2 bg-[#0F766E]">EP</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F4EFE6]">
+                {periodDates.map((dateStr) => {
+                  const dayNum = parseInt(dateStr.slice(8, 10), 10);
+                  const d = new Date(dateStr + 'T00:00:00Z');
+                  const dayName = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getUTCDay()];
+                  const dayData = calendarDailyMap.get(dateStr) ?? { am: [], pm: [], night: [] };
+                  const epOh = epMap.get(`${dateStr}:EP_OFFICE_HOUR`) ?? '';
+                  const epOc = epMap.get(`${dateStr}:EP_ONCALL`) ?? '';
+                  const isActive = dateStr === activeMobileDate;
+
+                  return (
+                    <tr
+                      key={dateStr}
+                      onClick={() => {
+                        setSelectedMobileDate(dateStr);
+                        setMobilePane('feed');
+                      }}
+                      className={`cursor-pointer ${isActive ? 'bg-[#FFF8F6]' : ''}`}
+                    >
+                      <td className="bg-[#FAF8F5] border-r border-[#F4EFE6] py-1.5 px-0.5 font-extrabold text-[9.5px] text-stone-900">
+                        {dayNum}
+                        <span className="block text-[7.5px] font-bold text-stone-400">
+                          {dayName}
+                        </span>
+                      </td>
+                      <td className="border-r border-[#F4EFE6] py-1 px-0.5 align-top">
+                        {dayData.am.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="block w-fit max-w-full mx-auto my-0.5 truncate rounded bg-[#E5EED8] border border-[#C6D8B6] px-1 py-0.5 text-[8px] font-bold text-[#2D4A22]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="border-r border-[#F4EFE6] py-1 px-0.5 align-top">
+                        {dayData.pm.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="block w-fit max-w-full mx-auto my-0.5 truncate rounded bg-[#DCE7F9] border border-[#B8CEF2] px-1 py-0.5 text-[8px] font-bold text-[#1E3A8A]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="border-r border-[#F4EFE6] py-1 px-0.5 align-top">
+                        {dayData.night.map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="block w-fit max-w-full mx-auto my-0.5 truncate rounded bg-[#FCE7F1] border border-[#F8B9D4] px-1 py-0.5 text-[8px] font-bold text-[#9D174D]"
+                          >
+                            {doc.name}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="py-1 px-0.5 align-top text-[8px] leading-tight">
+                        {epOh && (
+                          <div className="font-extrabold text-[#0F766E] truncate">{epOh}</div>
+                        )}
+                        {epOc && (
+                          <div className="font-bold text-[#854D0E] truncate">{epOc}</div>
+                        )}
+                        {!epOh && !epOc && <span className="text-stone-300">-</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      ) : (
+      /* 📊 Finalized Monthly Table Card (Desktop Calendar View) */
       <div className="overflow-hidden rounded-2xl border border-border-default bg-surface-primary shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full min-w-4xl border-collapse text-center text-xs">
@@ -631,6 +947,7 @@ export function RosterCalendarView({
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

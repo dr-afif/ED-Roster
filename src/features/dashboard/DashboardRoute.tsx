@@ -1,8 +1,11 @@
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   Calendar,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Database,
   Palmtree,
@@ -14,14 +17,35 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuthBoundary } from '@/platform/auth';
 import { useAllRequestsQuery, usePublicHolidaysQuery, useTeamMembersQuery } from '@/features/requests/useRequests';
-import { useRosterPeriodQuery } from '@/features/rosters/data/rosterQueries';
+import {
+  useDraftAssignmentsQuery,
+  usePlannedAssignmentsQuery,
+  useRosterEpAssignmentsQuery,
+  useRosterPeriodQuery,
+} from '@/features/rosters/data/rosterQueries';
+import { getDatesInRange } from '@/features/rosters/domain/rulesEngine';
 import { useSupabaseMetadata } from '@/platform/supabase';
 import { APP_TIMEZONE, FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
 import { PageHeader, SegmentedArcGauge, StatusBadge, SurfaceCard } from '@/shared/ui';
 
+function getMobileShiftTone(code?: string): string {
+  const c = (code ?? '').toUpperCase().trim();
+  if (c === 'AM' || c === 'OH') return 'bg-[#E5EED8] text-[#2D4A22] border border-[#C6D8B6]';
+  if (c === 'PM') return 'bg-[#DCE7F9] text-[#1E3A8A] border border-[#B8CEF2]';
+  if (c === 'ON1' || c === 'ON2' || c === 'PN') return 'bg-[#FCE7F1] text-[#9D174D] border border-[#F8B9D4]';
+  if (['AL', 'MC', 'EL', 'HKA', 'GHKA'].includes(c))
+    return 'bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]';
+  if (c === 'COURSE' || c === 'COURT')
+    return 'bg-[#FEF3C7] text-[#854D0E] border border-[#FDE047]';
+  return 'bg-[#F5F5F4] text-[#57534E] border border-[#E7E5E4]';
+}
+
 export function DashboardRoute() {
   const metadata = useSupabaseMetadata();
   const { user } = useAuthBoundary();
+  const isOwner = user?.role === 'owner';
+  const [mobileHomeMode, setMobileHomeMode] = useState<'duty' | 'admin'>('duty');
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const targetRosterHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
 
   // Live operational data queries
@@ -32,19 +56,347 @@ export function DashboardRoute() {
   const { data: teamMembers = [] } = useTeamMembersQuery();
   const { data: requests = [] } = useAllRequestsQuery();
   const { data: publicHolidays = [] } = usePublicHolidaysQuery();
+  const { data: draftAssignments = [] } = useDraftAssignmentsQuery(periodRow?.id);
+  const { data: plannedAssignments = [] } = usePlannedAssignmentsQuery(periodRow?.id);
+  const { data: epAssignments = [] } = useRosterEpAssignmentsQuery(periodRow?.id);
 
   const rosterStatus = periodRow?.status ? periodRow.status.toUpperCase() : 'PLANNING';
   const userGreetingName = user?.displayName ? user.displayName.split(' ')[0] : 'Doctor';
 
   // Dynamic progress fulfillment calculation
-  const isPublished = periodRow?.status === 'published';
+  const isPublished = periodRow?.status === 'published' || periodRow?.status === 'amended';
   const progressPercent = isPublished ? 100 : 77;
   const progressSubtitle = isPublished ? 'Published & Active' : 'Near complete';
 
+  const periodDates = useMemo(() => {
+    if (periodRow?.period_start && periodRow?.period_end) {
+      return getDatesInRange(periodRow.period_start, periodRow.period_end);
+    }
+    const yr = Number(FIRST_NATIVE_ROSTER_PERIOD.year);
+    const mo = Number(FIRST_NATIVE_ROSTER_PERIOD.month);
+    const daysInMonth = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const d = String(i + 1).padStart(2, '0');
+      return `${FIRST_NATIVE_ROSTER_PERIOD.year}-${FIRST_NATIVE_ROSTER_PERIOD.month}-${d}`;
+    });
+  }, [periodRow]);
+
+  const activeAssignments = useMemo(() => {
+    const rows = isPublished ? plannedAssignments : draftAssignments;
+    return rows.map((r) => ({
+      staffId: r.staff_id,
+      dutyDate: r.duty_date,
+      shiftCode: r.shift_code,
+    }));
+  }, [isPublished, plannedAssignments, draftAssignments]);
+
+  const staffNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const m of teamMembers) {
+      map.set(m.id, m.roster_name || m.display_name);
+    }
+    return map;
+  }, [teamMembers]);
+
+  const safeDayIndex = Math.max(0, Math.min(periodDates.length - 1, selectedDayIndex));
+  const activeDateStr = periodDates[safeDayIndex] ?? `${FIRST_NATIVE_ROSTER_PERIOD.year}-${FIRST_NATIVE_ROSTER_PERIOD.month}-01`;
+
+  const dayBreakdown = useMemo(() => {
+    const dayItems = activeAssignments.filter((a) => a.dutyDate === activeDateStr);
+    const myRow = user?.staffId ? dayItems.find((a) => a.staffId === user.staffId) : undefined;
+    const amNames: string[] = [];
+    const pmNames: string[] = [];
+    const onNames: string[] = [];
+    for (const a of dayItems) {
+      const code = (a.shiftCode || '').toUpperCase();
+      const name = staffNameById.get(a.staffId) ?? `MO #${a.staffId}`;
+      if (code === 'AM' || code === 'OH') amNames.push(name);
+      else if (code === 'PM') pmNames.push(name);
+      else if (code === 'ON1' || code === 'ON2' || code === 'ON' || code === 'ND' || code === 'NIGHT')
+        onNames.push(name);
+    }
+    const epOh =
+      epAssignments.find((e) => e.duty_date === activeDateStr && e.slot_type === 'EP_OFFICE_HOUR')
+        ?.physician_names ?? '';
+    const epOc =
+      epAssignments.find((e) => e.duty_date === activeDateStr && e.slot_type === 'EP_ONCALL')
+        ?.physician_names ?? '';
+    return {
+      myShift: myRow?.shiftCode || 'OFF',
+      amNames,
+      pmNames,
+      onNames,
+      epOh,
+      epOc,
+    };
+  }, [activeAssignments, activeDateStr, user?.staffId, staffNameById, epAssignments]);
+
+  const myShiftByDate = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!user?.staffId) return map;
+    for (const a of activeAssignments) {
+      if (a.staffId === user.staffId) {
+        map.set(a.dutyDate, a.shiftCode);
+      }
+    }
+    return map;
+  }, [activeAssignments, user?.staffId]);
+
+  const activeDateLabel = useMemo(() => {
+    const d = new Date(activeDateStr + 'T00:00:00Z');
+    return d.toLocaleDateString(undefined, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }, [activeDateStr]);
+
+  const leadEmptyDays = useMemo(() => {
+    const first = periodDates[0];
+    if (!first) return 0;
+    const wd = new Date(first + 'T00:00:00Z').getUTCDay();
+    return (wd + 6) % 7; // Monday = 0
+  }, [periodDates]);
+
   return (
     <div className="space-y-6">
-      {/* 0. Warm Editorial Greeting Header (Amie / Bento Style) */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-1">
+      {/* 📱 MOBILE-FIRST HOME: Option A (My Duty | Admin Pulse) + Day Sheet Hero + Month Sheet */}
+      <div className="lg:hidden space-y-3">
+        {isOwner && (
+          <div className="relative grid grid-cols-2 rounded-full bg-[#EAE4DA] p-0.5 select-none">
+            <div
+              className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-[#18181B] shadow-xs transition-transform duration-200 ${
+                mobileHomeMode === 'admin' ? 'translate-x-full' : 'translate-x-0'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setMobileHomeMode('duty')}
+              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                mobileHomeMode === 'duty' ? 'text-white' : 'text-stone-600'
+              }`}
+            >
+              My Duty
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileHomeMode('admin')}
+              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                mobileHomeMode === 'admin' ? 'text-white' : 'text-stone-600'
+              }`}
+            >
+              Admin Pulse
+            </button>
+          </div>
+        )}
+
+        {isOwner && mobileHomeMode === 'admin' ? (
+          <div className="space-y-3">
+            <div className="rounded-[26px] border border-stone-200/80 bg-white p-4 shadow-xs flex flex-col items-center">
+              <SegmentedArcGauge
+                label="Overall progress"
+                value={progressPercent}
+                title={`${progressPercent}%`}
+                subtitle={`${rosterStatus} · ${periodDates.length} days`}
+                palette="rainbow"
+                size="md"
+                className="w-full"
+              />
+              <div className="mt-2 flex items-center gap-2">
+                <Link
+                  to={targetRosterHref}
+                  className="rounded-full bg-[#18181B] px-4 py-1.5 text-xs font-extrabold text-white shadow-xs"
+                >
+                  Edit Timetable
+                </Link>
+                <Link
+                  to="/requests"
+                  className="rounded-full border border-stone-200 bg-[#FAF8F5] px-4 py-1.5 text-xs font-extrabold text-stone-800"
+                >
+                  Requests ({requests.length})
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-[22px] bg-[#E5EED8] border border-[#C6D8B6] p-3.5 text-[#2D4A22]">
+                <div className="text-[11px] font-extrabold">Morning AM</div>
+                <div className="text-2xl font-extrabold mt-1">08:00–16:00</div>
+                <div className="text-[10px] font-bold opacity-80 mt-0.5">
+                  {dayBreakdown.amNames.length} MOs on {activeDateStr.slice(8)}
+                </div>
+              </div>
+              <div className="rounded-[22px] bg-[#DCE7F9] border border-[#B8CEF2] p-3.5 text-[#1E3A8A]">
+                <div className="text-[11px] font-extrabold">Evening PM</div>
+                <div className="text-2xl font-extrabold mt-1">16:00–23:00</div>
+                <div className="text-[10px] font-bold opacity-80 mt-0.5">
+                  {dayBreakdown.pmNames.length} MOs on {activeDateStr.slice(8)}
+                </div>
+              </div>
+              <div className="rounded-[22px] bg-[#FCE7F1] border border-[#F8B9D4] p-3.5 text-[#9D174D]">
+                <div className="text-[11px] font-extrabold">ON1 / ON2</div>
+                <div className="text-2xl font-extrabold mt-1">23:00–08:00</div>
+                <div className="text-[10px] font-bold opacity-80 mt-0.5">
+                  {dayBreakdown.onNames.length} MOs on {activeDateStr.slice(8)}
+                </div>
+              </div>
+              <div className="rounded-[22px] bg-[#FEF3C7] border border-[#FDE047] p-3.5 text-[#854D0E]">
+                <div className="text-[11px] font-extrabold">EP Specialist</div>
+                <div className="text-sm font-extrabold mt-1.5 truncate">
+                  {dayBreakdown.epOh || 'Unassigned'}
+                </div>
+                <div className="text-[10px] font-bold opacity-80 mt-0.5">
+                  OC: {dayBreakdown.epOc || '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Hero: Day Sheet */}
+            <div className="rounded-[28px] border border-stone-200/80 bg-white p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  aria-label="Previous day"
+                  onClick={() => setSelectedDayIndex((i) => Math.max(0, i - 1))}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-[#FAF8F5] text-stone-800 cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="text-center">
+                  <div className="text-sm font-extrabold text-stone-900">{activeDateLabel}</div>
+                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                    Active Day Sheet
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Next day"
+                  onClick={() =>
+                    setSelectedDayIndex((i) => Math.min(periodDates.length - 1, i + 1))
+                  }
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-[#FAF8F5] text-stone-800 cursor-pointer"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div
+                className={`flex items-center justify-between rounded-2xl px-3.5 py-2.5 ${getMobileShiftTone(
+                  dayBreakdown.myShift,
+                )}`}
+              >
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase opacity-75">Your Shift</div>
+                  <div className="text-base font-extrabold">{dayBreakdown.myShift}</div>
+                </div>
+                <Link
+                  to="/requests"
+                  className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-extrabold text-stone-900 shadow-2xs"
+                >
+                  Request
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-2xl border border-stone-200/70 bg-[#FAF8F5] p-2.5">
+                  <div className="text-[9.5px] font-extrabold uppercase text-[#2D4A22]">
+                    AM (08–16)
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-bold text-stone-800 line-clamp-2">
+                    {dayBreakdown.amNames.join(', ') || '—'}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-stone-200/70 bg-[#FAF8F5] p-2.5">
+                  <div className="text-[9.5px] font-extrabold uppercase text-[#1E3A8A]">
+                    PM (16–23)
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-bold text-stone-800 line-clamp-2">
+                    {dayBreakdown.pmNames.join(', ') || '—'}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-stone-200/70 bg-[#FAF8F5] p-2.5">
+                  <div className="text-[9.5px] font-extrabold uppercase text-[#9D174D]">
+                    ON1/2 (23–08)
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-bold text-stone-800 line-clamp-2">
+                    {dayBreakdown.onNames.join(', ') || '—'}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-stone-200/70 bg-[#FAF8F5] p-2.5">
+                  <div className="text-[9.5px] font-extrabold uppercase text-[#854D0E]">
+                    EP Specialist
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-bold text-stone-800 truncate">
+                    OH: {dayBreakdown.epOh || '—'}
+                  </div>
+                  <div className="text-[10px] font-semibold text-stone-500 truncate">
+                    OC: {dayBreakdown.epOc || '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Below: Month Sheet */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">
+                Month Sheet
+              </span>
+              <Link to={targetRosterHref} className="text-xs font-extrabold text-teal-700">
+                Full Roster →
+              </Link>
+            </div>
+            <div className="rounded-[24px] border border-stone-200/80 bg-white p-3 shadow-xs">
+              <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-stone-400 pb-1.5">
+                <div>M</div>
+                <div>T</div>
+                <div>W</div>
+                <div>T</div>
+                <div>F</div>
+                <div>S</div>
+                <div>S</div>
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: leadEmptyDays }).map((_, i) => (
+                  <div key={`lead-${i}`} />
+                ))}
+                {periodDates.map((dateStr, idx) => {
+                  const dayNum = parseInt(dateStr.slice(8, 10), 10);
+                  const shift = myShiftByDate.get(dateStr) || 'OFF';
+                  const isSelected = idx === safeDayIndex;
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      onClick={() => setSelectedDayIndex(idx)}
+                      className={`flex flex-col items-center justify-center gap-0.5 rounded-xl border py-1.5 transition cursor-pointer ${
+                        isSelected
+                          ? 'border-[#E06D53] bg-[#FFF7F5] ring-2 ring-[#E06D53]/25'
+                          : 'border-[#EFECE6] bg-[#FAF8F5]'
+                      }`}
+                    >
+                      <span className="text-[10.5px] font-extrabold text-stone-900">{dayNum}</span>
+                      <span
+                        className={`rounded px-1 py-0.5 text-[7.5px] font-extrabold leading-none ${getMobileShiftTone(
+                          shift,
+                        )}`}
+                      >
+                        {shift}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 🖥️ DESKTOP GREETING & BENTO HEADER */}
+      <div className="hidden lg:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-1">
         <div>
           <h2 className="text-xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
             Good morning, {userGreetingName} 👋
@@ -87,27 +439,29 @@ export function DashboardRoute() {
         </div>
       </div>
 
-      <PageHeader
-        eyebrow="Emergency Department Workforce Operations"
-        title="Operations Overview"
-        description="Unified workforce command center for medical officer duty scheduling, shift requests, public holiday credits, and staffing governance."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge
-              label={`Env: ${metadata.appEnv.toUpperCase()} (${metadata.projectRef})`}
-              tone={metadata.isProduction ? 'brand' : 'teal'}
-            />
-            <StatusBadge
-              label={APP_TIMEZONE}
-              tone="neutral"
-            />
-          </div>
-        }
-      />
+      <div className="sr-only lg:not-sr-only">
+        <PageHeader
+          eyebrow="Emergency Department Workforce Operations"
+          title="Operations Overview"
+          description="Unified workforce command center for medical officer duty scheduling, shift requests, public holiday credits, and staffing governance."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge
+                label={`Env: ${metadata.appEnv.toUpperCase()} (${metadata.projectRef})`}
+                tone={metadata.isProduction ? 'brand' : 'teal'}
+              />
+              <StatusBadge
+                label={APP_TIMEZONE}
+                tone="neutral"
+              />
+            </div>
+          }
+        />
+      </div>
 
-      {/* 1. Bento Dashboard Grid (On mobile: Hero Arc Gauge is shown first, exactly matching Image 2!) */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-12 items-start">
-        {/* Right Area: Segmented Arc Gauge Widget & Members (Order-1 on mobile, lg:col-span-4 on desktop) */}
+      {/* 1. Desktop Bento Dashboard Grid */}
+      <div className="hidden lg:grid gap-4 sm:gap-6 lg:grid-cols-12 items-start">
+        {/* Right Area: Segmented Arc Gauge Widget & Members (lg:col-span-4 on desktop) */}
         <div className="order-1 lg:order-2 lg:col-span-4 rounded-3xl border border-stone-200/80 bg-white p-5 sm:p-6 shadow-sm space-y-5 sm:space-y-6">
           {/* Segmented Arc Gauge Speedometer */}
           <SegmentedArcGauge
@@ -120,24 +474,24 @@ export function DashboardRoute() {
             className="w-full pt-1"
           />
 
-          {/* In Progress Duty Breakdown (Exact list from reference image) */}
+          {/* In Progress Duty Breakdown (Aligned to live ED shifts) */}
           <div className="border-t border-stone-100 pt-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-900 tracking-tight">Shift Coverage</span>
-              <span className="text-[11px] font-bold text-stone-400 hover:text-stone-600 cursor-pointer">
+              <Link to={targetRosterHref} className="text-[11px] font-bold text-stone-400 hover:text-stone-600">
                 View All
-              </span>
+              </Link>
             </div>
 
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E5EED8] text-[#2D4A22] text-[10px] font-extrabold border border-[#C6D8B6]">
-                    75
+                    AM
                   </span>
                   <div>
                     <p className="font-bold text-stone-900">Morning AM</p>
-                    <p className="text-[10px] text-stone-400">07:00 - 15:00 Coverage</p>
+                    <p className="text-[10px] text-stone-400">08:00 - 16:00 Coverage</p>
                   </div>
                 </div>
                 <span className="font-bold text-stone-700 tabular-nums">75%</span>
@@ -146,11 +500,11 @@ export function DashboardRoute() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#DCE7F9] text-[#1E3A8A] text-[10px] font-extrabold border border-[#B8CEF2]">
-                    55
+                    PM
                   </span>
                   <div>
                     <p className="font-bold text-stone-900">Evening PM</p>
-                    <p className="text-[10px] text-stone-400">14:00 - 22:00 Coverage</p>
+                    <p className="text-[10px] text-stone-400">16:00 - 23:00 Coverage</p>
                   </div>
                 </div>
                 <span className="font-bold text-stone-700 tabular-nums">55%</span>
@@ -159,11 +513,11 @@ export function DashboardRoute() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FCE7F1] text-[#9D174D] text-[10px] font-extrabold border border-[#F8B9D4]">
-                    87
+                    ON1
                   </span>
                   <div>
-                    <p className="font-bold text-stone-900">Night ND</p>
-                    <p className="text-[10px] text-stone-400">21:00 - 08:00 Coverage</p>
+                    <p className="font-bold text-stone-900">Overnight ON1 / ON2</p>
+                    <p className="text-[10px] text-stone-400">23:00 - 08:00 Coverage</p>
                   </div>
                 </div>
                 <span className="font-bold text-stone-700 tabular-nums">87%</span>
@@ -172,11 +526,11 @@ export function DashboardRoute() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEF3C7] text-[#854D0E] text-[10px] font-extrabold border border-[#FDE047]">
-                    92
+                    EP
                   </span>
                   <div>
-                    <p className="font-bold text-stone-900">On-Call Standby</p>
-                    <p className="text-[10px] text-stone-400">24h Emergency Backup</p>
+                    <p className="font-bold text-stone-900">EP Specialist</p>
+                    <p className="text-[10px] text-stone-400">Office Hour &amp; On-Call</p>
                   </div>
                 </div>
                 <span className="font-bold text-stone-700 tabular-nums">92%</span>

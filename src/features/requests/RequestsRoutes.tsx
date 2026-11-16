@@ -116,47 +116,49 @@ export function StaffRequestsRoute() {
 
   return (
     <div className="space-y-6">
-      {/* Header & View Mode Switcher */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header & Sticky Mobile View Mode Switcher */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-200/60 shadow-sm">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-200/60 shadow-2xs">
             <ClipboardList className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-xl font-extrabold text-stone-900 tracking-tight">
               Request Panel
             </h2>
-            <p className="mt-0.5 text-xs font-medium text-slate-500">
+            <p className="mt-0.5 text-xs font-medium text-stone-500">
               Displaying active requests made by team members.
             </p>
           </div>
         </div>
 
-        <div className="inline-flex rounded-xl bg-slate-200/60 p-1 shadow-inner self-start sm:self-auto ring-1 ring-slate-200">
-          <button
-            type="button"
-            onClick={() => setViewMode('calendar')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition duration-150 cursor-pointer ${
-              viewMode === 'calendar'
-                ? 'bg-white text-teal-800 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Calendar className="h-4 w-4" />
-            <span>Calendar View</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition duration-150 cursor-pointer ${
-              viewMode === 'table'
-                ? 'bg-white text-teal-800 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Table className="h-4 w-4" />
-            <span>Table View</span>
-          </button>
+        <div className="sticky top-14 z-10 -mx-3.5 px-3.5 py-2 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-stone-200/60 sm:static sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0">
+          <div className="inline-flex w-full sm:w-auto rounded-full bg-stone-200/70 p-1 ring-1 ring-stone-200">
+            <button
+              type="button"
+              onClick={() => setViewMode('calendar')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition duration-150 cursor-pointer ${
+                viewMode === 'calendar'
+                  ? 'bg-[#18181B] text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>Calendar View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition duration-150 cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-[#18181B] text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              <Table className="h-3.5 w-3.5" />
+              <span>Table View</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -169,84 +171,80 @@ export function StaffRequestsRoute() {
         </div>
       )}
 
-      {/* 📊 Monthly Quota Summary Cards */}
+      {/* 📊 Monthly Quota Summary Cards (Warm Editorial Circular Rings) */}
       {monthlyStats.length > 0 && (
-        <div className="max-w-sm">
+        <div className="max-w-md space-y-2">
           {monthlyStats.map((stat) => {
             const pct = Math.min(100, (stat.count / (stat.limit || DEFAULT_MONTHLY_LIMIT)) * 100);
             const weekendPct = Math.min(
               100,
               (stat.weekendCount / (stat.weekendLimit || DEFAULT_MONTHLY_WEEKEND_LIMIT)) * 100,
             );
-
-            let barColor = 'bg-emerald-500';
-            let textColor = 'text-emerald-700';
-            let bgColor = 'bg-emerald-50';
-            let borderColor = 'border-emerald-200';
-
-            if (stat.count >= stat.limit) {
-              barColor = 'bg-rose-500';
-              textColor = 'text-rose-700';
-              bgColor = 'bg-rose-50';
-              borderColor = 'border-rose-200';
-            } else if (stat.count >= stat.limit - 2) {
-              barColor = 'bg-amber-500';
-              textColor = 'text-amber-700';
-              bgColor = 'bg-amber-50';
-              borderColor = 'border-amber-200';
-            }
+            const totalStroke =
+              stat.count >= stat.limit
+                ? '#E11D48'
+                : stat.count >= stat.limit - 2
+                  ? '#D97706'
+                  : '#0F766E';
+            const weekendStroke =
+              stat.weekendCount >= stat.weekendLimit ? '#E11D48' : '#E06D53';
 
             return (
-              <div
-                key={stat.key}
-                className={`rounded-3xl border ${borderColor} ${bgColor} p-4 shadow-sm transition flex flex-col justify-between`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    {stat.label} Quotas
-                  </span>
-                </div>
+              <div key={stat.key} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="flex items-center gap-3 rounded-3xl border border-stone-200/80 bg-white p-3.5 shadow-xs">
+                    <svg width="42" height="42" viewBox="0 0 36 36" className="shrink-0">
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="#E7E5E4" strokeWidth="4" />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="none"
+                        stroke={totalStroke}
+                        strokeWidth="4"
+                        strokeDasharray={`${Math.round((pct / 100) * 88)} 88`}
+                        transform="rotate(-90 18 18)"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-stone-500 truncate">Total Requests</p>
+                      <p className="text-base font-extrabold text-stone-900 tabular-nums">
+                        {stat.count} / {stat.limit}
+                      </p>
+                      <p className="text-[10px] font-semibold text-stone-400 truncate">{stat.label}</p>
+                    </div>
+                  </div>
 
-                <div className="mb-3">
-                  <div className="flex justify-between mb-1 text-[11px] font-bold">
-                    <span className="text-slate-600">Total Requests</span>
-                    <span className={textColor}>
-                      {stat.count} / {stat.limit}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-200/80 overflow-hidden">
-                    <div
-                      className={`h-full ${barColor} transition-all duration-500 rounded-full`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mb-1">
-                  <div className="flex justify-between mb-1 text-[11px] font-bold">
-                    <span className="text-slate-600">{stat.weekendLabel} Requests</span>
-                    <span
-                      className={
-                        stat.weekendCount >= stat.weekendLimit
-                          ? 'text-rose-700 font-bold'
-                          : 'text-slate-700'
-                      }
-                    >
-                      {stat.weekendCount} / {stat.weekendLimit}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-200/80 overflow-hidden">
-                    <div
-                      className={`h-full ${
-                        stat.weekendCount >= stat.weekendLimit ? 'bg-rose-500' : 'bg-slate-400'
-                      } transition-all duration-500 rounded-full`}
-                      style={{ width: `${weekendPct}%` }}
-                    />
+                  <div className="flex items-center gap-3 rounded-3xl border border-stone-200/80 bg-white p-3.5 shadow-xs">
+                    <svg width="42" height="42" viewBox="0 0 36 36" className="shrink-0">
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="#E7E5E4" strokeWidth="4" />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="none"
+                        stroke={weekendStroke}
+                        strokeWidth="4"
+                        strokeDasharray={`${Math.round((weekendPct / 100) * 88)} 88`}
+                        transform="rotate(-90 18 18)"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-stone-500 truncate">
+                        {stat.weekendLabel} Requests
+                      </p>
+                      <p className="text-base font-extrabold text-stone-900 tabular-nums">
+                        {stat.weekendCount} / {stat.weekendLimit}
+                      </p>
+                      <p className="text-[10px] font-semibold text-stone-400 truncate">Sat &amp; Sun</p>
+                    </div>
                   </div>
                 </div>
 
                 {(stat.count >= stat.limit || stat.weekendCount >= stat.weekendLimit) && (
-                  <p className="mt-2 text-xs font-semibold text-rose-600 flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-rose-600 flex items-center gap-1.5 px-1">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     <span>
                       {stat.count >= stat.limit

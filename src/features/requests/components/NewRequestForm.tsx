@@ -46,6 +46,34 @@ export interface NewRequestFormProps {
   isSubmitting?: boolean;
 }
 
+const LEGACY_HIDDEN_SHIFTS = new Set(['ON', 'NIGHT', 'ND']);
+
+function getShiftTileTone(code: string, isSelected: boolean, isCapped: boolean): string {
+  if (isSelected) {
+    return 'bg-[#18181B] border-[#18181B] text-white shadow-sm font-extrabold';
+  }
+  if (isCapped) {
+    return 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-55';
+  }
+  const c = code.toUpperCase().trim();
+  if (c === 'AM' || c === 'OH') {
+    return 'bg-[#E5EED8] border-[#C6D8B6] text-[#2D4A22] hover:brightness-95';
+  }
+  if (c === 'PM') {
+    return 'bg-[#DCE7F9] border-[#B8CEF2] text-[#1E3A8A] hover:brightness-95';
+  }
+  if (c === 'ON1' || c === 'ON2' || c === 'PN') {
+    return 'bg-[#FCE7F1] border-[#F8B9D4] text-[#9D174D] hover:brightness-95';
+  }
+  if (c === 'AL' || c === 'MC' || c === 'EL' || c === 'HKA' || c === 'GHKA') {
+    return 'bg-[#D1FAE5] border-[#A7F3D0] text-[#065F46] hover:brightness-95';
+  }
+  if (c === 'COURSE' || c === 'COURT') {
+    return 'bg-[#FEF3C7] border-[#FDE047] text-[#854D0E] hover:brightness-95';
+  }
+  return 'bg-[#FAF8F5] border-stone-200 text-stone-700 hover:bg-stone-100';
+}
+
 export function NewRequestForm({
   selectedName,
   selectedStaffId,
@@ -57,16 +85,18 @@ export function NewRequestForm({
   isSubmitting = false,
 }: NewRequestFormProps) {
   const { data: dbShiftDefs = [] } = useRequestShiftDefinitionsQuery();
+  const [isStaffPickerOpen, setIsStaffPickerOpen] = useState(false);
+  const [staffSearch, setStaffSearch] = useState('');
 
-  // If user is owner/admin, provide full catalog of departmental shifts.
+  // If user is owner/admin, provide full catalog of departmental shifts (excluding legacy ON/NIGHT/ND).
   // Regular doctors are constrained to standard requestable types (DEFAULT_SHIFT_TYPES).
   const availableShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
     if (!isOwner) {
       return DEFAULT_SHIFT_TYPES;
     }
     if (dbShiftDefs.length > 0) {
-      return dbShiftDefs
-        .filter((s) => s.is_active)
+      const mapped = dbShiftDefs
+        .filter((s) => s.is_active && !LEGACY_HIDDEN_SHIFTS.has(s.code.toUpperCase()))
         .map((s) => ({
           ID: s.code,
           Name: s.code,
@@ -75,6 +105,12 @@ export function NewRequestForm({
             : null,
           IsPublic: true,
         }));
+      for (const extra of ['OH', 'COURT']) {
+        if (!mapped.some((m) => m.Name.toUpperCase() === extra)) {
+          mapped.push({ ID: extra, Name: extra, GroupID: null, IsPublic: false });
+        }
+      }
+      return mapped;
     }
     return ADMIN_ALL_SHIFT_TYPES;
   }, [isOwner, dbShiftDefs]);
@@ -233,43 +269,99 @@ export function NewRequestForm({
     };
   }, [date, requests, targetMemberName, initialValues]);
 
+  const filteredMembers = useMemo(() => {
+    const q = staffSearch.trim().toLowerCase();
+    if (!q) return teamMembers;
+    return teamMembers.filter(
+      (m) =>
+        (m.roster_name || '').toLowerCase().includes(q) ||
+        (m.display_name || '').toLowerCase().includes(q) ||
+        (m.staff_code || '').toLowerCase().includes(q),
+    );
+  }, [teamMembers, staffSearch]);
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+      className="rounded-3xl bg-white p-4 shadow-xs ring-1 ring-stone-200/80"
     >
-      <fieldset className="flex flex-col gap-4" disabled={isSubmitting}>
-        <legend className="text-base font-bold text-slate-900">
+      <fieldset className="flex flex-col gap-3.5" disabled={isSubmitting}>
+        <legend className="text-sm font-extrabold text-stone-900">
           {initialValues?.id ? 'Update Request' : 'New Request'}
         </legend>
 
         {isOwner ? (
-          <label className="text-sm font-semibold text-slate-700">
-            Submit on behalf of:
-            <select
-              value={targetStaffId}
-              onChange={(e) => {
-                setValidationError('');
-                setTargetStaffId(Number(e.target.value));
-              }}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              required
-            >
-              {teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.roster_name || member.display_name} ({member.staff_code})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between rounded-2xl border border-stone-200/80 bg-[#FAF8F5] px-3 py-2 text-xs">
+              <div className="min-w-0">
+                <span className="font-semibold text-stone-500">Submit on behalf of: </span>
+                <span className="font-extrabold text-stone-900 truncate">{targetMemberName}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffSearch('');
+                  setIsStaffPickerOpen((v) => !v);
+                }}
+                className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1 text-[11px] font-bold text-stone-800 shadow-2xs hover:bg-stone-100 transition cursor-pointer"
+              >
+                {isStaffPickerOpen ? 'Done' : 'Change'}
+              </button>
+            </div>
+
+            {isStaffPickerOpen && (
+              <div className="rounded-2xl border border-stone-200 bg-white p-2.5 shadow-md space-y-2">
+                <input
+                  type="search"
+                  placeholder="Search MO name or code..."
+                  value={staffSearch}
+                  onChange={(e) => setStaffSearch(e.target.value)}
+                  className="w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-1.5 text-xs font-medium text-stone-900 focus:border-teal-600 focus:outline-none"
+                />
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {filteredMembers.map((member) => {
+                    const isActive = member.id === targetStaffId;
+                    const label = member.roster_name || member.display_name;
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => {
+                          setValidationError('');
+                          setTargetStaffId(member.id);
+                          setIsStaffPickerOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-bold transition cursor-pointer ${
+                          isActive
+                            ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-200'
+                            : 'text-stone-800 hover:bg-stone-50'
+                        }`}
+                      >
+                        <span>
+                          {label}{' '}
+                          <span className="text-[10px] font-normal text-stone-400">
+                            ({member.staff_code})
+                          </span>
+                        </span>
+                        {isActive && <span className="text-[10px] text-teal-700">Selected ✓</span>}
+                      </button>
+                    );
+                  })}
+                  {filteredMembers.length === 0 && (
+                    <p className="py-3 text-center text-xs text-stone-400">No matching MO</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            <span className="font-semibold text-slate-700">Team member: </span>
-            <span className="text-slate-900 font-bold">{selectedName}</span>
+          <div className="rounded-2xl bg-[#FAF8F5] border border-stone-200/70 px-3 py-2 text-xs text-stone-600">
+            <span className="font-semibold text-stone-500">Team member: </span>
+            <span className="text-stone-900 font-extrabold">{selectedName}</span>
           </div>
         )}
 
-        <label className="text-sm font-semibold text-slate-700">
+        <label className="text-xs font-bold text-stone-700">
           Date
           <input
             type="date"
@@ -278,7 +370,7 @@ export function NewRequestForm({
               setValidationError('');
               setDate(e.target.value);
             }}
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="mt-1 w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none"
             required
           />
         </label>
@@ -298,14 +390,14 @@ export function NewRequestForm({
         {/* Shift Type Grid */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-700">Request Type</span>
+            <span className="text-xs font-bold text-stone-700">Request Type</span>
             {isOwner && (
-              <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                Admin Mode: Full Shift Catalog ({availableShiftTypes.length} choices)
+              <span className="rounded-lg bg-teal-50 border border-teal-200/70 px-2 py-0.5 text-[10px] font-extrabold text-teal-800">
+                Admin Mode: Full Shift Catalog ({availableShiftTypes.length})
               </span>
             )}
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             {availableShiftTypes.map((st) => {
               const status = getLimitStatusForType({
                 type: st.Name,
@@ -325,19 +417,11 @@ export function NewRequestForm({
               const isCapped = !isOwner && status.isLimited && Boolean(status.isAtLimit);
               const isSelected = request === st.Name;
 
-              let btnClass =
-                'border text-xs font-bold py-2.5 rounded-full text-center transition duration-200 active:scale-[0.96] flex items-center justify-center min-w-0 px-1 cursor-pointer';
-
-              if (isSelected) {
-                btnClass +=
-                  ' bg-gradient-to-tr from-indigo-600 to-indigo-700 border-indigo-600 text-white shadow-sm font-extrabold';
-              } else if (isCapped) {
-                btnClass +=
-                  ' bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60';
-              } else {
-                btnClass +=
-                  ' bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50';
-              }
+              const btnClass = `border text-[11px] font-extrabold py-2.5 rounded-xl text-center transition duration-150 active:scale-[0.96] flex items-center justify-center min-w-0 px-1 cursor-pointer ${getShiftTileTone(
+                st.Name,
+                isSelected,
+                isCapped,
+              )}`;
 
               return (
                 <button
@@ -357,7 +441,7 @@ export function NewRequestForm({
             })}
           </div>
 
-          <p className="mt-1 text-[11px] font-medium text-slate-500">
+          <p className="mt-1 text-[11px] font-medium text-stone-500">
             {selectedDateKey && selectedTypeStatus.isLimited ? (
               <>
                 {selectedTypeStatus.usage}/{selectedTypeStatus.limit} requests for group &apos;
@@ -372,21 +456,21 @@ export function NewRequestForm({
           </p>
         </div>
 
-        <label className="text-sm font-semibold text-slate-700">
+        <label className="text-xs font-bold text-stone-700">
           Comment (optional)
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            rows={3}
+            rows={2}
             placeholder="Add context for this request"
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="mt-1 w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none"
           />
         </label>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-[#18181B] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-stone-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-stone-300 cursor-pointer"
         >
           {isSubmitting ? 'Saving...' : initialValues?.id ? 'Update Request' : 'Save Request'}
         </button>

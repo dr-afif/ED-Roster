@@ -5,13 +5,15 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const REQUEST_CLASS_MAP: Record<string, string> = {
   am: 'req--am',
+  oh: 'req--am',
   pm: 'req--pm',
-  night: 'req--night',
-  on: 'req--night',
   on1: 'req--night',
   on2: 'req--night',
+  pn: 'req--night',
   course: 'req--course',
+  court: 'req--course',
   off: 'req--off',
+  goff: 'req--off',
   leave: 'req--off',
   hka: 'req--hka',
   ghka: 'req--ghka',
@@ -258,7 +260,12 @@ export function CalendarView({
                         title={isSaving ? 'Saving...' : entry.comment || undefined}
                       >
                         <span className="req__tag">{entry.request}</span>
-                        {entry.name ? <span className="req__name">&bull; {entry.name}</span> : null}
+                        {entry.name ? (
+                          <span className="req__name">
+                            <span className="hidden sm:inline">&bull; </span>
+                            {entry.name}
+                          </span>
+                        ) : null}
                         {entry.comment ? (
                           <span className="req__comment" role="tooltip">
                             {entry.comment}

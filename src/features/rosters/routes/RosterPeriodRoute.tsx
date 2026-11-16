@@ -85,7 +85,9 @@ export function RosterPeriodRoute() {
 
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
-  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
+  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'calendar' : 'table',
+  );
 
   // Modal control states
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
