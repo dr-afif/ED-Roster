@@ -1,15 +1,16 @@
 import { getShiftSemantic, normalizeShiftCode } from './semantics';
 import { evaluateStaffSequences } from './sequences';
 import { evaluateStaffing } from './staffing';
-import type {
-  Assignment,
-  GoffPosition,
-  GoffProjection,
-  RosterIssue,
-  RulesInput,
-  RulesOutput,
-  SequenceResult,
-  WeeklyOffResult,
+import {
+  getMoWorkMode,
+  type Assignment,
+  type GoffPosition,
+  type GoffProjection,
+  type RosterIssue,
+  type RulesInput,
+  type RulesOutput,
+  type SequenceResult,
+  type WeeklyOffResult,
 } from './types';
 import { evaluateWeeklyOffForStaff, getRosterWeeks } from './weeklyOff';
 
@@ -159,29 +160,47 @@ export function evaluateRosterRules(input: RulesInput): RulesOutput {
       }
     }
 
-    // B: Consecutive sequence & night bundle evaluation
-    const sortedDates = Array.from(staffAssignmentsMap.keys()).sort();
-    const orderedEntries = sortedDates.map((date) => ({
-      date,
-      shiftCode: staffAssignmentsMap.get(date)?.shiftCode ?? '',
-    }));
+    // B: Consecutive sequence & night bundle evaluation (skip non-clinical MOs)
+    const workMode = getMoWorkMode(person.staffGroup);
+    if (workMode !== 'oh_non_clinical') {
+      const sortedDates = Array.from(staffAssignmentsMap.keys()).sort();
+      const orderedEntries = sortedDates.map((date) => ({
+        date,
+        shiftCode: staffAssignmentsMap.get(date)?.shiftCode ?? '',
+      }));
 
-    const { result: seqResult, issues: seqIssues } = evaluateStaffSequences(
-      person.id,
-      person.rosterName,
-      orderedEntries,
-      configuration.maxConsecutiveDays,
-      configuration.semantics,
-    );
+      const { result: seqResult, issues: seqIssues } = evaluateStaffSequences(
+        person.id,
+        person.rosterName,
+        orderedEntries,
+        configuration.maxConsecutiveDays,
+        configuration.semantics,
+      );
 
-    sequenceResults.push(seqResult);
-    issues.push(...seqIssues);
+      sequenceResults.push(seqResult);
+      issues.push(...seqIssues);
+    }
   }
 
-  // 3. Evaluate Staffing Coverage Thresholds
+  // 3. Evaluate Staffing Coverage Thresholds (exclude OH Non-Clinical; treat OH Clinical 'OH' as AM)
+  const workModeByStaffId = new Map(people.map((p) => [p.id, getMoWorkMode(p.staffGroup)]));
+  const clinicalAssignments: Assignment[] = [];
+  for (const a of assignments) {
+    const mode = workModeByStaffId.get(a.staffId) ?? 'shift';
+    if (mode === 'oh_non_clinical') continue;
+    if (mode === 'oh_clinical') {
+      const { base } = normalizeShiftCode(a.shiftCode);
+      if (base === 'OH') {
+        clinicalAssignments.push({ ...a, shiftCode: 'AM' });
+        continue;
+      }
+    }
+    clinicalAssignments.push(a);
+  }
+
   const { staffing, issues: staffingIssues } = evaluateStaffing(
     periodDates,
-    assignments,
+    clinicalAssignments,
     configuration.staffingThresholds,
     holidays,
     configuration.semantics,

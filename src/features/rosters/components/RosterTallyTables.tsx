@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Settings2, SlidersHorizontal, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { type SharedTallyThresholds, useAppUiState } from '@/shared/ui';
-import type { Assignment, StaffRosterIdentity } from '../domain/types';
+import { getMoWorkMode, type Assignment, type StaffRosterIdentity } from '../domain/types';
 
 export type TallyThresholds = SharedTallyThresholds;
 
@@ -68,12 +68,20 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
     });
   }
 
+  const staffById = new Map(staffList.map((s) => [s.id, s]));
+
   for (const a of assignments) {
     const code = cleanShiftCode(a.shiftCode);
     const day = dailyTally.get(a.dutyDate);
     const mem = memberTally.get(a.staffId);
+    const workMode = getMoWorkMode(staffById.get(a.staffId)?.staffGroup);
 
-    const isAm = code === 'AM';
+    if (workMode === 'oh_non_clinical') {
+      if (day && code) day.empty = Math.max(0, day.empty - 1);
+      continue;
+    }
+
+    const isAm = code === 'AM' || (workMode === 'oh_clinical' && code === 'OH');
     const isPm = code === 'PM';
     const isNight =
       code === 'ND' ||
@@ -84,20 +92,22 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       code === 'PN';
     const isOff = code === 'OFF';
     const isGoff = code === 'GOFF';
-    const isLeave = [
-      'AL',
-      'EL',
-      'MC',
-      'HKA',
-      'GHKA',
-      'COURSE',
-      'OH',
-      'COURT',
-      'LEAVE',
-      'CR_LEAVE',
-      'MATERNITY',
-      'UNPAID',
-    ].includes(code);
+    const isLeave =
+      !(workMode === 'oh_clinical' && code === 'OH') &&
+      [
+        'AL',
+        'EL',
+        'MC',
+        'HKA',
+        'GHKA',
+        'COURSE',
+        'OH',
+        'COURT',
+        'LEAVE',
+        'CR_LEAVE',
+        'MATERNITY',
+        'UNPAID',
+      ].includes(code);
 
     if (day) {
       if (isAm) day.am += 1;

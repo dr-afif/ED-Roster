@@ -4,6 +4,8 @@ export const IS_TEST_ENV =
   import.meta.env.MODE === 'test' ||
   Boolean((globalThis as Record<string, unknown>).__vitest_worker__);
 
+export const IS_PRODUCTION_ENV = import.meta.env.VITE_APP_ENV === 'production';
+
 const PROTOTYPE_EXTRA_STAFF: readonly StaffRosterIdentity[] = [
   {
     id: 1,
@@ -105,7 +107,7 @@ export function enrichSparseRosterForDisplay(
   assignments: Assignment[];
   requests: PrototypeRequestMarker[];
 } {
-  if (IS_TEST_ENV || periodDates.length === 0) {
+  if (IS_TEST_ENV || IS_PRODUCTION_ENV || periodDates.length === 0) {
     return {
       staffList: [...staffList],
       assignments: [...assignments],

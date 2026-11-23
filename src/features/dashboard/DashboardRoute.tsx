@@ -161,6 +161,16 @@ export function DashboardRoute() {
     const seeded = getSeededDayInfo(activeDayNum);
 
     if (dayItems.length === 0) {
+      if (import.meta.env.VITE_APP_ENV === 'production') {
+        return {
+          myShift: 'OFF',
+          amNames: [] as string[],
+          pmNames: [] as string[],
+          onNames: [] as string[],
+          epOh: '—',
+          epOc: '—',
+        };
+      }
       return {
         myShift: seeded.myShift,
         amNames: seeded.amPool,
@@ -176,9 +186,16 @@ export function DashboardRoute() {
     const pmNames: string[] = [];
     const onNames: string[] = [];
     for (const a of dayItems) {
-      const code = (a.shiftCode || '').toUpperCase();
+      const code = (a.shiftCode || '')
+        .toUpperCase()
+        .replace(/\(S\)|-S|\(X\)|-X/g, '')
+        .trim();
+      const staffMember = teamMembers.find((s) => s.id === a.staffId);
+      const sg = (staffMember?.staff_group ?? '').toLowerCase();
+      if (sg.includes('non-clinical')) continue;
+      const isOhClinical = sg.includes('office hour');
       const name = staffNameById.get(a.staffId) ?? `MO #${a.staffId}`;
-      if (code === 'AM' || code === 'OH') amNames.push(name);
+      if (code === 'AM' || (isOhClinical && code === 'OH')) amNames.push(name);
       else if (code === 'PM') pmNames.push(name);
       else if (
         code === 'ON1' ||
@@ -205,7 +222,15 @@ export function DashboardRoute() {
       epOh: (epOhRaw || seeded.epOh).replace(/^Dr\.?\s+/i, ''),
       epOc: (epOcRaw || seeded.epOc).replace(/^Dr\.?\s+/i, ''),
     };
-  }, [activeAssignments, activeDateStr, activeDayNum, userStaffId, staffNameById, epAssignments]);
+  }, [
+    activeAssignments,
+    activeDateStr,
+    activeDayNum,
+    userStaffId,
+    teamMembers,
+    staffNameById,
+    epAssignments,
+  ]);
 
   const myShiftByDate = useMemo(() => {
     const map = new Map<string, string>();

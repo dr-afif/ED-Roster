@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RosterCalendarView } from '../components/RosterCalendarView';
 import { RosterTallyTables } from '../components/RosterTallyTables';
+import { sortStaffByWorkMode, type StaffRosterIdentity } from '../domain/types';
 
 describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
   const periodDates = ['2027-01-01', '2027-01-02', '2027-01-03'];
@@ -253,5 +254,54 @@ describe('RosterTallyTables (Daily Coverage & Member Tallies)', () => {
     expect(screen.getByRole('columnheader', { name: /Total\s*Worked/i })).toBeInTheDocument();
     expect(screen.getByText('Dr Afif')).toBeInTheDocument();
     expect(screen.getByText('Dr Siti')).toBeInTheDocument();
+  });
+
+  it('shows OH-Clinical OH shifts in MO AM column and excludes OH-Non-Clinical in RosterCalendarView', () => {
+    const mixedStaff: StaffRosterIdentity[] = [
+      {
+        id: 10,
+        staffCode: 'MO-10',
+        displayName: 'Dr NonClin',
+        rosterName: 'Dr NonClin',
+        staffGroup: 'MO | Office Hour (Non-Clinical)',
+        active: true,
+      },
+      {
+        id: 11,
+        staffCode: 'MO-11',
+        displayName: 'Dr ClinOH',
+        rosterName: 'Dr ClinOH',
+        staffGroup: 'MO | Office Hour (Clinical)',
+        active: true,
+      },
+      {
+        id: 12,
+        staffCode: 'MO-12',
+        displayName: 'Dr ShiftMO',
+        rosterName: 'Dr ShiftMO',
+        staffGroup: 'MO | Shift',
+        active: true,
+      },
+    ];
+
+    const sorted = sortStaffByWorkMode(mixedStaff);
+    expect(sorted.map((s) => s.id)).toEqual([12, 11, 10]);
+
+    render(
+      <RosterCalendarView
+        periodDates={['2027-01-01']}
+        staffList={sorted}
+        assignments={[
+          { staffId: 10, dutyDate: '2027-01-01', shiftCode: 'OH' },
+          { staffId: 11, dutyDate: '2027-01-01', shiftCode: 'OH' },
+        ]}
+        epAssignments={[]}
+        holidays={[]}
+        isEditable={false}
+      />,
+    );
+
+    expect(screen.getByText('ClinOH')).toBeInTheDocument();
+    expect(screen.queryByText('NonClin')).toBeNull();
   });
 });

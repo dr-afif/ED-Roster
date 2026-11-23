@@ -13,7 +13,13 @@ import type { EpAssignmentRow, ShiftDefinitionRow } from '../data/rosterQueries'
 import { computeAutoPassiveEps } from './RosterCalendarView';
 import { type LivePdfContact, openLiveRosterPdfExport } from '../domain/livePdfExport';
 import { generateCalendarRosterPdf, generateRosterPdf } from '../domain/pdfGenerator';
-import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
+import {
+  getMoWorkMode,
+  sortStaffByWorkMode,
+  type Assignment,
+  type PublicHolidayEntry,
+  type StaffRosterIdentity,
+} from '../domain/types';
 
 export interface RosterExportModalProps {
   isOpen: boolean;
@@ -149,7 +155,8 @@ export function RosterExportModal({
     }
 
     // Doctors array
-    const spreadsheetDoctors = staffList.map((st) => {
+    const sortedMoStaff = sortStaffByWorkMode(staffList);
+    const spreadsheetDoctors = sortedMoStaff.map((st) => {
       const docShifts: Record<string, { value: string }> = {};
       for (const a of assignments) {
         if (a.staffId === st.id) {
@@ -179,9 +186,14 @@ export function RosterExportModal({
       for (const a of assignments) {
         if (a.dutyDate === d.dateStr) {
           const staff = staffMap.get(a.staffId);
+          const workMode = getMoWorkMode(staff?.staffGroup);
+          if (workMode === 'oh_non_clinical') continue;
           const name = staff ? staff.rosterName || staff.displayName : `Dr ${a.staffId}`;
-          const code = (a.shiftCode || '').toUpperCase().trim();
-          if (code === 'AM') amNames.push(name);
+          const code = (a.shiftCode || '')
+            .toUpperCase()
+            .replace(/\(S\)|-S|\(X\)|-X/g, '')
+            .trim();
+          if (code === 'AM' || (workMode === 'oh_clinical' && code === 'OH')) amNames.push(name);
           else if (code === 'PM') pmNames.push(name);
           else if (
             code === 'ND' ||

@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import type { EpAssignmentRow } from '../data/rosterQueries';
-import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
+import {
+  getMoWorkMode,
+  type Assignment,
+  type PublicHolidayEntry,
+  type StaffRosterIdentity,
+} from '../domain/types';
 
 export type EpSlotType = 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE';
 
@@ -165,6 +170,8 @@ export function RosterCalendarView({
       const dayData = map.get(a.dutyDate);
       if (!dayData) continue;
       const staff = staffMap.get(a.staffId);
+      const workMode = getMoWorkMode(staff?.staffGroup);
+      if (workMode === 'oh_non_clinical') continue;
       const name = staff ? staff.rosterName || staff.displayName : `Dr ${a.staffId}`;
       const code = staff ? staff.staffCode : '';
 
@@ -172,7 +179,7 @@ export function RosterCalendarView({
         .toUpperCase()
         .replace(/\(S\)|-S|\(X\)|-X/g, '')
         .trim();
-      if (shift === 'AM') {
+      if (shift === 'AM' || (workMode === 'oh_clinical' && shift === 'OH')) {
         dayData.am.push({ id: a.staffId, name, code });
       } else if (shift === 'PM') {
         dayData.pm.push({ id: a.staffId, name, code });

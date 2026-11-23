@@ -61,14 +61,15 @@ import { computeCurrentAssignments } from '../domain/amendments';
 import { detectOffDisplacementGoffAccruals } from '../domain/goff';
 import { enrichSparseRosterForDisplay } from '../domain/prototypeFallback';
 import { evaluateRosterRules, getDatesInRange } from '../domain/rulesEngine';
-import type {
-  Assignment,
-  PublicHolidayEntry,
-  RosterIssue,
-  RosterOperationalViewMode,
-  RosterPeriod,
-  StaffRosterIdentity,
-  VersionedRuleConfiguration,
+import {
+  sortStaffByWorkMode,
+  type Assignment,
+  type PublicHolidayEntry,
+  type RosterIssue,
+  type RosterOperationalViewMode,
+  type RosterPeriod,
+  type StaffRosterIdentity,
+  type VersionedRuleConfiguration,
 } from '../domain/types';
 
 const PALETTE_CODES = [
@@ -288,11 +289,13 @@ export function RosterPeriodRoute() {
 
   const moStaffList = useMemo(
     () =>
-      staffList.filter(
-        (s) =>
-          !/^(EP|PTPO)-/i.test(s.staffCode) &&
-          !/\bADMIN-PTPO\b/i.test(s.staffGroup ?? '') &&
-          !(s.staffGroup ?? '').toLowerCase().startsWith('ep |'),
+      sortStaffByWorkMode(
+        staffList.filter(
+          (s) =>
+            !/^(EP|PTPO)-/i.test(s.staffCode) &&
+            !/\bADMIN-PTPO\b/i.test(s.staffGroup ?? '') &&
+            !(s.staffGroup ?? '').toLowerCase().startsWith('ep |'),
+        ),
       ),
     [staffList],
   );

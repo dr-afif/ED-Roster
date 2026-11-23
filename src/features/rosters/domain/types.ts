@@ -52,6 +52,24 @@ export type StaffRosterIdentity = {
   readonly active: boolean;
 };
 
+export type MoWorkMode = 'shift' | 'oh_clinical' | 'oh_non_clinical';
+
+export function getMoWorkMode(staffGroup?: string | null): MoWorkMode {
+  const g = (staffGroup ?? '').toLowerCase();
+  if (g.includes('non-clinical')) return 'oh_non_clinical';
+  if (g.includes('office hour')) return 'oh_clinical';
+  return 'shift';
+}
+
+export function sortStaffByWorkMode<T extends { staffGroup?: string | null }>(
+  list: readonly T[],
+): T[] {
+  const rank = (m: MoWorkMode) => (m === 'shift' ? 0 : m === 'oh_clinical' ? 1 : 2);
+  return [...list].sort(
+    (a, b) => rank(getMoWorkMode(a.staffGroup)) - rank(getMoWorkMode(b.staffGroup)),
+  );
+}
+
 export type Assignment = {
   readonly staffId: number;
   readonly dutyDate: string; // YYYY-MM-DD
