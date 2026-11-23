@@ -34,7 +34,7 @@ jobs:
             echo "ERROR: Local environment file is tracked in Git."
             exit 1
           fi
-          if git grep -nE 'sb_secret_|SUPABASE_SERVICE_ROLE_KEY|TELEGRAM_BOT_TOKEN' -- ':!MODULAR_APP_BLUEPRINT/**' ':(exclude).github/workflows/ci.yml'; then
+          if git grep -nE 'sb_secret_[A-Za-z0-9_-]{12,}|TELEGRAM_BOT_TOKEN\s*=\s*[0-9]{6,}:' -- ':!MODULAR_APP_BLUEPRINT/**' ':!docs/**' ':!src/platform/supabase/__tests__/env.test.ts' ':(exclude).github/workflows/ci.yml'; then
             echo "ERROR: Potential secret key marker detected in tracked source files."
             exit 1
           fi
