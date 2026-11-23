@@ -102,6 +102,14 @@ function ProfileEditForm({
   const [displayName, setDisplayName] = useState(
     initialDisplayName || profile.directory.roster_name,
   );
+  const [staffNumber, setStaffNumber] = useState(() => {
+    try {
+      const cached = window.localStorage.getItem(`resq.profile.v1.staffNumber.${profile.staff_id}`);
+      return cached ?? profile.directory.staff_code ?? '';
+    } catch {
+      return profile.directory.staff_code ?? '';
+    }
+  });
   const [icNumber, setIcNumber] = useState('940512-10-5421');
   const [phone, setPhone] = useState(profile.phone || '');
   const [registrationNumber, setRegistrationNumber] = useState(parsedCreds.mmc);
@@ -132,10 +140,19 @@ function ProfileEditForm({
     const combinedRegistration = segments.join(' | ');
 
     try {
+      try {
+        window.localStorage.setItem(
+          `resq.profile.v1.staffNumber.${profile.staff_id}`,
+          staffNumber.trim(),
+        );
+      } catch {
+        // Ignore storage restrictions safely
+      }
       await updateMutation.mutateAsync({
         full_name: fullName,
         phone,
         registration_number: combinedRegistration,
+        staff_code: staffNumber.trim() || undefined,
       });
       setSuccessMessage('Your profile contact details have been updated.');
       showToast('Profile details saved ✓');
@@ -227,6 +244,27 @@ function ProfileEditForm({
               value={profile.directory.roster_name}
               disabled
               className="w-full rounded-[12px] border-[1.5px] border-[#EFECE6] bg-[#FAF8F5] py-2.5 px-3 text-xs sm:text-sm font-bold text-[#78716C]"
+            />
+          </div>
+        </div>
+
+        {/* Staff Number */}
+        <div>
+          <label
+            htmlFor="profile-staffnumber"
+            className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
+          >
+            Staff Number
+          </label>
+          <div className="relative">
+            <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
+            <input
+              id="profile-staffnumber"
+              type="text"
+              value={staffNumber}
+              onChange={(e) => setStaffNumber(e.target.value)}
+              placeholder="e.g. A05412 or MO-01"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
             />
           </div>
         </div>

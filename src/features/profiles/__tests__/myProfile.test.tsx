@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MyProfileRoute } from '../MyProfileRoute';
@@ -69,6 +69,11 @@ function renderProfile() {
 }
 
 describe('MyProfileRoute', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    mockMutateAsync.mockClear();
+  });
+
   it('renders operational directory details and editable contact fields', () => {
     renderProfile();
 
@@ -84,6 +89,9 @@ describe('MyProfileRoute', () => {
 
     const mmcInput = screen.getByLabelText(/malaysian medical council/i);
     expect(mmcInput).toHaveValue('MMC 88888');
+
+    const staffNumberInput = screen.getByLabelText(/staff number/i);
+    expect(staffNumberInput).toHaveValue('MO-ADMIN');
   });
 
   it('submits updated profile contact details', async () => {
@@ -91,6 +99,9 @@ describe('MyProfileRoute', () => {
 
     const phoneInput = screen.getByLabelText(/contact phone number/i);
     fireEvent.change(phoneInput, { target: { value: '+60199999999' } });
+
+    const staffNumberInput = screen.getByLabelText(/staff number/i);
+    fireEvent.change(staffNumberInput, { target: { value: 'MO-1234' } });
 
     const saveButton = screen.getByRole('button', { name: /save profile details/i });
     fireEvent.click(saveButton);
@@ -100,6 +111,7 @@ describe('MyProfileRoute', () => {
         full_name: 'Dr Muhammad Afif',
         phone: '+60199999999',
         registration_number: 'MMC 88888',
+        staff_code: 'MO-1234',
       });
     });
   });
@@ -122,6 +134,7 @@ describe('MyProfileRoute', () => {
           full_name: 'Dr Muhammad Afif',
           phone: '+60123456789',
           registration_number: 'MMC 99887 | TG',
+          staff_code: 'MO-ADMIN',
         });
       });
     } finally {
