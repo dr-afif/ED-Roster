@@ -43,24 +43,60 @@ const RAINBOW_SEGMENTS = [
 ];
 
 const TEAL_SEGMENTS = [
-  '#2DD4BF', '#14B8A6', '#0D9488', '#0F766E',
-  '#115E59', '#134E4A', '#2DD4BF', '#14B8A6',
-  '#0D9488', '#0F766E', '#115E59', '#14B8A6',
-  '#2DD4BF', '#5EEAD4', '#99F6E4', '#CCFBF1',
+  '#2DD4BF',
+  '#14B8A6',
+  '#0D9488',
+  '#0F766E',
+  '#115E59',
+  '#134E4A',
+  '#2DD4BF',
+  '#14B8A6',
+  '#0D9488',
+  '#0F766E',
+  '#115E59',
+  '#14B8A6',
+  '#2DD4BF',
+  '#5EEAD4',
+  '#99F6E4',
+  '#CCFBF1',
 ];
 
 const CORAL_SEGMENTS = [
-  '#FB7185', '#F43F5E', '#E11D48', '#FB923C',
-  '#F97316', '#EA580C', '#FBBF24', '#F59E0B',
-  '#FB7185', '#F43F5E', '#FB923C', '#F97316',
-  '#FBBF24', '#FDE047', '#FED7AA', '#FFE4E6',
+  '#FB7185',
+  '#F43F5E',
+  '#E11D48',
+  '#FB923C',
+  '#F97316',
+  '#EA580C',
+  '#FBBF24',
+  '#F59E0B',
+  '#FB7185',
+  '#F43F5E',
+  '#FB923C',
+  '#F97316',
+  '#FBBF24',
+  '#FDE047',
+  '#FED7AA',
+  '#FFE4E6',
 ];
 
 const EMERALD_SEGMENTS = [
-  '#86EFAC', '#4ADE80', '#22C55E', '#16A34A',
-  '#15803D', '#166534', '#86EFAC', '#4ADE80',
-  '#22C55E', '#16A34A', '#15803D', '#4ADE80',
-  '#86EFAC', '#BBF7D0', '#DCFCE7', '#F0FDF4',
+  '#86EFAC',
+  '#4ADE80',
+  '#22C55E',
+  '#16A34A',
+  '#15803D',
+  '#166534',
+  '#86EFAC',
+  '#4ADE80',
+  '#22C55E',
+  '#16A34A',
+  '#15803D',
+  '#4ADE80',
+  '#86EFAC',
+  '#BBF7D0',
+  '#DCFCE7',
+  '#F0FDF4',
 ];
 
 const TOTAL_SEGMENTS = 16;
@@ -117,11 +153,7 @@ export function SegmentedArcGauge({
       ) : null}
 
       <div className="relative w-full aspect-[200/125]">
-        <svg
-          viewBox="0 0 200 120"
-          className="w-full h-full overflow-visible"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 200 120" className="w-full h-full overflow-visible" aria-hidden="true">
           {Array.from({ length: TOTAL_SEGMENTS }).map((_, i) => {
             // Semicircular angle: 180° (left) down to 0° (right)
             const angleDeg = 180 - (i * 180) / (TOTAL_SEGMENTS - 1);

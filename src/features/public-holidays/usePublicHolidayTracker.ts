@@ -53,6 +53,7 @@ export function usePublicHolidayTracker(yearFilter?: string) {
           staff_code,
           roster_name,
           display_name,
+          staff_group,
           active,
           staff_profiles (
             phone,
@@ -62,10 +63,15 @@ export function usePublicHolidayTracker(yearFilter?: string) {
           )
         `,
         )
-        .order('display_name');
+        .order('id', { ascending: true });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(
+        (row) =>
+          !/^(EP|PTPO)-/i.test(row.staff_code ?? '') &&
+          !/\bADMIN-PTPO\b/i.test(row.staff_group ?? '') &&
+          !(row.staff_group ?? '').toLowerCase().startsWith('ep |'),
+      );
     },
     staleTime: 1000 * 60 * 5,
   });

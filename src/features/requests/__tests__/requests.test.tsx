@@ -170,6 +170,8 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
   it('renders personal request history with edit and delete options', async () => {
     renderStaffRequests();
 
+    fireEvent.click(screen.getByRole('button', { name: /My List/i }));
+
     expect(screen.getByText(/Request History/i)).toBeInTheDocument();
     expect(screen.getAllByText(/OFF/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Family event/i).length).toBeGreaterThanOrEqual(1);
@@ -309,5 +311,43 @@ describe('Quota and Limit Domain Logic', () => {
   it('normalizes ISO dates reliably', () => {
     expect(toIsoDate('2026-12-25')).toBe('2026-12-25');
     expect(toIsoDate(new Date(2026, 11, 25))).toBe('2026-12-25');
+  });
+
+  it('caps ON1 at 1/day and includes GHKA and COURSE inside the 3/day OFF group', () => {
+    const limitGroupById = buildLimitGroupById(DEFAULT_LIMIT_GROUPS);
+    const limitGroupIdByShiftType = buildLimitGroupIdByShiftType(DEFAULT_SHIFT_TYPES);
+
+    const testRequests = [
+      { name: 'Dr A', date: '2027-01-10', request: 'ON1', status: 'active' },
+      { name: 'Dr B', date: '2027-01-10', request: 'OFF', status: 'active' },
+      { name: 'Dr C', date: '2027-01-10', request: 'GHKA', status: 'active' },
+      { name: 'Dr D', date: '2027-01-10', request: 'COURSE', status: 'active' },
+    ];
+
+    const usage = buildUsageByDateAndGroup(testRequests, limitGroupIdByShiftType);
+
+    const on1Status = getLimitStatusForType({
+      type: 'ON1',
+      date: '2027-01-10',
+      limitGroupIdByShiftType,
+      limitGroupById,
+      usageByDateAndGroup: usage,
+    });
+    expect(on1Status.isLimited).toBe(true);
+    expect(on1Status.limit).toBe(1);
+    expect(on1Status.usage).toBe(1);
+    expect(on1Status.isAtLimit).toBe(true);
+
+    const offGroupStatus = getLimitStatusForType({
+      type: 'GHKA',
+      date: '2027-01-10',
+      limitGroupIdByShiftType,
+      limitGroupById,
+      usageByDateAndGroup: usage,
+    });
+    expect(offGroupStatus.isLimited).toBe(true);
+    expect(offGroupStatus.limit).toBe(3);
+    expect(offGroupStatus.usage).toBe(3);
+    expect(offGroupStatus.isAtLimit).toBe(true);
   });
 });

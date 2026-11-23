@@ -1,29 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  Calendar,
-  CalendarDays,
-  CalendarRange,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  FileEdit,
-  History,
-  Layers,
-  Lock,
-  Printer,
   ShieldAlert,
-  Table,
   Unlock,
 } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/platform/auth';
 import {
   FIRST_NATIVE_ROSTER_PERIOD,
   formatRosterPeriodLabel,
   isValidRosterYearMonth,
 } from '@/shared/dates';
-import { Button, PageHeader, SaveStatusBar, StatusBadge, SurfaceCard } from '@/shared/ui';
+import {
+  getShiftToneClasses,
+  MonthYearWheelModal,
+  SkeletonRosterWorkspace,
+  SurfaceCard,
+  useIsMobileViewport,
+  useToast,
+} from '@/shared/ui';
 import { rosterRouteParamsSchema } from '@/shared/validation';
 import { AmendmentHistoryList } from '../components/AmendmentHistoryList';
 import { AmendRosterModal } from '../components/AmendRosterModal';
@@ -40,11 +38,12 @@ import {
   type PlannedAssignmentRow,
   type ShiftSemanticRow,
   type StaffingThresholdRow,
-  useAllRosterPeriodsQuery,
   useAmendmentEventsQuery,
+  useBatchSaveDraftAssignmentsMutation,
   useBatchUpsertEpAssignmentsMutation,
   useDeleteDraftAssignmentMutation,
   useDraftAssignmentsQuery,
+  usePeriodShiftRequestsQuery,
   usePlannedAssignmentsQuery,
   usePublicHolidaysQuery,
   usePublishRosterMutation,
@@ -60,6 +59,7 @@ import {
 } from '../data/rosterQueries';
 import { computeCurrentAssignments } from '../domain/amendments';
 import { detectOffDisplacementGoffAccruals } from '../domain/goff';
+import { enrichSparseRosterForDisplay } from '../domain/prototypeFallback';
 import { evaluateRosterRules, getDatesInRange } from '../domain/rulesEngine';
 import type {
   Assignment,
@@ -71,23 +71,62 @@ import type {
   VersionedRuleConfiguration,
 } from '../domain/types';
 
+const PALETTE_CODES = [
+  'AM',
+  'PM',
+  'ON1',
+  'ON2',
+  'PN',
+  'OFF',
+  'GOFF',
+  'AL',
+  'MC',
+  'EL',
+  'HKA',
+  'GHKA',
+  'COURSE',
+  'MEDSB',
+  'OH',
+  'COURT',
+] as const;
+
+type PaintHistoryEntry = {
+  staffId: number;
+  dutyDate: string;
+  prevCode?: string;
+  nextCode?: string;
+};
+
 export function RosterPeriodRoute() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();
   const parsed = rosterRouteParamsSchema.safeParse(params);
   const isPeriodValid = parsed.success && isValidRosterYearMonth(parsed.data.yyyy, parsed.data.mm);
-  const yyyy = parsed.success ? parsed.data.yyyy : FIRST_NATIVE_ROSTER_PERIOD.year;
-  const mm = parsed.success ? parsed.data.mm : FIRST_NATIVE_ROSTER_PERIOD.month;
+  const yyyy = isPeriodValid && parsed.success ? parsed.data.yyyy : FIRST_NATIVE_ROSTER_PERIOD.year;
+  const mm = isPeriodValid && parsed.success ? parsed.data.mm : FIRST_NATIVE_ROSTER_PERIOD.month;
   const periodLabel = formatRosterPeriodLabel(yyyy, mm);
 
   const { user } = useAuth();
+  const showToast = useToast();
+  const isMobileViewport = useIsMobileViewport(1023);
   const isOwner = user?.role === 'owner';
 
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
-  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 640 ? 'calendar' : 'table',
+  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
+  const [isTableEditEnabled, setIsTableEditEnabled] = useState(false);
+  const [rosterEditMode, setRosterEditMode] = useState<'normal' | 'fast' | 'standby' | 'extended'>(
+    'normal',
   );
+  const [quickPaintCode, setQuickPaintCode] = useState<string | null>(null);
+  const [fastAnchor, setFastAnchor] = useState<{ staffIdx: number; dateIdx: number } | null>(null);
+  const [fastFocus, setFastFocus] = useState<{ staffIdx: number; dateIdx: number } | null>(null);
+  const [pendingFastEdits, setPendingFastEdits] = useState<Record<string, string>>({});
+  const [isFastPaletteModalOpen, setIsFastPaletteModalOpen] = useState(false);
+  const [paintUndoStack, setPaintUndoStack] = useState<PaintHistoryEntry[]>([]);
+  const [paintRedoStack, setPaintRedoStack] = useState<PaintHistoryEntry[]>([]);
+  const [isMonthWheelOpen, setIsMonthWheelOpen] = useState(false);
+  const [isRotatedOverlayOpen, setIsRotatedOverlayOpen] = useState(false);
 
   // Modal control states
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
@@ -104,19 +143,60 @@ export function RosterPeriodRoute() {
     staff: StaffRosterIdentity;
     date: string;
     currentCode?: string;
+    initialNote?: string;
   } | null>(null);
+
+  // Listen for Mobile App Header PDF Export Icon trigger & URL query actions
+  useEffect(() => {
+    const onOpenPdf = () => setIsPdfExportModalOpen(true);
+    window.addEventListener('resq:open-roster-pdf', onOpenPdf);
+    return () => window.removeEventListener('resq:open-roster-pdf', onOpenPdf);
+  }, []);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action) return;
+    queueMicrotask(() => {
+      if (action === 'export') {
+        setIsPdfExportModalOpen(true);
+      } else if (action === 'close' && isOwner) {
+        setIsCloseModalOpen(true);
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete('action');
+      setSearchParams(next, { replace: true });
+    });
+  }, [searchParams, setSearchParams, isOwner]);
 
   // Queries
   const { data: periodRow, isLoading: isPeriodLoading } = useRosterPeriodQuery(yyyy, mm);
-  const { data: allPeriods = [] } = useAllRosterPeriodsQuery();
   const { data: staffList = [], isLoading: isStaffLoading } = useRosterStaffQuery();
-  const { data: shiftDefinitions = [] } = useShiftDefinitionsQuery();
+  const { data: rawShiftDefinitions = [] } = useShiftDefinitionsQuery();
+  const shiftDefinitions = useMemo(() => {
+    if (rawShiftDefinitions.some((s) => s.code.toUpperCase() === 'MEDSB')) {
+      return rawShiftDefinitions;
+    }
+    return [
+      ...rawShiftDefinitions,
+      {
+        code: 'MEDSB',
+        label: 'Medical Standby',
+        short_label: 'MEDSB',
+        color_token: 'amber',
+        duration_hours: 12,
+        start_time: null,
+        end_time: null,
+        is_active: true,
+        sort_order: 55,
+        created_at: '',
+        updated_at: '',
+      },
+    ];
+  }, [rawShiftDefinitions]);
   const { data: shiftSemanticsRows = [] } = useShiftSemanticsQuery();
   const { data: ruleVersionRow } = useRuleVersionQuery(periodRow?.active_rule_version_id);
   const { data: thresholdsRows = [] } = useStaffingThresholdsQuery(ruleVersionRow?.id);
-  const { data: draftAssignmentRows = [], isFetching: isDraftFetching } = useDraftAssignmentsQuery(
-    periodRow?.id,
-  );
+  const { data: draftAssignmentRows = [] } = useDraftAssignmentsQuery(periodRow?.id);
   const { data: plannedAssignmentRows = [], isLoading: isPlannedLoading } =
     usePlannedAssignmentsQuery(periodRow?.id);
   const { data: amendmentEvents = [], isLoading: isAmendmentsLoading } = useAmendmentEventsQuery(
@@ -129,6 +209,7 @@ export function RosterPeriodRoute() {
   const periodId = periodRow?.id ?? 0;
   const upsertMutation = useUpsertDraftAssignmentMutation(periodId);
   const deleteMutation = useDeleteDraftAssignmentMutation(periodId);
+  const batchSaveDraftMutation = useBatchSaveDraftAssignmentsMutation(periodId);
   const upsertEpMutation = useUpsertEpAssignmentMutation(periodId);
   const batchUpsertEpMutation = useBatchUpsertEpAssignmentsMutation(periodId);
   const publishMutation = usePublishRosterMutation(periodId);
@@ -160,6 +241,11 @@ export function RosterPeriodRoute() {
     const endDate = `${yyyy}-${mm}-${String(lastDayOfMonth).padStart(2, '0')}`;
     return getDatesInRange(startDate, endDate);
   }, [yyyy, mm]);
+
+  const { data: periodShiftRequests = [] } = usePeriodShiftRequestsQuery(
+    periodDates[0],
+    periodDates[periodDates.length - 1],
+  );
 
   // Construct draft assignments
   const draftAssignments: Assignment[] = useMemo(() => {
@@ -199,6 +285,53 @@ export function RosterPeriodRoute() {
     }
     return currentAssignments;
   }, [periodRow, draftAssignments, plannedAssignments, currentAssignments, viewMode]);
+
+  const moStaffList = useMemo(
+    () =>
+      staffList.filter(
+        (s) =>
+          !/^(EP|PTPO)-/i.test(s.staffCode) &&
+          !/\bADMIN-PTPO\b/i.test(s.staffGroup ?? '') &&
+          !(s.staffGroup ?? '').toLowerCase().startsWith('ep |'),
+      ),
+    [staffList],
+  );
+
+  const epStaffList = useMemo(
+    () =>
+      staffList.filter(
+        (s) =>
+          /^EP-/i.test(s.staffCode) || (s.staffGroup ?? '').toLowerCase().includes('physician'),
+      ),
+    [staffList],
+  );
+
+  const calendarStaffList = useMemo(
+    () => [...moStaffList, ...epStaffList.filter((ep) => !moStaffList.some((m) => m.id === ep.id))],
+    [moStaffList, epStaffList],
+  );
+
+  const enrichedDisplay = useMemo(
+    () =>
+      enrichSparseRosterForDisplay(
+        moStaffList,
+        activeAssignments,
+        periodDates,
+        periodShiftRequests,
+      ),
+    [moStaffList, activeAssignments, periodDates, periodShiftRequests],
+  );
+
+  const amendedCellKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const ev of amendmentEvents) {
+      if (ev.status !== 'active') continue;
+      for (const line of ev.lines) {
+        keys.add(`${line.staffId}:${line.dutyDate}`);
+      }
+    }
+    return keys;
+  }, [amendmentEvents]);
 
   // Construct rule configuration
   const ruleConfig: VersionedRuleConfiguration = useMemo(() => {
@@ -241,7 +374,6 @@ export function RosterPeriodRoute() {
     };
   }, [ruleVersionRow, thresholdsRows, shiftSemanticsRows]);
 
-  // Evaluate rules on active assignments
   const domainPeriod: RosterPeriod = useMemo(() => {
     return {
       id: periodRow?.id ?? 1,
@@ -254,17 +386,16 @@ export function RosterPeriodRoute() {
   }, [periodRow, yyyy, mm, periodDates, ruleVersionRow]);
 
   const rulesOutput = useMemo(() => {
-    if (staffList.length === 0) return null;
+    if (moStaffList.length === 0) return null;
     return evaluateRosterRules({
       period: domainPeriod,
-      people: staffList,
+      people: moStaffList,
       assignments: activeAssignments,
       holidays: publicHolidays as PublicHolidayEntry[],
       configuration: ruleConfig,
     });
-  }, [domainPeriod, staffList, activeAssignments, publicHolidays, ruleConfig]);
+  }, [domainPeriod, moStaffList, activeAssignments, publicHolidays, ruleConfig]);
 
-  // Detect compensatory rest (GOFF) accrual candidates
   const accruedGoffCandidates = useMemo(() => {
     return detectOffDisplacementGoffAccruals(
       plannedAssignments,
@@ -273,12 +404,56 @@ export function RosterPeriodRoute() {
     );
   }, [plannedAssignments, currentAssignments, ruleConfig.semantics]);
 
+  const handleSaveError = useCallback(
+    (err: unknown) => {
+      const errObj =
+        typeof err === 'object' && err !== null
+          ? (err as { message?: string; code?: string })
+          : null;
+      const rawMsg =
+        err instanceof Error ? err.message : errObj?.message || 'Failed to save roster change';
+      const code = errObj?.code ? ` (${errObj.code})` : '';
+      const isRls = /row-level security|permission denied|42501|unauthorized/i.test(
+        `${rawMsg} ${errObj?.code ?? ''}`,
+      );
+      showToast(
+        isRls
+          ? `Save blocked by permissions (${user?.email ?? 'no owner session'}): ${rawMsg}`
+          : `Save failed${code}: ${rawMsg}`,
+      );
+    },
+    [showToast, user?.email],
+  );
+
+  useEffect(() => {
+    const err =
+      upsertMutation.error ??
+      deleteMutation.error ??
+      batchSaveDraftMutation.error ??
+      upsertEpMutation.error ??
+      batchUpsertEpMutation.error;
+    if (err) {
+      handleSaveError(err);
+    }
+  }, [
+    upsertMutation.error,
+    deleteMutation.error,
+    batchSaveDraftMutation.error,
+    upsertEpMutation.error,
+    batchUpsertEpMutation.error,
+    handleSaveError,
+  ]);
+
   const handleUpdateEpAssignment = (
     dutyDate: string,
-    slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL',
+    slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE',
     names: string,
   ) => {
     if (!isOwner) return;
+    if (!periodId) {
+      showToast('No roster period record found for this month');
+      return;
+    }
     upsertEpMutation.mutate({
       dutyDate,
       slotType,
@@ -289,11 +464,15 @@ export function RosterPeriodRoute() {
   const handleBatchUpdateEpAssignments = (
     payloads: Array<{
       dutyDate: string;
-      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE';
       physicianNames: string;
     }>,
   ) => {
     if (!isOwner) return;
+    if (!periodId) {
+      showToast('No roster period record found for this month');
+      return;
+    }
     batchUpsertEpMutation.mutate(payloads);
   };
 
@@ -301,9 +480,6 @@ export function RosterPeriodRoute() {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const isMonthArrived = todayStr >= periodStartDate;
 
-  // Background auto-enforce effect:
-  // Once the target month arrives, if the roster is still marked 'draft' with assignments,
-  // promote it to published without requiring manual button clicks.
   const autoPublishAttemptedRef = useRef(false);
   useEffect(() => {
     if (
@@ -319,6 +495,259 @@ export function RosterPeriodRoute() {
       publishMutation.mutate({ notes: 'Auto-enforced at month arrival' });
     }
   }, [isOwner, isMonthArrived, periodRow, draftAssignments.length, publishMutation]);
+
+  const isLegacyReadOnly = Boolean(periodRow?.legacy_read_only);
+  const isClosed = !isLegacyReadOnly && periodRow?.status === 'closed';
+  const isEnforced =
+    !isLegacyReadOnly &&
+    !isClosed &&
+    (isMonthArrived || periodRow?.status === 'published' || periodRow?.status === 'amended');
+  const isPlanning = !isLegacyReadOnly && !isClosed && !isEnforced;
+
+  const periodStatusLabel = isLegacyReadOnly
+    ? 'Legacy (Read-Only)'
+    : isClosed
+      ? 'Closed'
+      : isEnforced
+        ? 'Published'
+        : 'Planning';
+
+  const isGridInteractive =
+    !isLegacyReadOnly && isOwner && !isClosed && (isPlanning || viewMode === 'current');
+
+  const recordPaintAction = (entry: PaintHistoryEntry) => {
+    setPaintUndoStack((prev) => [...prev, entry]);
+    setPaintRedoStack([]);
+  };
+
+  const handleUndoPaint = () => {
+    const last = paintUndoStack[paintUndoStack.length - 1];
+    if (!last) return;
+    setPaintUndoStack((prev) => prev.slice(0, -1));
+    setPaintRedoStack((prev) => [...prev, last]);
+    if (last.prevCode) {
+      upsertMutation.mutate({
+        staffId: last.staffId,
+        dutyDate: last.dutyDate,
+        shiftCode: last.prevCode,
+      });
+    } else {
+      deleteMutation.mutate({ staffId: last.staffId, dutyDate: last.dutyDate });
+    }
+    showToast('Undid shift change');
+  };
+
+  const handleRedoPaint = () => {
+    const last = paintRedoStack[paintRedoStack.length - 1];
+    if (!last) return;
+    setPaintRedoStack((prev) => prev.slice(0, -1));
+    setPaintUndoStack((prev) => [...prev, last]);
+    if (last.nextCode) {
+      upsertMutation.mutate({
+        staffId: last.staffId,
+        dutyDate: last.dutyDate,
+        shiftCode: last.nextCode,
+      });
+    } else {
+      deleteMutation.mutate({ staffId: last.staffId, dutyDate: last.dutyDate });
+    }
+    showToast('Redid shift change');
+  };
+
+  const fastSelectedRangeKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (rosterEditMode !== 'fast' || !fastFocus) return keys;
+    const anchor = fastAnchor ?? fastFocus;
+    const minRow = Math.min(anchor.staffIdx, fastFocus.staffIdx);
+    const maxRow = Math.max(anchor.staffIdx, fastFocus.staffIdx);
+    const minCol = Math.min(anchor.dateIdx, fastFocus.dateIdx);
+    const maxCol = Math.max(anchor.dateIdx, fastFocus.dateIdx);
+    for (let r = minRow; r <= maxRow; r += 1) {
+      const s = enrichedDisplay.staffList[r];
+      if (!s || s.id < 0) continue;
+      for (let c = minCol; c <= maxCol; c += 1) {
+        const d = periodDates[c];
+        if (!d) continue;
+        keys.add(`${s.id}:${d}`);
+      }
+    }
+    return keys;
+  }, [rosterEditMode, fastAnchor, fastFocus, enrichedDisplay.staffList, periodDates]);
+
+  const dirtyCellKeys = useMemo(() => new Set(Object.keys(pendingFastEdits)), [pendingFastEdits]);
+
+  const tableAssignments = useMemo(() => {
+    if (Object.keys(pendingFastEdits).length === 0) return enrichedDisplay.assignments;
+    const map = new Map<string, Assignment>();
+    for (const a of enrichedDisplay.assignments) {
+      map.set(`${a.staffId}:${a.dutyDate}`, a);
+    }
+    for (const [key, code] of Object.entries(pendingFastEdits)) {
+      if (code === '') {
+        map.delete(key);
+      } else {
+        const [sidStr, dStr] = key.split(':');
+        const staffId = Number(sidStr);
+        const existing = map.get(key);
+        map.set(key, {
+          staffId,
+          dutyDate: dStr ?? '',
+          shiftCode: code,
+          note: existing?.note,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [enrichedDisplay.assignments, pendingFastEdits]);
+
+  const stageFastEditForKeys = useCallback((keys: Iterable<string>, shiftCode: string) => {
+    setPendingFastEdits((prev) => {
+      const next = { ...prev };
+      for (const k of keys) {
+        next[k] = shiftCode;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSaveFastEdits = useCallback(() => {
+    const entries = Object.entries(pendingFastEdits);
+    if (entries.length === 0 || !periodId) return;
+    const upserts: Array<{ staffId: number; dutyDate: string; shiftCode: string }> = [];
+    const deletes: Array<{ staffId: number; dutyDate: string }> = [];
+    for (const [key, code] of entries) {
+      const [sidStr, dutyDate] = key.split(':');
+      const staffId = Number(sidStr);
+      if (!Number.isFinite(staffId) || !dutyDate) continue;
+      if (code === '') {
+        deletes.push({ staffId, dutyDate });
+      } else {
+        upserts.push({ staffId, dutyDate, shiftCode: code });
+      }
+    }
+    batchSaveDraftMutation.mutate(
+      { upserts, deletes },
+      {
+        onSuccess: () => {
+          setPendingFastEdits({});
+          showToast(`Saved ${entries.length} roster change${entries.length === 1 ? '' : 's'}`);
+        },
+      },
+    );
+  }, [pendingFastEdits, periodId, batchSaveDraftMutation, showToast]);
+
+  useEffect(() => {
+    if (
+      !isTableEditEnabled ||
+      rosterEditMode !== 'fast' ||
+      !isPlanning ||
+      viewFormat !== 'table' ||
+      isFastPaletteModalOpen ||
+      selectedCell ||
+      isAmendModalOpen ||
+      isCloseModalOpen ||
+      isPdfExportModalOpen
+    ) {
+      return;
+    }
+
+    const KEY_TO_SHIFT: Record<string, string> = {
+      a: 'AM',
+      p: 'PM',
+      o: 'OFF',
+      '1': 'ON1',
+      '2': 'ON2',
+      n: 'PN',
+      h: 'HKA',
+      g: 'GOFF',
+      m: 'MEDSB',
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setFastAnchor(null);
+        setFastFocus(null);
+        return;
+      }
+
+      if (!fastFocus) return;
+
+      const maxRow = enrichedDisplay.staffList.length - 1;
+      const maxCol = periodDates.length - 1;
+      if (maxRow < 0 || maxCol < 0) return;
+
+      if (
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowLeft' ||
+        e.key === 'ArrowRight'
+      ) {
+        e.preventDefault();
+        const dr = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+        const dc = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+        const nextFocus = {
+          staffIdx: Math.max(0, Math.min(maxRow, fastFocus.staffIdx + dr)),
+          dateIdx: Math.max(0, Math.min(maxCol, fastFocus.dateIdx + dc)),
+        };
+        setFastFocus(nextFocus);
+        if (!e.shiftKey) {
+          setFastAnchor(nextFocus);
+        }
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        setIsFastPaletteModalOpen(true);
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (fastSelectedRangeKeys.size > 0) {
+          stageFastEditForKeys(fastSelectedRangeKeys, '');
+        }
+        return;
+      }
+
+      const mapped = KEY_TO_SHIFT[e.key.toLowerCase()];
+      if (mapped && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (fastSelectedRangeKeys.size > 0) {
+          stageFastEditForKeys(fastSelectedRangeKeys, mapped);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    isTableEditEnabled,
+    rosterEditMode,
+    isPlanning,
+    viewFormat,
+    isFastPaletteModalOpen,
+    selectedCell,
+    isAmendModalOpen,
+    isCloseModalOpen,
+    isPdfExportModalOpen,
+    fastFocus,
+    enrichedDisplay.staffList.length,
+    periodDates.length,
+    fastSelectedRangeKeys,
+    stageFastEditForKeys,
+  ]);
 
   if (!isPeriodValid) {
     const fallbackHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
@@ -342,409 +771,640 @@ export function RosterPeriodRoute() {
     );
   }
 
-  const isLegacyReadOnly = Boolean(periodRow?.legacy_read_only);
-  const isClosed = !isLegacyReadOnly && periodRow?.status === 'closed';
+  const handleCellSelect = (
+    staff: StaffRosterIdentity,
+    date: string,
+    currentCode?: string,
+    shiftKey?: boolean,
+  ) => {
+    if (isLegacyReadOnly || isClosed || staff.id < 0 || !isOwner) return;
+    if (!isTableEditEnabled) {
+      showToast('Tap "Edit Roster" to edit');
+      return;
+    }
 
-  // Lifecycle state:
-  // - Legacy read-only: historical ingested roster (locked)
-  // - Closed: reconciled, completed period
-  // - Enforced (active/amended): target month has arrived (today >= periodStartDate) or explicitly finalized
-  // - Planning: pre-month drafting period where changes are direct shifts and not formal amendments
-  const isEnforced =
-    !isLegacyReadOnly &&
-    !isClosed &&
-    (isMonthArrived || periodRow?.status === 'published' || periodRow?.status === 'amended');
-  const isPlanning = !isLegacyReadOnly && !isClosed && !isEnforced;
-
-  const periodStatus = isLegacyReadOnly
-    ? 'legacy (read-only)'
-    : isClosed
-      ? 'closed'
-      : periodRow?.status === 'published' || periodRow?.status === 'amended'
-        ? periodRow.status
-        : isMonthArrived
-          ? 'active'
-          : 'planning';
-
-  // Grid cell interactability:
-  // In planning mode: clicking cell opens ShiftPickerModal (for owner direct draft editing).
-  // In enforced mode (month arrived, current view): clicking cell opens AmendRosterModal (for owner).
-  // In planned view, closed status, or legacy read-only mode: strictly read-only.
-  const isGridInteractive =
-    !isLegacyReadOnly && isOwner && !isClosed && (isPlanning || viewMode === 'current');
-
-  const handleCellSelect = (staff: StaffRosterIdentity, date: string, currentCode?: string) => {
-    if (isLegacyReadOnly || isClosed) return;
-    if (isPlanning) {
-      setSelectedCell({ staff, date, currentCode });
-    } else if (isEnforced && viewMode === 'current') {
+    if (isEnforced && viewMode === 'current') {
       setAmendModalPrefill({
         staffId: staff.id,
         date,
         shiftCode: currentCode,
       });
       setIsAmendModalOpen(true);
+      return;
+    }
+
+    if (rosterEditMode === 'fast' && isPlanning) {
+      const staffIdx = enrichedDisplay.staffList.findIndex((s) => s.id === staff.id);
+      const dateIdx = periodDates.indexOf(date);
+      if (staffIdx >= 0 && dateIdx >= 0) {
+        const nextFocus = { staffIdx, dateIdx };
+        setFastFocus(nextFocus);
+        const anchor = shiftKey && fastAnchor ? fastAnchor : nextFocus;
+        if (!shiftKey || !fastAnchor) {
+          setFastAnchor(nextFocus);
+        }
+        if (quickPaintCode !== null) {
+          const minRow = Math.min(anchor.staffIdx, nextFocus.staffIdx);
+          const maxRow = Math.max(anchor.staffIdx, nextFocus.staffIdx);
+          const minCol = Math.min(anchor.dateIdx, nextFocus.dateIdx);
+          const maxCol = Math.max(anchor.dateIdx, nextFocus.dateIdx);
+          const keys: string[] = [];
+          for (let r = minRow; r <= maxRow; r += 1) {
+            const s = enrichedDisplay.staffList[r];
+            if (!s || s.id < 0) continue;
+            for (let c = minCol; c <= maxCol; c += 1) {
+              const d = periodDates[c];
+              if (d) keys.push(`${s.id}:${d}`);
+            }
+          }
+          stageFastEditForKeys(keys, quickPaintCode);
+        }
+      }
+      return;
+    }
+
+    const WORKING = new Set(['AM', 'PM', 'ON1', 'ON2', 'PN', 'MEDSB']);
+    const raw = (currentCode || '').trim().toUpperCase();
+    const isS = raw.includes('(S)') || raw.endsWith('-S');
+    const isX = raw.includes('(X)') || raw.endsWith('-X');
+    const clean = raw.replace(/\(S\)|-S|\(X\)|-X/g, '').trim();
+
+    if (rosterEditMode === 'standby') {
+      if (!clean || WORKING.has(clean)) return;
+      const nextVal = `${clean}${!isS ? ' (S)' : ''}${isX ? ' (X)' : ''}`;
+      recordPaintAction({
+        staffId: staff.id,
+        dutyDate: date,
+        prevCode: currentCode,
+        nextCode: nextVal,
+      });
+      upsertMutation.mutate({ staffId: staff.id, dutyDate: date, shiftCode: nextVal });
+      return;
+    }
+
+    if (rosterEditMode === 'extended') {
+      if (!WORKING.has(clean)) return;
+      const nextVal = `${clean}${isS ? ' (S)' : ''}${!isX ? ' (X)' : ''}`;
+      recordPaintAction({
+        staffId: staff.id,
+        dutyDate: date,
+        prevCode: currentCode,
+        nextCode: nextVal,
+      });
+      upsertMutation.mutate({ staffId: staff.id, dutyDate: date, shiftCode: nextVal });
+      return;
+    }
+
+    if (quickPaintCode !== null) {
+      recordPaintAction({
+        staffId: staff.id,
+        dutyDate: date,
+        prevCode: currentCode,
+        nextCode: quickPaintCode || undefined,
+      });
+      if (quickPaintCode === '') {
+        deleteMutation.mutate({ staffId: staff.id, dutyDate: date });
+      } else {
+        upsertMutation.mutate({ staffId: staff.id, dutyDate: date, shiftCode: quickPaintCode });
+      }
+      return;
+    }
+
+    if (isPlanning) {
+      const existingNote = activeAssignments.find(
+        (a) => a.staffId === staff.id && a.dutyDate === date,
+      )?.note;
+      setSelectedCell({ staff, date, currentCode, initialNote: existingNote });
     }
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow={`Roster Workspace · ${yyyy}-${mm}`}
-        title={`${periodLabel} Roster`}
-        description={
-          isLegacyReadOnly
-            ? `Historical legacy schedule ingested from Google Sheets (Batch: ${periodRow?.import_batch_id ?? 'Rehearsal'}). Locked for auditing.`
-            : isPlanning
-              ? 'Pre-month planning schedule. Direct roster drafting without amendment overhead until the month arrives.'
-              : isClosed
-                ? 'Closed operational period. Reconciled and sealed with immutable audit trail.'
-                : 'Live operational schedule with active amendment overlay and GOFF compensatory rest tracking.'
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge
-              label={periodStatus.toUpperCase()}
-              tone={
-                isLegacyReadOnly
-                  ? 'warning'
-                  : isEnforced
-                    ? 'success'
-                    : isClosed
-                      ? 'neutral'
-                      : 'brand'
-              }
-              icon={
-                isLegacyReadOnly
-                  ? ShieldAlert
-                  : isEnforced
-                    ? CheckCircle2
-                    : isClosed
-                      ? Lock
-                      : CalendarRange
-              }
-            />
-
-            {!isLegacyReadOnly && (
-              <SaveStatusBar
-                state={
-                  isDraftFetching || upsertMutation.isPending || deleteMutation.isPending
-                    ? 'saving'
-                    : 'saved'
-                }
-                label={
-                  rulesOutput
-                    ? `Checksum ${rulesOutput.checksum.slice(0, 8)} · Rule v${ruleVersionRow?.version ?? 1}`
-                    : 'Ready'
-                }
-                revision={periodRow?.revision ?? 0}
-              />
-            )}
-
-            {/* Live-Aligned Top Toolbar PDF Export */}
-            <Button
-              variant="secondary"
-              onClick={() => setIsPdfExportModalOpen(true)}
-              className="gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
-              aria-label="PDF Export"
-              title="PDF Export & Print (Live App Format)"
-            >
-              <Printer className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-              <span>PDF Export</span>
-            </Button>
-
-            {/* Owner Actions */}
-            {isOwner && !isLegacyReadOnly && (
-              <>
-                {isEnforced && (
-                  <>
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setAmendModalPrefill(null);
-                        setIsAmendModalOpen(true);
-                      }}
-                      className="gap-1.5"
-                    >
-                      <FileEdit className="h-4 w-4" />
-                      Amend Roster
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setIsCloseModalOpen(true)}
-                      className="gap-1.5"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Close Period
-                    </Button>
-                  </>
-                )}
-
-                {isClosed && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsCloseModalOpen(true)}
-                    className="gap-1.5"
-                  >
-                    <Unlock className="h-4 w-4" />
-                    Reopen Period
-                  </Button>
-                )}
-              </>
-            )}
+    <div className="space-y-3">
+      {/* Desktop Top Header Row (Hidden on Mobile — Mobile app bar already shows "Roster" + PDF icon) */}
+      <div className="sr-only lg:not-sr-only lg:flex flex-wrap items-center justify-between gap-4 border-b border-[#E7E5E4] pb-3.5">
+        <div>
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#0F766E]">
+            Emergency Department Workforce
           </div>
-        }
-      />
-
-      {/* Month Navigator Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-primary p-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handlePrevMonth}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default bg-surface-secondary/70 text-text-primary hover:bg-surface-secondary transition"
-            title="Previous Month"
-            aria-label="Previous Month"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
-          <div className="flex items-center gap-2 rounded-xl border border-border-default bg-surface-secondary/40 px-3 py-1">
-            <CalendarDays className="h-4 w-4 text-brand-primary shrink-0" />
-            <input
-              type="month"
-              value={`${yyyy}-${mm}`}
-              onChange={(e) => {
-                if (!e.target.value) return;
-                const [targetYear, targetMonth] = e.target.value.split('-');
-                if (targetYear && targetMonth) {
-                  handleMonthChange(targetYear, targetMonth);
-                }
-              }}
-              className="bg-transparent font-semibold text-xs text-text-primary focus:outline-none cursor-pointer"
-              title="Select Roster Month"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleNextMonth}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default bg-surface-secondary/70 text-text-primary hover:bg-surface-secondary transition"
-            title="Next Month"
-            aria-label="Next Month"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-[#18181B]">
+            {periodLabel} Roster
+          </h1>
+          <p className="mt-0.5 text-xs font-medium text-[#57534E]">
+            {isLegacyReadOnly
+              ? `Historical legacy schedule ingested from Google Sheets (Batch: ${periodRow?.import_batch_id ?? 'Rehearsal'}). Locked for auditing.`
+              : 'Duty timetable, EP specialist coverage, lifecycle snapshots & shift matrix'}
+          </p>
         </div>
 
-        {/* Existing Roster Periods Shortcut Chips */}
-        {allPeriods.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-1 scrollbar-none max-w-full">
-            <span className="text-[11px] font-bold text-stone-400 shrink-0 uppercase tracking-wider">
-              Periods:
+        {/* Center Lifecycle Pill Capsule (Owner + Published / Enforced only) */}
+        {!isMobileViewport && isOwner && isEnforced ? (
+          <div className="flex flex-col items-center gap-1">
+            <div className="inline-flex items-center gap-1 rounded-full bg-[#EFEAE1] p-1">
+              <button
+                type="button"
+                aria-label="Live Schedule (Current)"
+                onClick={() => setViewMode('current')}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition cursor-pointer ${
+                  viewMode === 'current'
+                    ? 'bg-[#18181B] text-white shadow-xs'
+                    : 'text-[#57534E] hover:text-[#18181B]'
+                }`}
+              >
+                ⚡ Current Active
+              </button>
+              <button
+                type="button"
+                aria-label="Original Planned"
+                onClick={() => setViewMode('planned')}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition cursor-pointer ${
+                  viewMode === 'planned'
+                    ? 'bg-[#18181B] text-white shadow-xs'
+                    : 'text-[#57534E] hover:text-[#18181B]'
+                }`}
+              >
+                🔒 Original Planned
+              </button>
+              <button
+                type="button"
+                aria-label={`Changes & Audit (${amendmentEvents.length})`}
+                onClick={() => setViewMode('changes')}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition cursor-pointer ${
+                  viewMode === 'changes'
+                    ? 'bg-[#18181B] text-white shadow-xs'
+                    : 'text-[#57534E] hover:text-[#18181B]'
+                }`}
+              >
+                📜 Changes &amp; Audit ({amendmentEvents.length})
+              </button>
+            </div>
+            <span className="text-[10.5px] font-semibold text-[#78716C]">
+              {viewMode === 'planned'
+                ? 'Immutable baseline frozen at publication (Read-Only)'
+                : viewMode === 'changes'
+                  ? 'Append-only operational amendments'
+                  : 'Live duty truth with active amendments'}
             </span>
-            {allPeriods.map((p) => {
-              const [pYear, pMonth] = p.period_start.split('-');
-              if (!pYear || !pMonth) return null;
-              const isSelected = pYear === yyyy && pMonth === mm;
-              return (
-                <button
-                  key={p.period_start}
-                  type="button"
-                  onClick={() => handleMonthChange(pYear, pMonth)}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    isSelected
-                      ? 'bg-stone-900 text-white shadow-xs'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
-                  }`}
-                >
-                  <span>{formatRosterPeriodLabel(pYear, pMonth)}</span>
-                  {p.legacy_read_only && (
-                    <span className="rounded-full bg-amber-500/20 px-1.5 text-[9px] font-bold text-amber-900">
-                      Legacy
-                    </span>
-                  )}
-                </button>
-              );
-            })}
           </div>
-        )}
+        ) : null}
+
+        {/* Right Toolbar Actions (Prototype: Export PDF + Close/Reopen when applicable) */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {isOwner && !isLegacyReadOnly && isEnforced ? (
+            <button
+              type="button"
+              onClick={() => setIsCloseModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-bold text-[#57534E] hover:bg-[#FAF8F5] transition cursor-pointer"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-[#0F766E]" />
+              <span>Close Period</span>
+            </button>
+          ) : null}
+
+          {isOwner && !isLegacyReadOnly && isClosed ? (
+            <button
+              type="button"
+              onClick={() => setIsCloseModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-bold text-[#57534E] hover:bg-[#FAF8F5] transition cursor-pointer"
+            >
+              <Unlock className="h-3.5 w-3.5 text-[#0F766E]" />
+              <span>Reopen Period</span>
+            </button>
+          ) : null}
+
+          {isOwner ? (
+            <button
+              type="button"
+              onClick={() => setIsPdfExportModalOpen(true)}
+              aria-label="PDF Export"
+              title="PDF Export & Print"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E5E4] bg-white px-3.5 py-1.5 text-xs font-extrabold text-[#18181B] shadow-2xs hover:bg-[#FAF8F5] transition cursor-pointer"
+            >
+              <span>📄</span>
+              <span>Export PDF</span>
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Legacy Read-Only Historical Banner */}
-      {isLegacyReadOnly && (
-        <div className="flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-2xs dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+      {isLegacyReadOnly ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-900 shadow-2xs">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600" />
           <div className="flex-1">
             <p className="font-bold">Historical Google Sheets Roster (Read-Only Audit Archive)</p>
-            <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-400">
+            <p className="mt-0.5 text-[11px] text-amber-800">
               This schedule was ingested from legacy Google Sheets workbook (
               {periodRow?.import_batch_id ?? 'Rehearsal'}). It is preserved in read-only mode to
-              safeguard historical audit evidence (ADR-002).
+              safeguard historical audit evidence.
             </p>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Roster Document Archive & Telegram Dispatch */}
-      {periodRow && (
-        <RosterSnapshotBar
-          periodId={periodRow.id}
-          periodYear={yyyy}
-          periodMonth={mm}
-          periodStart={`${yyyy}-${mm}-01`}
-          periodRevision={periodRow.revision}
-          staffList={staffList}
-          assignments={activeAssignments}
-          shiftDefinitions={shiftDefinitions}
-          epAssignments={epAssignments}
-          holidays={publicHolidays as PublicHolidayEntry[]}
-          isOwner={isOwner}
-        />
-      )}
-
-      {/* Operational View Switcher (for Enforced / Active / Amended / Closed periods) */}
-      {isEnforced && (
-        <div className="flex flex-col gap-2 border-b border-border-subtle pb-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex overflow-x-auto scrollbar-none rounded-2xl border border-stone-200/80 bg-stone-100/80 p-1 text-xs">
+      {/* Mobile Owner Lifecycle Bar */}
+      {isMobileViewport && isOwner && isEnforced ? (
+        <div className="lg:hidden space-y-1">
+          <div className="no-scrollbar flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
             <button
               type="button"
               onClick={() => setViewMode('current')}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition cursor-pointer ${
                 viewMode === 'current'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-500 hover:text-stone-900'
+                  ? 'border-[#18181B] bg-[#18181B] text-white'
+                  : 'border-[#E7E5E4] bg-white text-[#57534E]'
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
-              Live Schedule (Current)
+              ⚡ Current Active
             </button>
             <button
               type="button"
               onClick={() => setViewMode('planned')}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition cursor-pointer ${
                 viewMode === 'planned'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-500 hover:text-stone-900'
+                  ? 'border-[#18181B] bg-[#18181B] text-white'
+                  : 'border-[#E7E5E4] bg-white text-[#57534E]'
               }`}
             >
-              <Lock className="h-3.5 w-3.5" />
-              Original Planned
+              🔒 Original Planned
             </button>
             <button
               type="button"
               onClick={() => setViewMode('changes')}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition-all ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition cursor-pointer ${
                 viewMode === 'changes'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-500 hover:text-stone-900'
+                  ? 'border-[#18181B] bg-[#18181B] text-white'
+                  : 'border-[#E7E5E4] bg-white text-[#57534E]'
               }`}
             >
-              <History className="h-3.5 w-3.5" />
-              Changes &amp; Audit ({amendmentEvents.length})
+              📜 Changes &amp; Audit ({amendmentEvents.length})
             </button>
-          </div>
-
-          <div className="text-xs text-stone-500 hidden sm:block">
-            {viewMode === 'current' &&
-              (isOwner
-                ? 'Showing live duty truth with active amendments. Click any cell to submit an amendment.'
-                : 'Showing live operational duty truth.')}
-            {viewMode === 'planned' &&
-              'Showing immutable baseline frozen at publication time (Read-Only).'}
-            {viewMode === 'changes' &&
-              'Showing append-only audit trail of operational adjustments.'}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* View Format Switcher: Calendar View vs Table View */}
-      {viewMode !== 'changes' && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border-subtle pb-2 select-none">
-          <div className="flex items-center gap-1">
+      {viewMode !== 'changes' ? (
+        <>
+          {/* Centered Month Navigator Bar (Clickable Wheel Picker) */}
+          <div className="flex items-center justify-center gap-5 rounded-[16px] border border-[#E7E5E4] bg-white px-4 py-1.5 shadow-2xs">
             <button
               type="button"
-              id="tab-btn-calendar"
-              data-testid="tab-btn-calendar"
-              onClick={() => setViewFormat('calendar')}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                viewFormat === 'calendar'
-                  ? 'bg-stone-900 text-white shadow-xs'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
-              }`}
+              onClick={handlePrevMonth}
+              aria-label="Previous Month"
+              title="Previous Month"
+              className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
             >
-              <Calendar className="h-3.5 w-3.5 shrink-0" />
-              <span>Calendar View</span>
-              <span className="text-[10px] font-normal text-stone-300 hidden sm:inline">
-                (Duty Timetable)
-              </span>
+              <ChevronLeft className="h-4 w-4" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsMonthWheelOpen(true)}
+              title="Click to pick month"
+              className="cursor-pointer rounded-xl px-3 py-0.5 text-center transition hover:bg-[#FAF8F5]"
+            >
+              <div className="text-[13.5px] font-extrabold text-[#18181B]">
+                {periodLabel} <span className="text-[10px] text-[#0F766E]">▾</span>
+              </div>
+              <div className="text-[9.5px] font-semibold text-[#78716C]">
+                {periodDates.length} Days · {periodStatusLabel}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              aria-label="Next Month"
+              title="Next Month"
+              className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Full-Width 2-Tab Sliding Switch: Table View | Month */}
+          <div className="relative grid grid-cols-2 rounded-full bg-[#EAE4DA] p-[3px] select-none">
+            <div
+              className={`absolute top-[3px] bottom-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-[#18181B] shadow-[0_3px_10px_rgba(0,0,0,0.16)] transition-transform duration-200 ${
+                viewFormat === 'calendar' ? 'translate-x-full' : 'translate-x-0'
+              }`}
+            />
             <button
               type="button"
               id="tab-btn-table"
               data-testid="tab-btn-table"
               onClick={() => setViewFormat('table')}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                viewFormat === 'table'
-                  ? 'bg-stone-900 text-white shadow-xs'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
+              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                viewFormat === 'table' ? 'text-white' : 'text-[#57534E]'
               }`}
             >
-              <Table className="h-3.5 w-3.5 shrink-0" />
-              <span>Table View</span>
-              <span className="text-[10px] font-normal text-stone-300 hidden sm:inline">
-                (Spreadsheet)
-              </span>
+              Table View
+            </button>
+            <button
+              type="button"
+              id="tab-btn-calendar"
+              data-testid="tab-btn-calendar"
+              onClick={() => setViewFormat('calendar')}
+              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                viewFormat === 'calendar' ? 'text-white' : 'text-[#57534E]'
+              }`}
+            >
+              Month<span className="sr-only"> (Calendar View)</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {viewFormat === 'table' && (
-              <div className="inline-flex rounded-full border border-stone-200 bg-white p-0.5 text-xs shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setDensity('comfortable')}
-                  className={`rounded-full px-3 py-1 font-semibold transition-colors ${
-                    density === 'comfortable'
-                      ? 'bg-teal-700 text-white shadow-xs'
-                      : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  Comfortable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDensity('compact')}
-                  className={`rounded-full px-3 py-1 font-semibold transition-colors ${
-                    density === 'compact'
-                      ? 'bg-teal-700 text-white shadow-xs'
-                      : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  Compact
-                </button>
-              </div>
-            )}
+          {/* Owner-Only Read-Only Protection & Quick Shift Palette Bar (Table View) */}
+          {isOwner && !isLegacyReadOnly && !isClosed && viewFormat === 'table' ? (
+            isTableEditEnabled ? (
+              <div className="sticky top-2 z-30 rounded-[16px] border border-[#E7E5E4] bg-[#FAF8F5]/95 backdrop-blur-xs p-3 space-y-2.5 shadow-[0_8px_22px_-8px_rgba(24,24,27,0.16)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="no-scrollbar flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+                    <span className="shrink-0 text-[10px] font-extrabold uppercase text-[#57534E] mr-1">
+                      Edit Mode:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRosterEditMode('normal');
+                        setQuickPaintCode(null);
+                      }}
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-bold cursor-pointer ${
+                        rosterEditMode === 'normal'
+                          ? 'bg-[#18181B] text-white border-[#18181B]'
+                          : 'bg-white text-[#57534E] border-[#E7E5E4]'
+                      }`}
+                    >
+                      📋 Normal Roster
+                    </button>
+                    {isPlanning ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRosterEditMode('fast');
+                          setQuickPaintCode(null);
+                        }}
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-bold cursor-pointer ${
+                          rosterEditMode === 'fast'
+                            ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                            : 'bg-white text-[#0F766E] border-[#99F6E4]'
+                        }`}
+                      >
+                        ⚡ Fast Edit
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRosterEditMode('standby');
+                        setQuickPaintCode(null);
+                      }}
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-bold cursor-pointer ${
+                        rosterEditMode === 'standby'
+                          ? 'bg-[#B45309] text-white border-[#B45309]'
+                          : 'bg-white text-[#57534E] border-[#E7E5E4]'
+                      }`}
+                    >
+                      🟡 Standby Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRosterEditMode('extended');
+                        setQuickPaintCode(null);
+                      }}
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-bold cursor-pointer ${
+                        rosterEditMode === 'extended'
+                          ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                          : 'bg-white text-[#57534E] border-[#E7E5E4]'
+                      }`}
+                    >
+                      🔵 Extended Edit
+                    </button>
+                  </div>
 
-            {rulesOutput && (
-              <div className="flex items-center gap-2 text-xs text-stone-500 hidden md:flex">
-                <span className="font-mono text-stone-400">
-                  Policy:{' '}
-                  {ruleConfig.weeklyOffPolicy === 'policy_b'
-                    ? 'Policy B (Nights: 1 OFF / No Nights: 2 OFFs)'
-                    : 'Policy A (1 OFF)'}
-                </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold text-[#57534E]">
+                      {rosterEditMode === 'fast'
+                        ? fastSelectedRangeKeys.size > 1
+                          ? `${fastSelectedRangeKeys.size} cells selected`
+                          : fastFocus
+                            ? 'Press A/P/O/1/2/N/H/Del or Enter'
+                            : 'Click any cell to start'
+                        : rosterEditMode === 'standby'
+                          ? 'Tap off/leave cell to toggle (S)'
+                          : rosterEditMode === 'extended'
+                            ? 'Tap working cell to toggle (X)'
+                            : quickPaintCode !== null
+                              ? `Painting: ${quickPaintCode || 'Clear'}`
+                              : 'Pick stamp or tap cell'}
+                    </span>
+                    {quickPaintCode !== null &&
+                    (rosterEditMode === 'normal' || rosterEditMode === 'fast') ? (
+                      <button
+                        type="button"
+                        onClick={() => setQuickPaintCode(null)}
+                        className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[10px] font-bold text-[#57534E] cursor-pointer"
+                      >
+                        Exit Paint
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTableEditEnabled(false);
+                        setQuickPaintCode(null);
+                        setRosterEditMode('normal');
+                        setFastAnchor(null);
+                        setFastFocus(null);
+                      }}
+                      className="rounded-full bg-[#18181B] px-3 py-1 text-[10.5px] font-extrabold text-white cursor-pointer"
+                    >
+                      ✓ Done Editing
+                    </button>
+                  </div>
+                </div>
+
+                {rosterEditMode === 'fast' ? (
+                  <div className="space-y-2">
+                    <div className="rounded-xl border border-[#99F6E4] bg-[#F0FDFA] px-3 py-2 text-[11px] font-bold text-[#0F766E]">
+                      Fast Editing Mode Active (Table): Click any cell and press A (AM), P (PM), O
+                      (OFF), 1/2 (ON1/ON2), N (PN), H (HKA), Del (Clear), or Enter to open the Quick
+                      Shift Palette. Hold Shift + Arrow Keys (or Shift + Click) to fill a multi-cell
+                      range at once. Nothing is sent over the network until you click Save Changes.
+                    </div>
+                    <div className="no-scrollbar flex flex-nowrap items-center gap-1.5 overflow-x-auto py-0.5 px-0.5">
+                      <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-[#57534E] mr-0.5">
+                        Fast Palette:
+                      </span>
+                      {PALETTE_CODES.map((c) => {
+                        const isActive = quickPaintCode === c;
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              if (fastSelectedRangeKeys.size > 0) {
+                                stageFastEditForKeys(fastSelectedRangeKeys, c);
+                              } else {
+                                setQuickPaintCode((prev) => (prev === c ? null : c));
+                              }
+                            }}
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition ${getShiftToneClasses(
+                              c,
+                            )} ${
+                              isActive
+                                ? 'ring-2 ring-[#18181B] ring-offset-1 scale-[1.05] shadow-xs'
+                                : 'opacity-85 hover:opacity-100'
+                            }`}
+                          >
+                            {c}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (fastSelectedRangeKeys.size > 0) {
+                            stageFastEditForKeys(fastSelectedRangeKeys, '');
+                          } else {
+                            setQuickPaintCode((prev) => (prev === '' ? null : ''));
+                          }
+                        }}
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition ${
+                          quickPaintCode === ''
+                            ? 'bg-[#B91C1C] text-white border-[#B91C1C] ring-2 ring-[#18181B] ring-offset-1'
+                            : 'bg-white text-[#B91C1C] border-[#FECACA] hover:bg-rose-50'
+                        }`}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : rosterEditMode === 'normal' ? (
+                  <div className="no-scrollbar flex flex-nowrap items-center gap-1.5 overflow-x-auto py-0.5 px-0.5">
+                    <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-[#57534E] mr-0.5">
+                      Fast Palette:
+                    </span>
+                    {PALETTE_CODES.map((c) => {
+                      const isActive = quickPaintCode === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setQuickPaintCode((prev) => (prev === c ? null : c))}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition ${getShiftToneClasses(
+                            c,
+                          )} ${
+                            isActive
+                              ? 'ring-2 ring-[#18181B] ring-offset-1 scale-[1.05] shadow-xs'
+                              : 'opacity-85 hover:opacity-100'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setQuickPaintCode((prev) => (prev === '' ? null : ''))}
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition ${
+                        quickPaintCode === ''
+                          ? 'bg-[#B91C1C] text-white border-[#B91C1C] ring-2 ring-[#18181B] ring-offset-1'
+                          : 'bg-white text-[#B91C1C] border-[#FECACA] hover:bg-rose-50'
+                      }`}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : rosterEditMode === 'standby' ? (
+                  <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 text-[11px] font-bold text-[#92400E]">
+                    Standby Edit Mode: Click any off/leave cell to toggle Standby (S). Working
+                    shifts are dimmed.
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#99F6E4] bg-[#F0FDFA] px-3 py-2 text-[11px] font-bold text-[#0F766E]">
+                    Extended Edit Mode: Click any working shift cell to toggle Extended (EX).
+                    Non-working shifts are dimmed.
+                  </div>
+                )}
+
+                {/* Undo / Redo / Sync Status Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#EFECE6] pt-2">
+                  {Object.keys(pendingFastEdits).length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10.5px] font-extrabold text-[#B45309]">
+                        {Object.keys(pendingFastEdits).length} unsaved change
+                        {Object.keys(pendingFastEdits).length === 1 ? '' : 's'}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={batchSaveDraftMutation.isPending}
+                        onClick={handleSaveFastEdits}
+                        className="rounded-full bg-[#0F766E] px-3 py-1 text-[10.5px] font-extrabold text-white hover:bg-[#0D9488] disabled:opacity-50 cursor-pointer"
+                      >
+                        {batchSaveDraftMutation.isPending ? 'Saving...' : 'Save Changes'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={batchSaveDraftMutation.isPending}
+                        onClick={() => {
+                          setPendingFastEdits({});
+                          showToast('Discarded unsaved edits');
+                        }}
+                        className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[10px] font-bold text-[#57534E] hover:bg-stone-100 cursor-pointer"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10.5px] font-bold text-[#047857]">
+                      {upsertMutation.isPending ||
+                      deleteMutation.isPending ||
+                      batchSaveDraftMutation.isPending
+                        ? 'Saving change...'
+                        : 'All changes saved ✓'}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={paintUndoStack.length === 0}
+                      onClick={handleUndoPaint}
+                      className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-0.5 text-[10px] font-bold text-[#57534E] disabled:opacity-40 cursor-pointer"
+                    >
+                      ↩ {paintUndoStack.length}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={paintRedoStack.length === 0}
+                      onClick={handleRedoPaint}
+                      className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-0.5 text-[10px] font-bold text-[#57534E] disabled:opacity-40 cursor-pointer"
+                    >
+                      ↪ {paintRedoStack.length}
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[#E7E5E4] bg-[#FAF8F5] px-3.5 py-2">
+                <span className="text-[11px] font-bold text-[#57534E]">
+                  🔒 Read-Only Protection Active ({periodStatusLabel})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsTableEditEnabled(true)}
+                  className="rounded-full bg-[#0F766E] px-3.5 py-1 text-[11px] font-extrabold text-white shadow-2xs hover:bg-[#115E59] transition cursor-pointer"
+                >
+                  ✏️ Edit Roster
+                </button>
+              </div>
+            )
+          ) : null}
+        </>
+      ) : null}
 
       {/* Main Content Area */}
       {isPeriodLoading || isStaffLoading || (isEnforced && isPlannedLoading) ? (
-        <SurfaceCard variant="solid" className="p-8 text-center text-sm text-text-muted">
-          Loading roster workspace for {periodLabel}...
-        </SurfaceCard>
+        <SkeletonRosterWorkspace label={`Loading roster workspace for ${periodLabel}...`} />
       ) : staffList.length === 0 ? (
         <SurfaceCard variant="solid" className="p-8 text-center space-y-3">
           <ShieldAlert className="mx-auto h-8 w-8 text-warning" />
@@ -762,99 +1422,282 @@ export function RosterPeriodRoute() {
           </Link>
         </SurfaceCard>
       ) : viewMode === 'changes' ? (
-        /* Changes / Audit View */
         <AmendmentHistoryList
           periodId={periodId}
           isOwner={isOwner}
           staffList={staffList}
           events={amendmentEvents}
           isLoading={isAmendmentsLoading}
+          onOpenAmend={() => {
+            setAmendModalPrefill(null);
+            setIsAmendModalOpen(true);
+          }}
         />
       ) : viewFormat === 'calendar' ? (
-        /* Calendar View (Duty Timetable & EP Coverage) */
         <RosterCalendarView
           periodDates={periodDates}
-          staffList={staffList}
-          assignments={activeAssignments}
+          staffList={calendarStaffList}
+          assignments={enrichedDisplay.assignments}
           epAssignments={epAssignments}
           holidays={publicHolidays as PublicHolidayEntry[]}
           isEditable={isOwner}
+          periodLabel={periodLabel}
+          isPublished={isEnforced || isClosed}
+          currentUserName={user?.rosterName || user?.displayName}
+          currentUserId={user?.staffId}
+          onOpenPdfExport={() => setIsPdfExportModalOpen(true)}
           onUpdateEpAssignment={handleUpdateEpAssignment}
           onBatchUpdateEpAssignments={handleBatchUpdateEpAssignments}
         />
       ) : (
-        /* Table Grid View & Tallies */
         <>
           <RosterGrid
             periodDates={periodDates}
-            staffList={staffList}
-            assignments={activeAssignments}
+            staffList={enrichedDisplay.staffList}
+            assignments={tableAssignments}
             shiftDefinitions={shiftDefinitions}
             holidays={publicHolidays as PublicHolidayEntry[]}
-            density={density}
             isEditable={isGridInteractive}
+            isTableEditEnabled={isTableEditEnabled}
+            rosterEditMode={rosterEditMode}
             selectedCell={
               selectedCell ? { staffId: selectedCell.staff.id, date: selectedCell.date } : null
             }
+            selectedRangeKeys={fastSelectedRangeKeys}
+            dirtyCellKeys={dirtyCellKeys}
+            requests={enrichedDisplay.requests}
+            amendedCellKeys={amendedCellKeys}
             onSelectCell={handleCellSelect}
+            onBlockedEditTap={() => showToast('Tap "Edit Roster" to edit')}
           />
 
-          {/* Shift Distribution Tally & Individual Member Shift Tally */}
-          <RosterTallyTables
-            periodDates={periodDates}
-            staffList={staffList}
-            assignments={activeAssignments}
-          />
+          {/* Mobile Full View / Rotate Pill */}
+          <div className="flex justify-center pt-0.5 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setIsRotatedOverlayOpen(true)}
+              className="rounded-full border border-[#E7E5E4] bg-white px-4 py-1.5 text-[11.5px] font-bold text-[#57534E] shadow-2xs hover:border-stone-400 hover:text-[#18181B] cursor-pointer"
+            >
+              🔄 Full View / Rotate
+            </button>
+          </div>
 
-          {/* Live Rules Guidance Panel */}
-          {rulesOutput && (
-            <RosterIssuesPanel
-              issues={rulesOutput.issues}
-              onSelectIssue={(issue: RosterIssue) => {
-                if (issue.staffId && issue.date) {
-                  const targetStaff = staffList.find((s) => s.id === issue.staffId);
-                  if (targetStaff) {
-                    const currentCode = activeAssignments.find(
-                      (a) => a.staffId === issue.staffId && a.dutyDate === issue.date,
-                    )?.shiftCode;
-                    handleCellSelect(targetStaff, issue.date, currentCode);
-                  }
-                }
-              }}
-            />
-          )}
+          {/* Owner-Only Tallies, Rules Engine & Snapshot Archive */}
+          {isOwner ? (
+            <>
+              <RosterTallyTables
+                periodDates={periodDates}
+                staffList={enrichedDisplay.staffList}
+                assignments={enrichedDisplay.assignments}
+              />
+
+              {rulesOutput ? (
+                <RosterIssuesPanel
+                  issues={rulesOutput.issues}
+                  onSelectIssue={(issue: RosterIssue) => {
+                    if (issue.staffId && issue.date) {
+                      const targetStaff = staffList.find((s) => s.id === issue.staffId);
+                      if (targetStaff) {
+                        const currentCode = activeAssignments.find(
+                          (a) => a.staffId === issue.staffId && a.dutyDate === issue.date,
+                        )?.shiftCode;
+                        handleCellSelect(targetStaff, issue.date, currentCode);
+                      }
+                    } else if (issue.date) {
+                      showToast(`Focused ${issue.date}`);
+                    }
+                  }}
+                />
+              ) : null}
+
+              {periodRow ? (
+                <RosterSnapshotBar
+                  periodId={periodRow.id}
+                  periodYear={yyyy}
+                  periodMonth={mm}
+                  periodStart={`${yyyy}-${mm}-01`}
+                  periodRevision={periodRow.revision}
+                  staffList={moStaffList}
+                  assignments={activeAssignments}
+                  shiftDefinitions={shiftDefinitions}
+                  epAssignments={epAssignments}
+                  holidays={publicHolidays as PublicHolidayEntry[]}
+                  isOwner={isOwner}
+                />
+              ) : null}
+            </>
+          ) : null}
         </>
       )}
 
+      {/* Mobile Rotated Landscape Roster Overlay — Fits full rotated screen width with zero horizontal scroll */}
+      {isRotatedOverlayOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Rotated Full Roster Landscape View"
+          className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-[#FAF8F5] lg:hidden"
+        >
+          <div className="flex h-[calc(100dvw-12px)] w-[calc(100dvh-12px)] shrink-0 rotate-90 flex-col rounded-2xl border border-[#E7E5E4] bg-white p-2 shadow-2xl">
+            <div className="mb-1 flex shrink-0 items-center justify-between gap-2">
+              <span className="truncate text-[11px] font-extrabold text-[#18181B]">
+                {periodLabel} · Full Roster (Landscape)
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsRotatedOverlayOpen(false)}
+                className="shrink-0 rounded-full bg-[#18181B] px-2.5 py-0.5 text-[10px] font-extrabold text-white cursor-pointer"
+              >
+                ✕ Exit Rotate
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-[10px] border border-[#F4EFE6]">
+              <table className="w-full table-fixed border-collapse text-center">
+                <thead>
+                  <tr className="border-b border-[#E7E5E4] bg-[#FAF8F5]">
+                    <th className="sticky top-0 z-10 w-[52px] border-r border-[#E7E5E4] bg-[#FAF8F5] px-1 py-1 text-left text-[8px] font-extrabold text-[#57534E]">
+                      Staff
+                    </th>
+                    {periodDates.map((d) => {
+                      const utcDay = new Date(`${d}T00:00:00Z`).getUTCDay();
+                      const isWeekend = utcDay === 0 || utcDay === 6;
+                      const isHoliday = publicHolidays.some((h) => h.date === d);
+                      return (
+                        <th
+                          key={d}
+                          className={`sticky top-0 border-r border-[#F4EFE6] py-1 text-[7.5px] font-extrabold leading-none ${
+                            isHoliday
+                              ? 'bg-[#FFE4E6] text-[#BE123C]'
+                              : isWeekend
+                                ? 'bg-[#FEF3C7] text-[#B45309]'
+                                : 'bg-[#FAF8F5] text-[#57534E]'
+                          }`}
+                        >
+                          {parseInt(d.slice(8, 10), 10)}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {enrichedDisplay.staffList.map((s) => (
+                    <tr key={s.id} className="border-b border-[#F4EFE6]">
+                      <td className="truncate border-r border-[#E7E5E4] bg-white px-1 py-0.5 text-left text-[8px] font-extrabold text-[#18181B]">
+                        {s.rosterName.replace(/^Dr\.?\s+/i, '')}
+                      </td>
+                      {periodDates.map((d) => {
+                        const code =
+                          enrichedDisplay.assignments.find(
+                            (a) => a.staffId === s.id && a.dutyDate === d,
+                          )?.shiftCode ?? '';
+                        return (
+                          <td key={d} className="border-r border-[#FAF8F5] p-[0.5px]">
+                            <span
+                              className={`block w-full truncate rounded-[3px] py-[2px] text-[6.5px] font-extrabold leading-none tracking-tighter ${getShiftToneClasses(
+                                code,
+                              )}`}
+                            >
+                              {code || '·'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Month / Year Wheel Picker Modal */}
+      <MonthYearWheelModal
+        isOpen={isMonthWheelOpen}
+        onClose={() => setIsMonthWheelOpen(false)}
+        title="Select Roster Month"
+        subtitle="Current/previous = Published · Upcoming = Draft"
+        selectedYear={parseInt(yyyy, 10)}
+        selectedMonth={parseInt(mm, 10)}
+        shortcutLabel="Current"
+        shortcutYear={2027}
+        shortcutMonth={1}
+        onSelect={(yr, mo) => handleMonthChange(String(yr), String(mo).padStart(2, '0'))}
+      />
+
+      {/* Fast Edit Quick Shift Palette Modal (Enter key in Fast Edit Mode) */}
+      {(() => {
+        const fastStaff = fastFocus ? enrichedDisplay.staffList[fastFocus.staffIdx] : undefined;
+        const fastDate = fastFocus ? periodDates[fastFocus.dateIdx] : undefined;
+        if (!isFastPaletteModalOpen || !isPlanning || !fastStaff || !fastDate) return null;
+        return (
+          <ShiftPickerModal
+            isOpen={isFastPaletteModalOpen}
+            staff={fastStaff}
+            date={fastDate}
+            currentCode={
+              tableAssignments.find((a) => a.staffId === fastStaff.id && a.dutyDate === fastDate)
+                ?.shiftCode
+            }
+            shiftDefinitions={shiftDefinitions}
+            onClose={() => setIsFastPaletteModalOpen(false)}
+            onSelectShift={(code) => {
+              if (fastSelectedRangeKeys.size > 0) {
+                stageFastEditForKeys(fastSelectedRangeKeys, code);
+              }
+            }}
+            onClearShift={() => {
+              if (fastSelectedRangeKeys.size > 0) {
+                stageFastEditForKeys(fastSelectedRangeKeys, '');
+              }
+            }}
+          />
+        );
+      })()}
+
       {/* Shift Picker Modal (Pre-Month Planning Mode Only) */}
-      {selectedCell && isPlanning && (
+      {selectedCell && isPlanning ? (
         <ShiftPickerModal
           isOpen={Boolean(selectedCell)}
           staff={selectedCell.staff}
           date={selectedCell.date}
           currentCode={selectedCell.currentCode}
+          initialNote={selectedCell.initialNote}
           shiftDefinitions={shiftDefinitions}
           onClose={() => setSelectedCell(null)}
-          onSelectShift={(code) => {
+          onSelectShift={(code, note) => {
             if (!periodId) return;
+            recordPaintAction({
+              staffId: selectedCell.staff.id,
+              dutyDate: selectedCell.date,
+              prevCode: selectedCell.currentCode,
+              nextCode: code,
+            });
             upsertMutation.mutate({
               staffId: selectedCell.staff.id,
               dutyDate: selectedCell.date,
               shiftCode: code,
+              cellNote: note,
             });
           }}
           onClearShift={() => {
             if (!periodId) return;
+            recordPaintAction({
+              staffId: selectedCell.staff.id,
+              dutyDate: selectedCell.date,
+              prevCode: selectedCell.currentCode,
+              nextCode: undefined,
+            });
             deleteMutation.mutate({
               staffId: selectedCell.staff.id,
               dutyDate: selectedCell.date,
             });
           }}
         />
-      )}
+      ) : null}
 
       {/* Amend Roster Modal */}
-      {isAmendModalOpen && (
+      {isAmendModalOpen ? (
         <AmendRosterModal
           isOpen={isAmendModalOpen}
           onClose={() => {
@@ -863,7 +1706,7 @@ export function RosterPeriodRoute() {
           }}
           periodId={periodId}
           periodDates={periodDates}
-          staffList={staffList}
+          staffList={moStaffList}
           shiftDefinitions={shiftDefinitions}
           currentAssignments={currentAssignments}
           shiftSemantics={ruleConfig.semantics ?? []}
@@ -871,10 +1714,10 @@ export function RosterPeriodRoute() {
           initialDate={amendModalPrefill?.date}
           initialShiftCode={amendModalPrefill?.shiftCode}
         />
-      )}
+      ) : null}
 
       {/* Roster PDF Export Modal */}
-      {isPdfExportModalOpen && periodRow && (
+      {isPdfExportModalOpen && periodRow ? (
         <RosterExportModal
           isOpen={isPdfExportModalOpen}
           onClose={() => setIsPdfExportModalOpen(false)}
@@ -882,16 +1725,17 @@ export function RosterPeriodRoute() {
           periodMonth={mm}
           periodStart={periodRow.period_start}
           periodRevision={periodRow.revision ?? 0}
-          staffList={staffList}
+          staffList={moStaffList}
+          allStaffList={staffList}
           assignments={activeAssignments}
           shiftDefinitions={shiftDefinitions}
           epAssignments={epAssignments}
           holidays={publicHolidays as PublicHolidayEntry[]}
         />
-      )}
+      ) : null}
 
       {/* Close / Reconcile Modal */}
-      {isCloseModalOpen && (
+      {isCloseModalOpen ? (
         <CloseReconcileModal
           isOpen={isCloseModalOpen}
           onClose={() => setIsCloseModalOpen(false)}
@@ -901,9 +1745,9 @@ export function RosterPeriodRoute() {
           plannedCount={plannedAssignments.length}
           amendmentCount={amendmentEvents.length}
           accruedGoffCandidates={accruedGoffCandidates}
-          staffList={staffList}
+          staffList={moStaffList}
         />
-      )}
+      ) : null}
     </div>
   );
 }

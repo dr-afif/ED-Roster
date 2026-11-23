@@ -60,7 +60,15 @@ export function CloseReconcileModal({
       onSuccess?.();
       onClose();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Operation failed. Please try again.');
+      const errObj =
+        typeof err === 'object' && err !== null
+          ? (err as { message?: string; code?: string })
+          : null;
+      const msg =
+        err instanceof Error
+          ? err.message
+          : errObj?.message || 'Operation failed. Please try again.';
+      setActionError(errObj?.code ? `${msg} (${errObj.code})` : msg);
     }
   };
 

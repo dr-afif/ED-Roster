@@ -1,35 +1,10 @@
 import { useState } from 'react';
-import {
-  AlertTriangle,
-  BarChart3,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Moon,
-  Palmtree,
-  Settings2,
-  SlidersHorizontal,
-  Sun,
-  Sunset,
-  Users,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Settings2, SlidersHorizontal, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { type SharedTallyThresholds, useAppUiState } from '@/shared/ui';
 import type { Assignment, StaffRosterIdentity } from '../domain/types';
 
-export interface TallyThresholds {
-  amMin: number;
-  pmMin: number;
-  nightMin: number;
-  nightMax: number;
-  totalLeaveMax: number;
-}
-
-const DEFAULT_THRESHOLDS: TallyThresholds = {
-  amMin: 4,
-  pmMin: 4,
-  nightMin: 2,
-  nightMax: 4,
-  totalLeaveMax: 3,
-};
+export type TallyThresholds = SharedTallyThresholds;
 
 interface RosterTallyTablesProps {
   periodDates: readonly string[];
@@ -37,12 +12,30 @@ interface RosterTallyTablesProps {
   assignments: readonly Assignment[];
 }
 
+function cleanShiftCode(raw?: string): string {
+  return (raw || '')
+    .toUpperCase()
+    .replace(/\(S\)|-S|\(X\)|-X/g, '')
+    .trim();
+}
+
 export function RosterTallyTables({ periodDates, staffList, assignments }: RosterTallyTablesProps) {
-  const [thresholds, setThresholds] = useState<TallyThresholds>(DEFAULT_THRESHOLDS);
+  const { tallyThresholds, setTallyThresholds, showToast } = useAppUiState();
+  const [prevTallyThresholds, setPrevTallyThresholds] =
+    useState<SharedTallyThresholds>(tallyThresholds);
+  const [draftThresholds, setDraftThresholds] = useState<SharedTallyThresholds>(tallyThresholds);
+  const [isDirty, setIsDirty] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMemberTally, setShowMemberTally] = useState(false);
 
-  // Group assignments by date -> shiftCode -> count
+  if (prevTallyThresholds !== tallyThresholds) {
+    setPrevTallyThresholds(tallyThresholds);
+    setDraftThresholds(tallyThresholds);
+    setIsDirty(false);
+  }
+
+  const thresholds = isDirty ? draftThresholds : tallyThresholds;
+
   const dailyTally = new Map<
     string,
     { am: number; pm: number; night: number; leave: number; empty: number }
@@ -51,7 +44,6 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
     dailyTally.set(date, { am: 0, pm: 0, night: 0, leave: 0, empty: staffList.length });
   }
 
-  // Group assignments by staffId -> stats
   const memberTally = new Map<
     number,
     {
@@ -77,23 +69,41 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
   }
 
   for (const a of assignments) {
-    const code = (a.shiftCode || '').toUpperCase().trim();
+    const code = cleanShiftCode(a.shiftCode);
     const day = dailyTally.get(a.dutyDate);
     const mem = memberTally.get(a.staffId);
 
     const isAm = code === 'AM';
     const isPm = code === 'PM';
     const isNight =
-      code === 'ND' || code === 'NIGHT' || code === 'ON1' || code === 'ON2' || code === 'PN';
-    const isLeave = ['AL', 'EL', 'MC', 'LEAVE', 'CR_LEAVE', 'MATERNITY', 'UNPAID'].includes(code);
+      code === 'ND' ||
+      code === 'NIGHT' ||
+      code === 'ON' ||
+      code === 'ON1' ||
+      code === 'ON2' ||
+      code === 'PN';
     const isOff = code === 'OFF';
     const isGoff = code === 'GOFF';
+    const isLeave = [
+      'AL',
+      'EL',
+      'MC',
+      'HKA',
+      'GHKA',
+      'COURSE',
+      'OH',
+      'COURT',
+      'LEAVE',
+      'CR_LEAVE',
+      'MATERNITY',
+      'UNPAID',
+    ].includes(code);
 
     if (day) {
       if (isAm) day.am += 1;
       else if (isPm) day.pm += 1;
       else if (isNight) day.night += 1;
-      else if (isLeave) day.leave += 1;
+      else if (isOff || isGoff || isLeave) day.leave += 1;
       if (code) day.empty = Math.max(0, day.empty - 1);
     }
 
@@ -103,6 +113,8 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
         mem.totalWorked += 1;
       } else if (isPm) {
         mem.pm += 1;
+        mem.totalWorked += 1;
+      } else if (code === 'MEDSB') {
         mem.totalWorked += 1;
       } else if (isNight) {
         mem.night += 1;
@@ -117,116 +129,146 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
     }
   }
 
+  const updateDraftField = (field: keyof SharedTallyThresholds, rawValue: string) => {
+    setDraftThresholds((prev) => ({ ...prev, [field]: Math.max(0, Number(rawValue) || 0) }));
+    setIsDirty(true);
+  };
+
+  const handleSaveThresholds = () => {
+    setTallyThresholds(draftThresholds);
+    setIsDirty(false);
+    showToast('Alert thresholds saved & synced with Rules & Policies ✓');
+  };
+
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-3 pt-1">
       {/* 1. Daily Shift Distribution Tally */}
-      <div className="overflow-hidden rounded-xl border border-border-default bg-surface-primary shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-default bg-surface-secondary/60 px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-text-primary">
-              <BarChart3 className="h-4 w-4 text-teal-600" />
-              <span>Shift Distribution Tally</span>
+      <div className="overflow-hidden rounded-[22px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E7E5E4] bg-[#FAFAF9] px-4 py-2.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[13px] font-extrabold text-[#1C1917]">
+              📊 Shift Distribution Tally
             </span>
-            <span className="text-[11px] text-text-secondary">
-              (Daily duty staffing totals & alert guidance)
+            <span className="text-[11px] font-semibold text-[#78716C]">
+              · Daily duty staffing totals &amp; alert guidance
             </span>
           </div>
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-primary px-2.5 py-1 text-xs font-semibold text-text-secondary hover:bg-surface-secondary hover:text-text-primary cursor-pointer"
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition cursor-pointer ${
+              showSettings
+                ? 'bg-[#18181B] text-white border-[#18181B]'
+                : 'bg-white text-[#57534E] border-[#E7E5E4] hover:border-stone-400'
+            }`}
           >
             <Settings2 className="h-3.5 w-3.5" />
-            Alert Thresholds
+            <span>Alert Thresholds</span>
           </button>
         </div>
 
-        {/* Optional Thresholds Config Panel */}
-        {showSettings && (
-          <div className="border-b border-border-default bg-amber-500/5 p-3 text-xs">
-            <div className="mb-2 inline-flex items-center gap-1.5 font-semibold text-text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
-              <span>Shift Coverage Guidance Thresholds:</span>
+        {/* Thresholds Config Panel (Persisted & Synced to Rules & Policies) */}
+        {showSettings ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 font-extrabold text-[#92400E]">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Guidance Thresholds:</span>
+              </span>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#78716C]">
+                <span>AM Min</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={draftThresholds.amMin}
+                  onChange={(e) => updateDraftField('amMin', e.target.value)}
+                  className="h-7 w-11 rounded-md border border-[#D6D3D1] bg-white px-1.5 text-center text-xs font-extrabold text-[#1C1917]"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#78716C]">
+                <span>PM Min</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={draftThresholds.pmMin}
+                  onChange={(e) => updateDraftField('pmMin', e.target.value)}
+                  className="h-7 w-11 rounded-md border border-[#D6D3D1] bg-white px-1.5 text-center text-xs font-extrabold text-[#1C1917]"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#78716C]">
+                <span>Night Min</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={draftThresholds.nightMin}
+                  onChange={(e) => updateDraftField('nightMin', e.target.value)}
+                  className="h-7 w-11 rounded-md border border-[#D6D3D1] bg-white px-1.5 text-center text-xs font-extrabold text-[#1C1917]"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#78716C]">
+                <span>Night Max</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={draftThresholds.nightMax}
+                  onChange={(e) => updateDraftField('nightMax', e.target.value)}
+                  className="h-7 w-11 rounded-md border border-[#D6D3D1] bg-white px-1.5 text-center text-xs font-extrabold text-[#1C1917]"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#78716C]">
+                <span>Leave Max</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={draftThresholds.totalLeaveMax}
+                  onChange={(e) => updateDraftField('totalLeaveMax', e.target.value)}
+                  className="h-7 w-11 rounded-md border border-[#D6D3D1] bg-white px-1.5 text-center text-xs font-extrabold text-[#1C1917]"
+                />
+              </label>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted">Min AM</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={thresholds.amMin}
-                  onChange={(e) =>
-                    setThresholds((t) => ({ ...t, amMin: Number(e.target.value) || 0 }))
-                  }
-                  className="h-7 rounded border border-border-default bg-surface-primary px-2 text-xs text-text-primary"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted">Min PM</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={thresholds.pmMin}
-                  onChange={(e) =>
-                    setThresholds((t) => ({ ...t, pmMin: Number(e.target.value) || 0 }))
-                  }
-                  className="h-7 rounded border border-border-default bg-surface-primary px-2 text-xs text-text-primary"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted">Min Night</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={thresholds.nightMin}
-                  onChange={(e) =>
-                    setThresholds((t) => ({ ...t, nightMin: Number(e.target.value) || 0 }))
-                  }
-                  className="h-7 rounded border border-border-default bg-surface-primary px-2 text-xs text-text-primary"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted">Max Night</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={thresholds.nightMax}
-                  onChange={(e) =>
-                    setThresholds((t) => ({ ...t, nightMax: Number(e.target.value) || 0 }))
-                  }
-                  className="h-7 rounded border border-border-default bg-surface-primary px-2 text-xs text-text-primary"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted">Max Leave</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={thresholds.totalLeaveMax}
-                  onChange={(e) =>
-                    setThresholds((t) => ({ ...t, totalLeaveMax: Number(e.target.value) || 0 }))
-                  }
-                  className="h-7 rounded border border-border-default bg-surface-primary px-2 text-xs text-text-primary"
-                />
-              </label>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                  isDirty ? 'tone-am' : 'tone-leave'
+                }`}
+              >
+                {isDirty ? 'Unsaved edits' : 'Synced ✓'}
+              </span>
+              <Link
+                to="/admin/rules"
+                className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[10.5px] font-bold text-[#57534E] hover:border-stone-400 hover:text-[#18181B]"
+              >
+                Rules &amp; Policies ↗
+              </Link>
+              <button
+                type="button"
+                onClick={handleSaveThresholds}
+                className="rounded-full bg-[#0F766E] px-3 py-1 text-[11px] font-extrabold text-white hover:bg-[#115E59] cursor-pointer"
+              >
+                Save
+              </button>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Tally Matrix */}
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs">
+        <div className="overflow-x-auto lg:overflow-hidden">
+          <table className="w-max min-w-full lg:w-full lg:table-fixed border-collapse text-center text-[10px]">
             <thead>
-              <tr className="border-b border-border-default bg-surface-secondary/40 text-[11px] font-semibold text-text-secondary">
-                <th className="sticky left-0 z-10 min-w-36 bg-surface-secondary px-3 py-1.5 text-left shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  Shift Category
+              <tr className="border-b border-[#E7E5E4] bg-[#FAF8F5] text-[#57534E] font-extrabold">
+                <th className="sticky left-0 z-10 w-[108px] min-w-[98px] bg-[#FAF8F5] px-2.5 py-2 text-center border-r border-[#E7E5E4]">
+                  Bucket
                 </th>
                 {periodDates.map((date) => {
                   const dayNum = parseInt(date.slice(8, 10), 10);
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <th
                       key={date}
-                      className="min-w-10 border-l border-border-subtle px-1 py-1 text-center font-bold"
+                      className={`min-w-[26px] lg:min-w-0 py-1.5 px-0.5 text-center font-extrabold ${
+                        isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'
+                      }`}
                     >
                       {dayNum}
                     </th>
@@ -234,88 +276,77 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                 })}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-subtle font-mono text-[11px]">
+            <tbody className="text-[10px]">
               {/* Row AM */}
-              <tr>
-                <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-amber-700 dark:text-amber-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Sun className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                    <span>AM Shift</span>
-                  </span>
+              <tr className="border-b border-[#F4EFE6]">
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#9A3412] border-r border-[#E7E5E4] whitespace-nowrap">
+                  <span>☀️ AM (≥{thresholds.amMin})</span>
+                  <span className="sr-only">AM Shift</span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.am ?? 0;
                   const isBelow = count < thresholds.amMin;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <td
                       key={date}
-                      className={`border-l border-border-subtle px-1 py-1 text-center font-bold ${
-                        isBelow
-                          ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 font-extrabold'
-                          : 'text-text-primary'
-                      }`}
+                      className={`py-1.5 px-0.5 text-center font-extrabold tabular-nums ${
+                        isBelow ? 'bg-[#FEF2F2] text-[#DC2626]' : 'text-[#1C1917]'
+                      } ${isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'}`}
                       title={isBelow ? `Alert: Below AM minimum of ${thresholds.amMin}` : undefined}
                     >
                       {count}
-                      {isBelow && (
-                        <AlertTriangle className="h-2.5 w-2.5 text-amber-600 mx-auto mt-0.5" />
-                      )}
+                      {isBelow ? '⚠' : ''}
                     </td>
                   );
                 })}
               </tr>
 
               {/* Row PM */}
-              <tr>
-                <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-sky-700 dark:text-sky-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Sunset className="h-3.5 w-3.5 text-sky-500 shrink-0" />
-                    <span>PM Shift</span>
-                  </span>
+              <tr className="border-b border-[#F4EFE6]">
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#0F766E] border-r border-[#E7E5E4] whitespace-nowrap">
+                  <span>🌇 PM (≥{thresholds.pmMin})</span>
+                  <span className="sr-only">PM Shift</span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.pm ?? 0;
                   const isBelow = count < thresholds.pmMin;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <td
                       key={date}
-                      className={`border-l border-border-subtle px-1 py-1 text-center font-bold ${
-                        isBelow
-                          ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 font-extrabold'
-                          : 'text-text-primary'
-                      }`}
+                      className={`py-1.5 px-0.5 text-center font-extrabold tabular-nums ${
+                        isBelow ? 'bg-[#FEF2F2] text-[#DC2626]' : 'text-[#1C1917]'
+                      } ${isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'}`}
                       title={isBelow ? `Alert: Below PM minimum of ${thresholds.pmMin}` : undefined}
                     >
                       {count}
-                      {isBelow && (
-                        <AlertTriangle className="h-2.5 w-2.5 text-amber-600 mx-auto mt-0.5" />
-                      )}
+                      {isBelow ? '⚠' : ''}
                     </td>
                   );
                 })}
               </tr>
 
               {/* Row Night */}
-              <tr>
-                <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-bold text-indigo-700 dark:text-indigo-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Moon className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                    <span>Night Duty (ND)</span>
+              <tr className="border-b border-[#F4EFE6]">
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#3730A3] border-r border-[#E7E5E4] whitespace-nowrap">
+                  <span>
+                    🌙 Night ({thresholds.nightMin}–{thresholds.nightMax})
                   </span>
+                  <span className="sr-only">Night Duty</span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.night ?? 0;
                   const isBelow = count < thresholds.nightMin;
                   const isAbove = count > thresholds.nightMax;
                   const isAlert = isBelow || isAbove;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <td
                       key={date}
-                      className={`border-l border-border-subtle px-1 py-1 text-center font-bold ${
-                        isAlert
-                          ? 'bg-rose-500/15 text-rose-800 dark:text-rose-300 font-extrabold'
-                          : 'text-text-primary'
-                      }`}
+                      className={`py-1.5 px-0.5 text-center font-extrabold tabular-nums ${
+                        isAlert ? 'bg-[#FEF2F2] text-[#DC2626]' : 'text-[#1C1917]'
+                      } ${isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'}`}
                       title={
                         isBelow
                           ? `Alert: Below Night minimum of ${thresholds.nightMin}`
@@ -325,33 +356,28 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                       }
                     >
                       {count}
-                      {isAlert && (
-                        <AlertTriangle className="h-2.5 w-2.5 text-rose-600 mx-auto mt-0.5" />
-                      )}
+                      {isAlert ? '⚠' : ''}
                     </td>
                   );
                 })}
               </tr>
 
               {/* Row Total Leave */}
-              <tr>
-                <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans font-medium text-emerald-700 dark:text-emerald-400 shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Palmtree className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                    <span>Total Leave</span>
-                  </span>
+              <tr className="border-b border-[#F4EFE6]">
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#166534] border-r border-[#E7E5E4] whitespace-nowrap">
+                  <span>🌴 Leave (≤{thresholds.totalLeaveMax})</span>
+                  <span className="sr-only">Total Leave</span>
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.leave ?? 0;
                   const isAbove = count > thresholds.totalLeaveMax;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <td
                       key={date}
-                      className={`border-l border-border-subtle px-1 py-1 text-center font-bold ${
-                        isAbove
-                          ? 'bg-rose-500/15 text-rose-800 dark:text-rose-300'
-                          : 'text-text-muted'
-                      }`}
+                      className={`py-1.5 px-0.5 text-center font-bold tabular-nums ${
+                        isAbove ? 'bg-[#FFF1F2] text-[#BE123C]' : 'text-[#57534E]'
+                      } ${isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'}`}
                       title={
                         isAbove
                           ? `Alert: Exceeds Total Leave maximum of ${thresholds.totalLeaveMax}`
@@ -359,30 +385,25 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                       }
                     >
                       {count}
-                      {isAbove && (
-                        <AlertTriangle className="h-2.5 w-2.5 text-rose-600 mx-auto mt-0.5" />
-                      )}
                     </td>
                   );
                 })}
               </tr>
 
-              {/* Row Empty */}
+              {/* Row Unassigned */}
               <tr>
-                <td className="sticky left-0 z-10 bg-surface-primary px-3 py-1 font-sans text-text-muted shadow-[1px_0_0_0_rgba(0,0,0,0.06)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Circle className="h-3 w-3 text-slate-400 shrink-0" />
-                    <span>Unassigned</span>
-                  </span>
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-bold text-[#78716C] border-r border-[#E7E5E4] whitespace-nowrap">
+                  ○ Unassigned
                 </td>
                 {periodDates.map((date) => {
                   const count = dailyTally.get(date)?.empty ?? 0;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
                   return (
                     <td
                       key={date}
-                      className={`border-l border-border-subtle px-1 py-1 text-center ${
-                        count > 0 ? 'text-amber-600 font-semibold' : 'text-text-muted'
-                      }`}
+                      className={`py-1.5 px-0.5 text-center font-bold tabular-nums ${
+                        count > 0 ? 'text-[#D97706]' : 'text-[#A8A29E]'
+                      } ${isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'}`}
                     >
                       {count}
                     </td>
@@ -394,59 +415,56 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
         </div>
       </div>
 
-      {/* 2. Individual Member Shift Tally Card */}
-      <div className="overflow-hidden rounded-xl border border-border-default bg-surface-primary shadow-xs">
+      {/* 2. Individual Member Shift Tally Card (Expandable) */}
+      <div className="overflow-hidden rounded-[22px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]">
         <button
           type="button"
           onClick={() => setShowMemberTally(!showMemberTally)}
-          className="flex w-full items-center justify-between border-b border-border-default bg-surface-secondary/60 px-4 py-2.5 text-left"
+          className={`flex w-full items-center justify-between bg-[#FAFAF9] px-4 py-2.5 text-left cursor-pointer ${
+            showMemberTally ? 'border-b border-[#E7E5E4]' : ''
+          }`}
         >
           <div className="flex items-center gap-2">
             {showMemberTally ? (
-              <ChevronDown className="h-4 w-4 text-text-muted" />
+              <ChevronDown className="h-4 w-4 text-[#57534E]" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-text-muted" />
+              <ChevronRight className="h-4 w-4 text-[#57534E]" />
             )}
-            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-text-primary">
-              <Users className="h-4 w-4 text-teal-600 shrink-0" />
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-[#1C1917]">
+              <Users className="h-4 w-4 text-[#0F766E] shrink-0" />
               <span>Individual Member Shift Tally</span>
             </span>
-            <span className="text-xs text-text-muted">
+            <span className="text-[11px] font-semibold text-[#78716C]">
               ({staffList.length} members · Monthly workload distribution)
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <Users className="h-3.5 w-3.5" />
-            <span>{showMemberTally ? 'Collapse' : 'Expand'}</span>
-          </div>
+          <span className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-0.5 text-[10.5px] font-bold text-[#57534E]">
+            {showMemberTally ? 'Collapse' : 'Expand'}
+          </span>
         </button>
 
-        {showMemberTally && (
+        {showMemberTally ? (
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
-            <table className="w-full border-collapse text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-surface-secondary text-[11px] font-semibold text-text-secondary">
-                <tr className="border-b border-border-default">
-                  <th className="px-3 py-2">Doctor Name</th>
-                  <th className="px-2 py-2 text-center">Code</th>
-                  <th className="px-2 py-2 text-center font-bold text-amber-700 dark:text-amber-400">
-                    AM
+            <table className="w-full border-collapse text-center text-[11px]">
+              <thead className="sticky top-0 z-10 bg-[#FAF8F5] text-[#57534E] font-extrabold">
+                <tr className="border-b border-[#E7E5E4]">
+                  <th className="sticky left-0 bg-[#FAF8F5] px-3 py-2 text-left border-r border-[#E7E5E4]">
+                    Doctor Name
                   </th>
-                  <th className="px-2 py-2 text-center font-bold text-sky-700 dark:text-sky-400">
-                    PM
+                  <th className="px-2 py-2">Code</th>
+                  <th className="px-2 py-2 text-[#B45309]">AM</th>
+                  <th className="px-2 py-2 text-[#0F766E]">PM</th>
+                  <th className="px-2 py-2 text-[#3730A3]">NIGHT</th>
+                  <th className="px-2 py-2 text-[#0F766E]">
+                    <span className="sr-only">Total</span>Worked
                   </th>
-                  <th className="px-2 py-2 text-center font-bold text-indigo-700 dark:text-indigo-400">
-                    NIGHT
-                  </th>
-                  <th className="px-2 py-2 text-center font-bold text-brand-primary">
-                    Total Worked
-                  </th>
-                  <th className="px-2 py-2 text-center font-medium text-emerald-700">OFF</th>
-                  <th className="px-2 py-2 text-center font-medium text-purple-700">GOFF</th>
-                  <th className="px-2 py-2 text-center font-medium text-rose-700">Leaves</th>
-                  <th className="px-3 py-2 text-center">Guidance Status</th>
+                  <th className="px-2 py-2 text-[#15803D]">OFF</th>
+                  <th className="px-2 py-2 text-[#6D28D9]">GOFF</th>
+                  <th className="px-2 py-2 text-[#BE123C]">Leaves</th>
+                  <th className="px-3 py-2">Guidance Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle font-mono text-xs">
+              <tbody className="divide-y divide-[#F4EFE6]">
                 {staffList.map((staff) => {
                   const stats = memberTally.get(staff.id) ?? {
                     am: 0,
@@ -461,52 +479,49 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                   const isLowWorked = stats.totalWorked > 0 && stats.totalWorked < 15;
 
                   return (
-                    <tr key={staff.id} className="hover:bg-surface-secondary/40 font-sans">
-                      <td className="px-3 py-2 font-medium text-text-primary">
-                        {staff.rosterName || staff.displayName}
+                    <tr key={staff.id} className="hover:bg-[#FAF8F5]">
+                      <td className="sticky left-0 bg-white px-3 py-2 text-left font-extrabold text-[#18181B] border-r border-[#E7E5E4]">
+                        {staff.rosterName}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-[11px] text-text-muted">
+                      <td className="px-2 py-2 font-mono text-[10px] text-[#78716C]">
                         {staff.staffCode}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono font-bold text-amber-700 dark:text-amber-400">
+                      <td className="px-2 py-2 font-extrabold text-[#B45309] tabular-nums">
                         {stats.am}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono font-bold text-sky-700 dark:text-sky-400">
+                      <td className="px-2 py-2 font-extrabold text-[#0F766E] tabular-nums">
                         {stats.pm}
                       </td>
                       <td
-                        className={`px-2 py-2 text-center font-mono font-bold ${
-                          isHighNight
-                            ? 'text-rose-600 bg-rose-500/10'
-                            : 'text-indigo-700 dark:text-indigo-400'
+                        className={`px-2 py-2 font-extrabold tabular-nums ${
+                          isHighNight ? 'text-[#DC2626]' : 'text-[#3730A3]'
                         }`}
                       >
                         {stats.night}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono font-extrabold text-brand-primary bg-brand-primary/5">
+                      <td className="px-2 py-2 font-extrabold bg-[#F0FDFA] text-[#0F766E] tabular-nums">
                         {stats.totalWorked}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+                      <td className="px-2 py-2 font-bold text-[#15803D] tabular-nums">
                         {stats.off}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-purple-700 dark:text-purple-400 font-semibold">
+                      <td className="px-2 py-2 font-bold text-[#6D28D9] tabular-nums">
                         {stats.goff}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-rose-700 dark:text-rose-400 font-semibold">
+                      <td className="px-2 py-2 font-bold text-[#BE123C] tabular-nums">
                         {stats.leave}
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-3 py-2">
                         {isHighNight ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-400">
-                            <AlertTriangle className="h-3 w-3" />
-                            Heavy Night Load ({stats.night})
+                          <span className="inline-flex items-center gap-1 rounded-full tone-nd px-2 py-0.5 text-[10px] font-bold">
+                            ⚠ Heavy Night
                           </span>
                         ) : isLowWorked ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                            Low Shifts ({stats.totalWorked})
+                          <span className="inline-flex items-center gap-1 rounded-full tone-am px-2 py-0.5 text-[10px] font-bold">
+                            Low Shifts
                           </span>
                         ) : (
-                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center gap-1 rounded-full tone-leave px-2 py-0.5 text-[10px] font-bold">
                             ✓ Balanced
                           </span>
                         )}
@@ -517,7 +532,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -1,39 +1,9 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { getShiftToneClasses } from '@/shared/ui';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
 import { NewRequestForm } from './NewRequestForm';
-
-const VARIANT_STYLES: Record<string, { background: string; color: string; borderColor: string }> = {
-  am: { background: '#ecfdf5', color: '#047857', borderColor: '#34d399' },
-  pm: { background: '#fef3c7', color: '#b45309', borderColor: '#facc15' },
-  night: { background: '#fee2e2', color: '#b91c1c', borderColor: '#f87171' },
-  on: { background: '#fee2e2', color: '#b91c1c', borderColor: '#f87171' },
-  on1: { background: '#fee2e2', color: '#b91c1c', borderColor: '#f87171' },
-  on2: { background: '#fee2e2', color: '#b91c1c', borderColor: '#f87171' },
-  nd: { background: '#fee2e2', color: '#b91c1c', borderColor: '#f87171' },
-  pn: { background: '#f1f5f9', color: '#475569', borderColor: '#94a3b8' },
-  course: { background: '#dbeafe', color: '#1d4ed8', borderColor: '#60a5fa' },
-  off: { background: '#ede9fe', color: '#5b21b6', borderColor: '#a855f7' },
-  leave: { background: '#ede9fe', color: '#5b21b6', borderColor: '#a855f7' },
-  goff: { background: '#f3e8ff', color: '#6b21a8', borderColor: '#c084fc' },
-  al: { background: '#ede9fe', color: '#5b21b6', borderColor: '#a855f7' },
-  mc: { background: '#ffedd5', color: '#c2410c', borderColor: '#fb923c' },
-  el: { background: '#ffe4e6', color: '#be123c', borderColor: '#fb7185' },
-  hka: { background: '#f3e8ff', color: '#7c3aed', borderColor: '#c084fc' },
-  ghka: { background: '#e0e7ff', color: '#4338ca', borderColor: '#6366f1' },
-};
-
-function getVariantStyle(requestStr?: string) {
-  const key = (requestStr ?? '').toString().trim().toLowerCase();
-  return (
-    VARIANT_STYLES[key] ?? {
-      background: '#f8fafc',
-      color: '#0f172a',
-      borderColor: '#e2e8f0',
-    }
-  );
-}
 
 function formatDisplayDate(date: Date) {
   return date.toLocaleDateString(undefined, {
@@ -46,6 +16,7 @@ function formatDisplayDate(date: Date) {
 
 export interface DateDetailPanelProps {
   date: Date;
+  holidayName?: string;
   requests: RequestRecord[];
   selectedName: string;
   selectedStaffId: number;
@@ -73,6 +44,7 @@ export interface DateDetailPanelProps {
 
 export function DateDetailPanel({
   date,
+  holidayName,
   requests = [],
   selectedName,
   selectedStaffId,
@@ -95,7 +67,7 @@ export function DateDetailPanel({
 
   const handleClose = () => {
     setOpen(false);
-    setTimeout(() => onClose?.(), 300);
+    setTimeout(() => onClose?.(), 260);
   };
 
   useEffect(() => {
@@ -116,6 +88,7 @@ export function DateDetailPanel({
 
   const dateKey = toIsoDate(date);
   const displayDate = formatDisplayDate(date);
+  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
   const allDateRequests = requests.filter((r) => {
     const status = (r.status ?? '').toLowerCase();
@@ -153,34 +126,40 @@ export function DateDetailPanel({
         <div className="date-panel__handle" aria-hidden="true" />
 
         <div className="date-panel__header">
-          <div>
+          <div className="min-w-0">
             <p className="date-panel__header-eyebrow">
               {editingRequest ? 'Editing Request' : 'Date Details'}
+              {isWeekend ? ' · Weekend' : ''}
             </p>
             <h2 className="date-panel__header-title">{displayDate}</h2>
+            {holidayName ? (
+              <span className="mt-1 inline-flex items-center rounded-full border border-[#FECACA] bg-[#FFE4E6] px-2.5 py-0.5 text-[10px] font-extrabold text-[#BE123C]">
+                Public Holiday: {holidayName}
+              </span>
+            ) : null}
           </div>
           <button
             type="button"
-            className="date-panel__close-btn inline-flex items-center justify-center cursor-pointer hover:bg-slate-100 rounded-full p-1 transition-colors"
+            className="date-panel__close-btn"
             onClick={handleClose}
             aria-label="Close panel"
           >
-            <X className="h-5 w-5 text-slate-500" />
+            <X className="h-4 w-4 text-[#1C1917]" />
           </button>
         </div>
 
         <div className="date-panel__body">
-          {allDateRequests.length > 0 && (
-            <div className="date-panel__section">
+          {allDateRequests.length > 0 ? (
+            <div>
               <h3 className="date-panel__section-title">
                 {allDateRequests.length} request
                 {allDateRequests.length !== 1 ? 's' : ''} on this day
               </h3>
               <ul className="date-panel__request-list">
                 {allDateRequests.map((r) => {
-                  const style = getVariantStyle(r.request);
-                  const isOwn =
-                    selectedStaffId && r.staff_id && String(r.staff_id) === String(selectedStaffId);
+                  const isOwn = Boolean(
+                    selectedStaffId && r.staff_id && String(r.staff_id) === String(selectedStaffId),
+                  );
                   const canManage = isOwner || isOwn;
 
                   return (
@@ -192,12 +171,9 @@ export function DateDetailPanel({
                     >
                       <div className="date-panel__request-info flex-1">
                         <span
-                          className="date-panel__request-badge shrink-0"
-                          style={{
-                            background: style.background,
-                            color: style.color,
-                            borderColor: style.borderColor,
-                          }}
+                          className={`date-panel__request-badge shrink-0 ${getShiftToneClasses(
+                            r.request,
+                          )}`}
                         >
                           {r.request}
                         </span>
@@ -207,7 +183,7 @@ export function DateDetailPanel({
                         ) : null}
                       </div>
 
-                      {canManage && (
+                      {canManage ? (
                         <div className="date-panel__request-actions shrink-0">
                           <button
                             type="button"
@@ -224,17 +200,17 @@ export function DateDetailPanel({
                             Delete
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </li>
                   );
                 })}
               </ul>
             </div>
-          )}
+          ) : null}
 
-          {error && <div className="date-panel__error">{error}</div>}
+          {error ? <div className="date-panel__error">{error}</div> : null}
 
-          <div className="date-panel__section">
+          <div>
             <h3 className="date-panel__section-title">
               {editingRequest ? 'Update Request' : 'Add a Request'}
             </h3>

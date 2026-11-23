@@ -1,0 +1,60 @@
+/**
+ * Canonical Warm Editorial shift palette matching the interactive prototype.
+ */
+export function stripShiftModifiers(rawCode?: string): {
+  cleanShift: string;
+  isStandby: boolean;
+  isExtended: boolean;
+} {
+  if (!rawCode) {
+    return { cleanShift: '', isStandby: false, isExtended: false };
+  }
+  const upper = String(rawCode).trim().toUpperCase();
+  const isStandby = upper.includes('(S)') || upper.endsWith('-S');
+  const isExtended = upper.includes('(X)') || upper.endsWith('-X');
+  const cleanShift = upper.replace(/\(S\)|-S|\(X\)|-X/g, '').trim();
+  return { cleanShift, isStandby, isExtended };
+}
+
+export function getShiftToneClasses(rawCode?: string, isHonoredRequest = false): string {
+  const { cleanShift } = stripShiftModifiers(rawCode);
+  if (!cleanShift) {
+    return 'bg-transparent text-[#A8A29E] border border-transparent';
+  }
+
+  if (isHonoredRequest) {
+    if (cleanShift === 'AM' || cleanShift === 'OH') {
+      return 'bg-[#3F6212] text-white border border-[#365314] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+    }
+    if (cleanShift === 'PM') {
+      return 'bg-[#1D4ED8] text-white border border-[#1E40AF] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+    }
+    if (['ON1', 'ON2', 'ON', 'ND', 'NIGHT', 'PN'].includes(cleanShift)) {
+      return 'bg-[#BE185D] text-white border border-[#9D174D] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+    }
+    if (cleanShift === 'COURSE' || cleanShift === 'COURT' || cleanShift === 'MEDSB') {
+      return 'bg-[#D97706] text-white border border-[#B45309] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+    }
+    if (cleanShift === 'OFF' || cleanShift === 'GOFF') {
+      return 'bg-[#44403C] text-white border border-[#292524] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+    }
+    return 'bg-[#0F766E] text-white border border-[#115E59] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]';
+  }
+
+  if (cleanShift === 'AM' || cleanShift === 'OH') {
+    return 'bg-[#E5EED8] text-[#2D4A22] border border-[#C6D8B6]';
+  }
+  if (cleanShift === 'PM') {
+    return 'bg-[#DCE7F9] text-[#1E3A8A] border border-[#B8CEF2]';
+  }
+  if (['ON1', 'ON2', 'ON', 'ND', 'NIGHT', 'PN'].includes(cleanShift)) {
+    return 'bg-[#FCE7F1] text-[#9D174D] border border-[#F8B9D4]';
+  }
+  if (['AL', 'EL', 'MC', 'HKA', 'GHKA'].includes(cleanShift)) {
+    return 'bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]';
+  }
+  if (cleanShift === 'COURSE' || cleanShift === 'COURT' || cleanShift === 'MEDSB') {
+    return 'bg-[#FEF3C7] text-[#854D0E] border border-[#FDE047]';
+  }
+  return 'bg-[#F5F5F4] text-[#57534E] border border-[#E7E5E4]';
+}

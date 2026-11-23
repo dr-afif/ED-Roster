@@ -1,9 +1,11 @@
 export {
+  TEST_NORMAL_MO_USER,
   useAuth,
   useAuthBoundary,
   type AuthBootstrapStatus,
   type AuthBoundaryState,
   type AuthenticatedUserContext,
+  type TestPersonaMode,
   type UnapprovedReason,
 } from './authContext';
 export { AuthProvider } from './AuthProvider';

@@ -9,7 +9,7 @@ import {
   SupabaseProvider,
   type SupabaseRuntimeBundle,
 } from '@/platform/supabase';
-import { SurfaceCard } from '@/shared/ui';
+import { AppUiStateProvider, SurfaceCard } from '@/shared/ui';
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { createAppHashRouter } from './router';
 
@@ -75,7 +75,9 @@ export function App({ runtimeBundle, router, authState }: AppProps) {
       <SupabaseProvider bundle={bootResult.bundle}>
         <QueryProvider>
           <AuthProvider value={authState}>
-            <RouterProvider router={activeRouter} />
+            <AppUiStateProvider>
+              <RouterProvider router={activeRouter} />
+            </AppUiStateProvider>
           </AuthProvider>
         </QueryProvider>
       </SupabaseProvider>

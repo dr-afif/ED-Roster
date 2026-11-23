@@ -1,23 +1,38 @@
 import { useMemo, useState } from 'react';
+import { Skeleton } from '@/shared/ui';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = [
+  { short: 'M', full: 'Mon' },
+  { short: 'T', full: 'Tue' },
+  { short: 'W', full: 'Wed' },
+  { short: 'T', full: 'Thu' },
+  { short: 'F', full: 'Fri' },
+  { short: 'S', full: 'Sat' },
+  { short: 'S', full: 'Sun' },
+] as const;
 
 const REQUEST_CLASS_MAP: Record<string, string> = {
   am: 'req--am',
   oh: 'req--am',
   pm: 'req--pm',
+  on: 'req--night',
   on1: 'req--night',
   on2: 'req--night',
+  nd: 'req--night',
+  night: 'req--night',
   pn: 'req--night',
+  al: 'req--leave',
+  el: 'req--leave',
+  mc: 'req--leave',
+  hka: 'req--leave',
+  ghka: 'req--leave',
   course: 'req--course',
   court: 'req--course',
+  medsb: 'req--course',
   off: 'req--off',
   goff: 'req--off',
   leave: 'req--off',
-  hka: 'req--hka',
-  ghka: 'req--ghka',
-  al: 'req--off',
 };
 
 function buildCalendarMatrix(currentDate: Date): (Date | null)[][] {
@@ -38,8 +53,7 @@ function buildCalendarMatrix(currentDate: Date): (Date | null)[][] {
   for (let i = 0; i < cells.length; i += 1) {
     const wi = Math.floor(i / 7);
     if (!weeks[wi]) weeks[wi] = [];
-    const cell = cells[i] ?? null;
-    weeks[wi].push(cell);
+    weeks[wi].push(cells[i] ?? null);
   }
   return weeks;
 }
@@ -56,24 +70,35 @@ function getRequestVariant(value?: string | null): string {
 
 export interface CalendarViewProps {
   requests: RequestRecord[];
+  isLoading?: boolean;
   selectedDate: Date | null;
   onDateSelect: (date: Date) => void;
   publicHolidays?: Array<{ holiday_date: string; name: string }>;
+  selectedMonth?: Date;
+  onPrevMonth?: () => void;
+  onNextMonth?: () => void;
+  onOpenMonthPicker?: () => void;
   onMonthChange?: (date: Date) => void;
 }
 
 export function CalendarView({
   requests,
+  isLoading = false,
   selectedDate,
   onDateSelect,
   publicHolidays = [],
+  selectedMonth,
+  onPrevMonth,
+  onNextMonth,
+  onOpenMonthPicker,
   onMonthChange,
 }: CalendarViewProps) {
-  const [currentMonth, setCurrentMonth] = useState(() => {
+  const [internalMonth, setInternalMonth] = useState(() => {
     const now = new Date();
-    // Default to the upcoming month (1st of next month)
     return new Date(now.getFullYear(), now.getMonth() + 1, 1);
   });
+
+  const currentMonth = selectedMonth ?? internalMonth;
 
   const todayKey = useMemo(() => toIsoDate(new Date()), []);
   const selectedKey = selectedDate ? toIsoDate(selectedDate) : null;
@@ -108,69 +133,71 @@ export function CalendarView({
   });
 
   const handlePrevMonth = () => {
+    if (onPrevMonth) {
+      onPrevMonth();
+      return;
+    }
     const prev = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-    setCurrentMonth(prev);
+    setInternalMonth(prev);
     onMonthChange?.(prev);
   };
 
   const handleNextMonth = () => {
+    if (onNextMonth) {
+      onNextMonth();
+      return;
+    }
     const next = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-    setCurrentMonth(next);
+    setInternalMonth(next);
     onMonthChange?.(next);
-  };
-
-  const handleToday = () => {
-    const today = new Date();
-    const target = new Date(today.getFullYear(), today.getMonth(), 1);
-    setCurrentMonth(target);
-    onMonthChange?.(target);
   };
 
   return (
     <section
-      className="calendar rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+      className="calendar rounded-[24px] border border-[#E7E5E4] bg-white p-3 sm:p-4 shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]"
       aria-label="Roster Request Calendar"
     >
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Roster Calendar
-          </p>
-          <h2 className="text-2xl font-bold text-slate-900">{monthTitle}</h2>
-        </div>
+      <header className="flex items-center justify-between gap-2 pb-2.5">
+        <button
+          type="button"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-sm font-extrabold text-[#1C1917] transition hover:bg-[#EFECE6] cursor-pointer active:scale-[0.92]"
+          onClick={handlePrevMonth}
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            onClick={handlePrevMonth}
-            aria-label="Previous month"
-          >
-            ‹ Prev
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-indigo-300 bg-indigo-50 px-3.5 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            onClick={handleToday}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            onClick={handleNextMonth}
-            aria-label="Next month"
-          >
-            Next ›
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onOpenMonthPicker?.()}
+          title="Tap to pick month & year"
+          className="cursor-pointer rounded-xl px-3 py-0.5 text-center transition hover:bg-[#FAF8F5]"
+        >
+          <span className="sr-only">Roster Calendar</span>
+          <div className="text-[14px] sm:text-[15px] font-extrabold text-[#18181B]">
+            {monthTitle} <span className="text-[11px] text-[#0F766E]">▾</span>
+          </div>
+          <p className="text-[10.5px] font-semibold text-[#78716C]">
+            Tap any date to view or add request
+          </p>
+        </button>
+
+        <button
+          type="button"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-sm font-extrabold text-[#1C1917] transition hover:bg-[#EFECE6] cursor-pointer active:scale-[0.92]"
+          onClick={handleNextMonth}
+          aria-label="Next month"
+        >
+          ›
+        </button>
       </header>
 
-      <div className="calendar__frame mt-4">
+      <div className="calendar__frame mt-1">
         <div className="calendar__header">
-          {DAY_LABELS.map((label) => (
-            <div key={label} className="calendar__header-cell">
-              {label}
+          {DAY_LABELS.map((label, idx) => (
+            <div key={`${label.full}-${idx}`} className="calendar__header-cell">
+              <span className="sm:hidden">{label.short}</span>
+              <span className="hidden sm:inline">{label.full}</span>
             </div>
           ))}
         </div>
@@ -227,63 +254,62 @@ export function CalendarView({
                   year: 'numeric',
                 })}${isHoliday ? ` - Public Holiday: ${holidayName}` : ''}`}
               >
-                <div className="calendar__cell-header w-full flex-col items-start gap-0.5">
-                  <div className="flex w-full items-start justify-between">
-                    <span className={dateClasses}>{dayNumber}</span>
-                  </div>
-                  {holidayName && (
+                <div className="calendar__cell-header">
+                  <span className={dateClasses}>{dayNumber}</span>
+                  {holidayName ? (
                     <span
-                      className="mt-0.5 block max-w-full truncate rounded border border-rose-100 bg-rose-50 px-1 py-0.5 text-[8px] font-extrabold uppercase leading-none text-rose-600 sm:text-[9px]"
+                      className="max-w-full truncate rounded-[4px] bg-[#FFE4E6] px-1 py-0.5 text-center text-[6.5px] sm:text-[8px] font-extrabold leading-[1.1] text-[#BE123C]"
                       title={holidayName}
                     >
                       {holidayName}
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="calendar__requests">
-                  {dayRequests.map((entry) => {
-                    const variantClass = getRequestVariant(entry.request);
-                    const isSaving = entry.isOptimistic;
-                    const chipClasses = [
-                      'req',
-                      variantClass,
-                      isSaving ? 'animate-pulse opacity-60 ring-2 ring-indigo-400' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ');
+                  {isLoading && dayRequests.length === 0 ? (
+                    <>
+                      <Skeleton className="h-3.5 w-full" rounded="sm" />
+                      {dayNumber % 2 === 0 ? (
+                        <Skeleton className="h-3.5 w-3/4" rounded="sm" />
+                      ) : null}
+                    </>
+                  ) : (
+                    dayRequests.map((entry) => {
+                      const variantClass = getRequestVariant(entry.request);
+                      const isSaving = entry.isOptimistic;
+                      const shortDoctor = (entry.name || '').replace(/^Dr\.?\s+/i, '');
+                      const chipClasses = [
+                        'req',
+                        variantClass,
+                        isSaving ? 'skeleton-shimmer opacity-80 ring-2 ring-[#0F766E]' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
 
-                    return (
-                      <div
-                        key={entry.id ?? `${entry.name}-${entry.date}-${entry.request}`}
-                        className={chipClasses}
-                        title={isSaving ? 'Saving...' : entry.comment || undefined}
-                      >
-                        <span className="req__tag">{entry.request}</span>
-                        {entry.name ? (
-                          <span className="req__name">
-                            <span className="hidden sm:inline">&bull; </span>
-                            {entry.name}
-                          </span>
-                        ) : null}
-                        {entry.comment ? (
-                          <span className="req__comment" role="tooltip">
-                            {entry.comment}
-                          </span>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div
+                          key={entry.id ?? `${entry.name}-${entry.date}-${entry.request}`}
+                          className={chipClasses}
+                          title={isSaving ? 'Saving...' : entry.comment || undefined}
+                        >
+                          <span className="req__tag">{entry.request}</span>
+                          {shortDoctor ? <span className="req__name">{shortDoctor}</span> : null}
+                          {entry.comment ? (
+                            <span className="req__comment" role="tooltip">
+                              {entry.comment}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </button>
             );
           })}
         </div>
       </div>
-
-      <p className="mt-3 text-center text-xs text-slate-500">
-        Tap any date to view or add a request
-      </p>
     </section>
   );
 }

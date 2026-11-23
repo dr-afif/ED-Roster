@@ -55,28 +55,31 @@ export interface MonthlyStatsItem {
 }
 
 export const DAILY_LIMIT = 3;
+export const ON1_DAILY_LIMIT = 1;
 export const DEFAULT_MONTHLY_LIMIT = 10;
 export const DEFAULT_MONTHLY_WEEKEND_LIMIT = 4;
 
 export const DEFAULT_LIMIT_GROUPS: LimitGroup[] = [
   { ID: 'OFF', GroupName: 'OFF / Leave', DefaultLimit: DAILY_LIMIT },
+  { ID: 'ON1', GroupName: 'ON1 Night Duty', DefaultLimit: ON1_DAILY_LIMIT },
 ];
 
 export const DEFAULT_SHIFT_TYPES: ShiftTypeDefinition[] = [
   { ID: 'AM', Name: 'AM', GroupID: null, IsPublic: true },
   { ID: 'PM', Name: 'PM', GroupID: null, IsPublic: true },
-  { ID: 'ON1', Name: 'ON1', GroupID: null, IsPublic: true },
+  { ID: 'ON1', Name: 'ON1', GroupID: 'ON1', IsPublic: true },
   { ID: 'OFF', Name: 'OFF', GroupID: 'OFF', IsPublic: true },
   { ID: 'AL', Name: 'AL', GroupID: 'OFF', IsPublic: true },
   { ID: 'HKA', Name: 'HKA', GroupID: 'OFF', IsPublic: true },
-  { ID: 'GHKA', Name: 'GHKA', GroupID: null, IsPublic: true },
-  { ID: 'COURSE', Name: 'COURSE', GroupID: null, IsPublic: true },
+  { ID: 'GHKA', Name: 'GHKA', GroupID: 'OFF', IsPublic: true },
+  { ID: 'COURSE', Name: 'COURSE', GroupID: 'OFF', IsPublic: true },
+  { ID: 'MEDSB', Name: 'MEDSB', GroupID: null, IsPublic: true },
 ];
 
 export const ADMIN_ALL_SHIFT_TYPES: ShiftTypeDefinition[] = [
   { ID: 'AM', Name: 'AM', GroupID: null, IsPublic: true },
   { ID: 'PM', Name: 'PM', GroupID: null, IsPublic: true },
-  { ID: 'ON1', Name: 'ON1', GroupID: null, IsPublic: true },
+  { ID: 'ON1', Name: 'ON1', GroupID: 'ON1', IsPublic: true },
   { ID: 'ON2', Name: 'ON2', GroupID: null, IsPublic: false },
   { ID: 'PN', Name: 'PN', GroupID: null, IsPublic: false },
   { ID: 'OH', Name: 'OH', GroupID: null, IsPublic: false },
@@ -87,8 +90,9 @@ export const ADMIN_ALL_SHIFT_TYPES: ShiftTypeDefinition[] = [
   { ID: 'MC', Name: 'MC', GroupID: 'OFF', IsPublic: false },
   { ID: 'EL', Name: 'EL', GroupID: 'OFF', IsPublic: false },
   { ID: 'HKA', Name: 'HKA', GroupID: 'OFF', IsPublic: true },
-  { ID: 'GHKA', Name: 'GHKA', GroupID: null, IsPublic: true },
-  { ID: 'COURSE', Name: 'COURSE', GroupID: null, IsPublic: true },
+  { ID: 'GHKA', Name: 'GHKA', GroupID: 'OFF', IsPublic: true },
+  { ID: 'COURSE', Name: 'COURSE', GroupID: 'OFF', IsPublic: true },
+  { ID: 'MEDSB', Name: 'MEDSB', GroupID: null, IsPublic: true },
 ];
 
 export function toIsoDate(dateLike: Date | string | null | undefined): string {
@@ -322,6 +326,7 @@ export function getMonthLabel(yearMonthKey: string): string {
 export function getMonthlyStatsForUser({
   requests = [],
   selectedName,
+  selectedStaffId,
   settings = {},
   shiftTypes = DEFAULT_SHIFT_TYPES,
   limitGroups = DEFAULT_LIMIT_GROUPS,
@@ -329,6 +334,7 @@ export function getMonthlyStatsForUser({
 }: {
   requests?: RequestRecord[];
   selectedName?: string;
+  selectedStaffId?: number | string;
   settings?: {
     monthly_request_limit?: number | string;
     monthly_weekend_limit?: number | string;
@@ -338,19 +344,22 @@ export function getMonthlyStatsForUser({
   limitGroups?: LimitGroup[];
   calendarMonth?: Date;
 } = {}): MonthlyStatsItem[] {
-  if (
-    !selectedName ||
-    selectedName.trim().toLowerCase() === 'admin' ||
-    selectedName.trim().toLowerCase() === 'guest'
-  ) {
+  if (!selectedName && !selectedStaffId) {
+    return [];
+  }
+  if (selectedName && selectedName.trim().toLowerCase() === 'guest') {
     return [];
   }
 
-  const targetName = selectedName.trim().toLowerCase();
+  const targetName = (selectedName || '').trim().toLowerCase();
   const userActiveRequests = (requests ?? []).filter((request) => {
-    const isUser = request.name && request.name.trim().toLowerCase() === targetName;
-    const isActive = (request.status ?? '').toLowerCase() === 'active';
-    return isUser && isActive;
+    const status = (request.status ?? '').toLowerCase();
+    const isActive = status === 'active' || status === 'submitted' || status === 'approved';
+    if (!isActive) return false;
+    if (selectedStaffId != null && request.staff_id != null) {
+      if (String(request.staff_id) === String(selectedStaffId)) return true;
+    }
+    return Boolean(targetName && request.name && request.name.trim().toLowerCase() === targetName);
   });
 
   const limitGroupIdByShiftType = buildLimitGroupIdByShiftType(shiftTypes);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RosterPeriodRoute } from '../routes/RosterPeriodRoute';
@@ -7,8 +7,10 @@ import { AuthContext, type AuthBoundaryState } from '@/platform/auth/authContext
 
 const mockUpsertMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockBatchSaveDraftMutate = vi.fn();
 
 vi.mock('../data/rosterQueries', () => ({
+  usePeriodShiftRequestsQuery: () => ({ data: [], isLoading: false }),
   useRosterPeriodQuery: () => ({
     data: {
       id: 1,
@@ -238,6 +240,10 @@ vi.mock('../data/rosterQueries', () => ({
     mutate: mockDeleteMutate,
     isPending: false,
   }),
+  useBatchSaveDraftAssignmentsMutation: () => ({
+    mutate: mockBatchSaveDraftMutate,
+    isPending: false,
+  }),
   usePlannedAssignmentsQuery: () => ({
     data: [],
     isLoading: false,
@@ -325,26 +331,27 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
     renderRosterWorkspace('owner');
 
     expect(screen.getByRole('heading', { level: 1, name: /January 2027 Roster/i })).toBeDefined();
-    expect(screen.getByText('PLANNING')).toBeDefined();
-    expect(screen.getByText(/Policy B \(Nights: 1 OFF \/ No Nights: 2 OFFs\)/i)).toBeDefined();
+    expect(screen.getByText(/31 Days · Planning/i)).toBeDefined();
+    expect(screen.getByText(/Read-Only Protection Active/i)).toBeDefined();
     expect(screen.getByText('Dr Afif')).toBeDefined();
     expect(screen.getByText('Dr Siti')).toBeDefined();
   });
 
-  it('renders density switcher and search filter', () => {
+  it('enforces Read-Only Protection Lock until owner clicks Edit Roster', () => {
     renderRosterWorkspace('owner');
 
-    const searchInput = screen.getByPlaceholderText(/search staff/i);
-    expect(searchInput).toBeDefined();
+    const amCell = screen.getByTitle(/Dr Afif on 2027-01-04: AM/i);
+    fireEvent.click(amCell);
 
-    // Filter to Dr Siti
-    fireEvent.change(searchInput, { target: { value: 'Siti' } });
-    expect(screen.getByText('Dr Siti')).toBeDefined();
-    expect(screen.queryByText('Dr Afif')).toBeNull();
+    // Locked by default: ShiftPickerModal does not open
+    expect(screen.queryByRole('dialog')).toBeNull();
 
-    // Clear filter
-    fireEvent.click(screen.getByText('Clear'));
-    expect(screen.getByText('Dr Afif')).toBeDefined();
+    // Unlock editing
+    const editBtn = screen.getByRole('button', { name: /Edit Roster/i });
+    fireEvent.click(editBtn);
+
+    expect(screen.getByText(/Edit Mode:/i)).toBeDefined();
+    expect(screen.getByRole('button', { name: /Done Editing/i })).toBeDefined();
   });
 
   it('renders rules guidance panel with live issues', () => {
@@ -356,24 +363,31 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
   it('opens ShiftPickerModal when clicking a cell as owner and assigns a shift', () => {
     renderRosterWorkspace('owner');
 
+    // Unlock Read-Only Protection first
+    fireEvent.click(screen.getByRole('button', { name: /Edit Roster/i }));
+
     // Find the cell with 'AM'
     const amCell = screen.getByTitle(/Dr Afif on 2027-01-04: AM/i);
     fireEvent.click(amCell);
 
     // Modal opens
-    expect(screen.getByRole('dialog')).toBeDefined();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeDefined();
     expect(screen.getByRole('heading', { level: 2, name: /Assign Shift/i })).toBeDefined();
     expect(screen.getByText(/Dr Afif \(MO-01\) · 2027-01-04/i)).toBeDefined();
 
-    // Click 'PM' pill
-    const pmButton = screen.getByRole('button', { name: /^PM/i });
+    // Click 'PM' tile inside modal and save
+    const pmButton = within(dialog).getByRole('button', { name: /^PM/i });
     fireEvent.click(pmButton);
+    fireEvent.click(within(dialog).getByRole('button', { name: /Save Shift/i }));
 
-    expect(mockUpsertMutate).toHaveBeenCalledWith({
-      staffId: 1,
-      dutyDate: '2027-01-04',
-      shiftCode: 'PM',
-    });
+    expect(mockUpsertMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staffId: 1,
+        dutyDate: '2027-01-04',
+        shiftCode: 'PM',
+      }),
+    );
   });
 
   it('does not render a manual Publish Roster button in planning mode as roster auto-enforces upon month arrival', () => {
@@ -381,5 +395,44 @@ describe('RosterPeriodRoute (Draft Workspace & Rules Engine UI)', () => {
 
     const publishBtn = screen.queryByRole('button', { name: /Publish Roster/i });
     expect(publishBtn).toBeNull();
+  });
+
+  it('supports keyboard shortcuts and Shift+Arrow multi-cell fill in Fast Edit mode without network calls until Save Changes', () => {
+    mockUpsertMutate.mockClear();
+    mockDeleteMutate.mockClear();
+    mockBatchSaveDraftMutate.mockClear();
+
+    renderRosterWorkspace('owner');
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit Roster/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Fast Edit/i }));
+
+    expect(screen.getByText(/Fast Editing Mode Active \(Table\)/i)).toBeInTheDocument();
+
+    const cell = document.querySelector('td[data-cell-key="1:2027-01-01"]');
+    if (!cell) throw new Error('Expected cell 1:2027-01-01');
+    fireEvent.click(cell);
+
+    // Extend selection 1 column right with Shift + ArrowRight and press 'a' for AM
+    fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true });
+    fireEvent.keyDown(window, { key: 'a' });
+
+    // Nothing sent over the network yet
+    expect(mockUpsertMutate).not.toHaveBeenCalled();
+    expect(mockBatchSaveDraftMutate).not.toHaveBeenCalled();
+    expect(screen.getByText(/2 unsaved changes/i)).toBeInTheDocument();
+
+    // Clicking Save Changes dispatches the batch save
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/i }));
+    expect(mockBatchSaveDraftMutate).toHaveBeenCalledWith(
+      {
+        upserts: [
+          { staffId: 1, dutyDate: '2027-01-01', shiftCode: 'AM' },
+          { staffId: 1, dutyDate: '2027-01-02', shiftCode: 'AM' },
+        ],
+        deletes: [],
+      },
+      expect.any(Object),
+    );
   });
 });

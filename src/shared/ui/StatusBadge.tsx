@@ -11,7 +11,7 @@ type StatusBadgeProps = {
 const TONE_STYLES: Record<BadgeTone, string> = {
   neutral: 'bg-surface-muted text-text-secondary border-border-subtle',
   brand: 'bg-brand-primary-soft text-brand-primary border-brand-primary/25',
-  teal: 'bg-brand-secondary-soft text-brand-secondary border-brand-secondary/25',
+  teal: 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4]',
   success: 'bg-success-soft text-success border-success-border',
   warning: 'bg-warning-soft text-warning border-warning-border',
   danger: 'bg-danger-soft text-danger border-danger-border',

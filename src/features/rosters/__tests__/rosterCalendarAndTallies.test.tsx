@@ -75,12 +75,12 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
 
     expect(screen.getByText('DATE')).toBeInTheDocument();
     expect(screen.getByText('DAY')).toBeInTheDocument();
-    expect(screen.getByText(/MEDICAL OFFICER \(ON DUTY\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/EMERGENCY PHYSICIAN \(SPECIALIST\)/i)).toBeInTheDocument();
+    expect(screen.getByText('MEDICAL OFFICER')).toBeInTheDocument();
+    expect(screen.getByText('EMERGENCY PHYSICIAN')).toBeInTheDocument();
 
-    // Verify MO and EP assignments for Day 1
-    expect(screen.getAllByText('Dr Siti').length).toBeGreaterThan(0);
-    expect(screen.getByText('Dr Tan')).toBeInTheDocument();
+    // Verify MO and EP assignments for Day 1 (uppercase short names rendered)
+    expect(screen.getAllByText('Siti').length).toBeGreaterThan(0);
+    expect(screen.getByText('Tan')).toBeInTheDocument();
     expect(screen.getAllByText('Dr Afif').length).toBeGreaterThan(0);
     expect(screen.getByText("New Year's Day")).toBeInTheDocument();
   });
@@ -103,30 +103,91 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
     );
 
     // In default view mode, painter toolbar is NOT visible
-    expect(screen.queryByText(/Emergency Physician Quick Stamp & Painter/i)).toBeNull();
+    expect(screen.queryByText(/EP 1-Click Painter/i)).toBeNull();
 
     // Enter Edit EP Mode
-    const editEpBtn = screen.getByRole('button', { name: /Edit EP Schedule/i });
+    const editEpBtn = screen.getByRole('button', { name: /Edit EP/i });
     fireEvent.click(editEpBtn);
 
-    expect(screen.getByText(/Emergency Physician Quick Stamp & Painter/i)).toBeInTheDocument();
+    expect(screen.getByText(/EP 1-Click Painter/i)).toBeInTheDocument();
 
     // Select Dr Afif stamp
-    const epStampBtn = screen.getByRole('button', { name: /Dr Afif/i });
+    const epStampBtn = screen.getByRole('button', { name: /^Dr Afif$/i });
     fireEvent.click(epStampBtn);
 
-    expect(screen.getByText(/Active Stamp: Dr Afif/i)).toBeInTheDocument();
+    expect(screen.getByText(/Active: Dr Afif/i)).toBeInTheDocument();
 
     // Batch fill weekdays
-    const fillWeekdaysBtn = screen.getByRole('button', { name: /Fill Weekdays/i });
+    const fillWeekdaysBtn = screen.getByRole('button', { name: /Fill Weekdays \(OH\)/i });
     fireEvent.click(fillWeekdaysBtn);
 
     expect(mockBatchUpdate).toHaveBeenCalledTimes(1);
 
     // Done editing exits edit mode
-    const doneBtn = screen.getByRole('button', { name: /Done Editing EP/i });
+    const doneBtn = screen.getByRole('button', { name: /Done EP/i });
     fireEvent.click(doneBtn);
-    expect(screen.queryByText(/Emergency Physician Quick Stamp & Painter/i)).toBeNull();
+    expect(screen.queryByText(/EP 1-Click Painter/i)).toBeNull();
+  });
+
+  it('auto-saves and deselects an active EP inline edit cell when clicking outside', () => {
+    const mockUpdate = vi.fn();
+
+    render(
+      <RosterCalendarView
+        periodDates={periodDates}
+        staffList={staffList}
+        assignments={assignments}
+        epAssignments={epAssignments}
+        holidays={holidays}
+        isEditable={true}
+        onUpdateEpAssignment={mockUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit EP/i }));
+
+    // Open inline editor on the first EP Office Hour (AM) cell
+    const ohCells = screen.getAllByTitle('Tap to add/remove EP Office Hour (AM)');
+    const firstCell = ohCells[0];
+    if (!firstCell) throw new Error('Expected at least one EP Office Hour cell');
+    fireEvent.click(firstCell);
+
+    const input = screen.getByPlaceholderText('Dr. ...');
+    expect(input).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Dr Nurul' } });
+
+    // Click outside the active cell
+    fireEvent.mouseDown(document.body);
+
+    expect(mockUpdate).toHaveBeenCalledWith('2027-01-01', 'EP_OFFICE_HOUR', 'Dr Nurul');
+    expect(screen.queryByPlaceholderText('Dr. ...')).toBeNull();
+  });
+
+  it('renders unified Printable Monthly Duty Roster Sheet without Daily Card Feed on mobile viewport', () => {
+    const origInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 });
+    try {
+      render(
+        <RosterCalendarView
+          periodDates={periodDates}
+          staffList={staffList}
+          assignments={assignments}
+          epAssignments={epAssignments}
+          holidays={holidays}
+          isEditable={false}
+        />,
+      );
+
+      expect(screen.getByText('MEDICAL OFFICER')).toBeInTheDocument();
+      expect(screen.queryByText(/Daily Card Feed/i)).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: origInnerWidth,
+      });
+    }
   });
 });
 
@@ -189,7 +250,7 @@ describe('RosterTallyTables (Daily Coverage & Member Tallies)', () => {
     fireEvent.click(toggleBtn);
 
     expect(screen.getByText('Doctor Name')).toBeInTheDocument();
-    expect(screen.getByText('Total Worked')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Total\s*Worked/i })).toBeInTheDocument();
     expect(screen.getByText('Dr Afif')).toBeInTheDocument();
     expect(screen.getByText('Dr Siti')).toBeInTheDocument();
   });

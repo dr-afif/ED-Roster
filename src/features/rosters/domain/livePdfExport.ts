@@ -39,9 +39,7 @@ function renderContactRows(contacts: readonly LivePdfContact[] = []): string {
     .map((contact) => {
       const displayName = contact.name || DASH;
       const name =
-        displayName === DASH || /^dr\.?\s/i.test(displayName)
-          ? displayName
-          : `Dr. ${displayName}`;
+        displayName === DASH || /^dr\.?\s/i.test(displayName) ? displayName : `Dr. ${displayName}`;
       const phone = String(contact.phone || DASH).toUpperCase();
       return `
       <div class="contact-row">
@@ -62,6 +60,7 @@ export interface LivePdfCalendarRow {
   moNight?: string;
   epAm?: string;
   epOncall?: string;
+  epPassive?: string;
 }
 
 function renderCalendarTable({
@@ -71,10 +70,24 @@ function renderCalendarTable({
   rosterType: string;
   rows: readonly LivePdfCalendarRow[];
 }): string {
-  const isEpOnly = rosterType === 'EP ROSTER';
+  const isEpPlus = rosterType === 'EP+ ROSTER';
+  const isEpOnly = rosterType === 'EP ROSTER' || isEpPlus;
 
-  const header = isEpOnly
+  const header = isEpPlus
     ? `
+      <tr>
+        <th rowspan="2" class="date-col">DATE</th>
+        <th rowspan="2" class="day-col">DAY</th>
+        <th colspan="3">EMERGENCY PHYSICIAN</th>
+      </tr>
+      <tr>
+        <th>AM<br><span>8AM-4PM</span></th>
+        <th>ONCALL<br><span>4PM-8AM</span></th>
+        <th>OFFICE HOUR<br><span>8AM-5PM</span></th>
+      </tr>
+    `
+    : isEpOnly
+      ? `
       <tr>
         <th rowspan="2" class="date-col">DATE</th>
         <th rowspan="2" class="day-col">DAY</th>
@@ -85,7 +98,7 @@ function renderCalendarTable({
         <th>ONCALL<br><span>4PM-8AM</span></th>
       </tr>
     `
-    : `
+      : `
       <tr>
         <th rowspan="2" class="date-col">DATE</th>
         <th rowspan="2" class="day-col">DAY</th>
@@ -108,6 +121,18 @@ function renderCalendarTable({
         rowClassAttr = ' class="holiday"';
       } else if (row.day === 'SAT' || row.day === 'SUN') {
         rowClassAttr = ' class="weekend"';
+      }
+
+      if (isEpPlus) {
+        return `
+        <tr${rowClassAttr}>
+          <td>${escapeHtml(row.date)}</td>
+          <td>${escapeHtml(row.day)}</td>
+          <td>${formatCell(row.epAm)}</td>
+          <td>${formatCell(row.epOncall)}</td>
+          <td>${formatCell(row.epPassive)}</td>
+        </tr>
+      `;
       }
 
       if (isEpOnly) {
@@ -150,7 +175,7 @@ function renderContacts({
   rosterType: string;
   contacts: { mo?: readonly LivePdfContact[]; ep?: readonly LivePdfContact[] };
 }): string {
-  if (rosterType === 'EP ROSTER') {
+  if (rosterType === 'EP ROSTER' || rosterType === 'EP+ ROSTER') {
     return `
       <section class="contact-grid single">
         <div class="contact-box">
@@ -349,7 +374,7 @@ function renderPlanningFooter({
 
 export interface LivePdfExportOptions {
   mainTitle?: string;
-  rosterType?: 'MO & EP ROSTER' | 'MO ROSTER' | 'EP ROSTER' | string;
+  rosterType?: 'MO & EP ROSTER' | 'MO ROSTER' | 'EP ROSTER' | 'EP+ ROSTER' | string;
   monthYear?: string;
   version?: string;
   notes?: string;
@@ -380,6 +405,7 @@ export function buildPrintDocument({
 }: LivePdfExportOptions): string {
   const dateLine = `${monthYear || ''} ${version || ''}`.trim();
   const isLandscape = rosterType === 'MO ROSTER' || rosterType === 'SPREADSHEET ROSTER';
+  const isEpOnlySheet = rosterType === 'EP ROSTER' || rosterType === 'EP+ ROSTER';
 
   // Extract public holidays for the month if it's landscape (spreadsheet)
   let holidaysHtml = '';
@@ -469,6 +495,9 @@ export function buildPrintDocument({
             width: 145mm;
             transform-origin: top center;
           }
+          .scale-target.ep-only {
+            width: 198mm;
+          }
           .scale-target.landscape {
             width: 285mm;
           }
@@ -478,6 +507,23 @@ export function buildPrintDocument({
             display: flex;
             flex-direction: column;
             gap: 2.4mm;
+          }
+          .sheet.ep-only {
+            width: 198mm;
+            align-items: center;
+          }
+          .sheet.ep-only .header {
+            border-bottom: 0;
+            padding-bottom: 0;
+            margin-bottom: 1.5mm;
+          }
+          .sheet.ep-only .logo {
+            position: static;
+            transform: none;
+            display: block;
+            margin: 0 auto 1.5mm;
+            max-height: 11mm;
+            max-width: 11mm;
           }
           .sheet.landscape {
             width: 285mm;
@@ -546,15 +592,31 @@ export function buildPrintDocument({
             opacity: 0.9;
           }
           .roster-table tr.weekend {
-            background: #f8fafc;
+            background: #e2e8f0;
           }
           .roster-table tr.holiday {
-            background: #fee2e2;
+            background: #fecaca;
           }
           .date-col { width: 14mm; }
           .day-col { width: 14mm; }
-          .ep-only .date-col,
-          .ep-only .day-col { width: 22mm; }
+          .roster-table.ep-only {
+            width: auto;
+            min-width: 72mm;
+            margin: 0 auto;
+            table-layout: auto;
+          }
+          .roster-table.ep-only th,
+          .roster-table.ep-only td {
+            padding: 1.5px 4mm;
+            white-space: nowrap;
+          }
+          .roster-table.ep-only .date-col,
+          .roster-table.ep-only .day-col,
+          .roster-table.ep-only tbody td:nth-child(1),
+          .roster-table.ep-only tbody td:nth-child(2) {
+            width: auto;
+            padding: 1.5px 2.2mm;
+          }
 
           /* Landscape Spreadsheet Table */
           .spreadsheet-table {
@@ -575,6 +637,7 @@ export function buildPrintDocument({
           .spreadsheet-table th {
             background: #1e293b;
             color: #ffffff;
+            font-size: 6px;
             font-weight: 800;
           }
           .spreadsheet-table th.weekend-header {
@@ -584,10 +647,10 @@ export function buildPrintDocument({
             background: #991b1b;
           }
           .spreadsheet-table td.weekend-cell {
-            background: #f1f5f9;
+            background: #e2e8f0;
           }
           .spreadsheet-table td.holiday-cell {
-            background: #fee2e2;
+            background: #fecaca;
           }
           .day-num {
             font-size: 6px;
@@ -601,6 +664,10 @@ export function buildPrintDocument({
             width: 35mm;
             min-width: 35mm;
             max-width: 35mm;
+            font-size: 6px;
+            letter-spacing: 0.4px;
+            text-align: left !important;
+            padding-left: 3px !important;
           }
           .spreadsheet-name-cell {
             width: 35mm;
@@ -685,7 +752,7 @@ export function buildPrintDocument({
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-top: auto;
+            margin-top: 3mm;
             padding-top: 1.5mm;
             gap: 4mm;
           }
@@ -813,7 +880,8 @@ export function buildPrintDocument({
           }
           .contact-grid.single {
             grid-template-columns: 1fr;
-            width: 62mm;
+            width: 66mm;
+            margin-top: 4mm;
           }
           .contact-box {
             border: 1px solid #111827;
@@ -875,8 +943,8 @@ export function buildPrintDocument({
       <body>
         <main class="page ${isLandscape ? 'landscape' : ''}">
           <div class="scale-frame ${isLandscape ? 'landscape' : ''}">
-            <div class="scale-target ${isLandscape ? 'landscape' : ''}" id="scaleTarget">
-              <section class="sheet ${isLandscape ? 'landscape' : ''}" id="sheet">
+            <div class="scale-target ${isLandscape ? 'landscape' : isEpOnlySheet ? 'ep-only' : ''}" id="scaleTarget">
+              <section class="sheet ${isLandscape ? 'landscape' : isEpOnlySheet ? 'ep-only' : ''}" id="sheet">
                 <header class="header">
                   <div class="headline">
                     ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="">` : ''}

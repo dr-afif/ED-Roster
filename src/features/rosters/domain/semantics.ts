@@ -120,6 +120,13 @@ export const CANONICAL_SHIFT_SEMANTICS: readonly ShiftSemanticDefinition[] = [
     nightPolicyBQualifying: false,
     displacesOffEarnsGoff: false,
   },
+  {
+    shiftCode: 'MEDSB',
+    semanticClass: 'worked',
+    providesCoverage: false,
+    nightPolicyBQualifying: false,
+    displacesOffEarnsGoff: true,
+  },
 ];
 
 /**

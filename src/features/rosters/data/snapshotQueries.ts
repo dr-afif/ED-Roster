@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/platform/query';
 import { supabase } from '@/platform/supabase';
-import type { Database, Json } from '@/platform/supabase';
+import type { Database } from '@/platform/supabase';
 import { computeSha256Hex } from '@/shared/crypto/sha256';
 import { generateRosterPdf } from '../domain/pdfGenerator';
 import type { Assignment, StaffRosterIdentity } from '../domain/types';
@@ -95,30 +95,56 @@ export function useArchiveRosterSnapshotMutation(periodId: number) {
         canonicalHash,
       });
 
-      // 3. Stable Drive IDs (resilient folder structure from 06_GOOGLE_DRIVE_DOCUMENTS.md)
-      const driveFileId = `drive_${pdfResult.pdfSha256.slice(0, 16)}`;
-      const driveParentId = `02_Rosters_${payload.period.year}_${payload.period.month.padStart(2, '0')}`;
+      // 3. Invoke Edge Function to upload PDF to Google Drive + record snapshot atomically
+      let binary = '';
+      for (let i = 0; i < pdfResult.pdfBytes.length; i += 1) {
+        binary += String.fromCharCode(pdfResult.pdfBytes[i] ?? 0);
+      }
+      const pdfBase64 = btoa(binary);
 
-      // 4. Atomically record snapshot and catalog entry via RPC
-      const { data, error } = await supabase.rpc('create_or_get_roster_snapshot', {
-        p_period_id: periodId,
-        p_source_revision: payload.period.revision,
-        p_canonical_payload: {
-          ...canonicalPayload,
-          size_bytes: pdfResult.pdfBytes.length,
-        } as unknown as Json,
-        p_canonical_hash: canonicalHash,
-        p_pdf_sha256: pdfResult.pdfSha256,
-        p_drive_file_id: driveFileId,
-        p_drive_parent_id: driveParentId,
-        p_file_name: pdfResult.fileName,
-        p_reason: payload.reason ?? undefined,
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke<{
+        snapshot: RosterSnapshotRow;
+        driveFileId: string;
+        driveParentId: string;
+      }>('archive-roster-snapshot', {
+        body: {
+          periodId,
+          fileName: pdfResult.fileName,
+          pdfBase64,
+          year: payload.period.year,
+          month: payload.period.month,
+          periodStart: payload.period.periodStart,
+          revision: payload.period.revision,
+          canonicalPayload: {
+            ...canonicalPayload,
+            size_bytes: pdfResult.pdfBytes.length,
+          },
+          canonicalHash,
+          pdfSha256: pdfResult.pdfSha256,
+          reason: payload.reason,
+        },
       });
 
-      if (error) throw error;
+      if (fnErr) {
+        let detailedMsg = fnErr.message || 'Archive Edge Function failed';
+        try {
+          const ctx = (fnErr as { context?: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const errBody = (await ctx.json()) as { error?: string };
+            if (errBody?.error) detailedMsg = errBody.error;
+          }
+        } catch {
+          // Ignore JSON parse failures on error context
+        }
+        throw new Error(detailedMsg);
+      }
+
+      if (!fnData?.snapshot) {
+        throw new Error('Archive Edge Function returned no snapshot record.');
+      }
 
       return {
-        snapshot: data as unknown as RosterSnapshotRow,
+        snapshot: fnData.snapshot,
         pdfResult,
       };
     },
@@ -148,19 +174,35 @@ export function useSendToTelegramMutation() {
   return useMutation({
     mutationFn: async (payload: SendToTelegramPayload) => {
       const idempotencyKey = crypto.randomUUID();
-      const targetChatId = payload.chatId || 'OWNER_PRIVATE_CHAT';
-      const simulatedMsgId = `tg_msg_${Date.now()}`;
-
-      const { data, error } = await supabase.rpc('record_snapshot_delivery', {
-        p_snapshot_id: payload.snapshotId,
-        p_idempotency_key: idempotencyKey,
-        p_telegram_chat_id: targetChatId,
-        p_telegram_message_id: simulatedMsgId,
-        p_status: 'sent',
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke<{
+        delivery: SnapshotDeliveryRow;
+      }>('send-snapshot-telegram', {
+        body: {
+          snapshotId: payload.snapshotId,
+          idempotencyKey,
+          caption: payload.caption,
+        },
       });
 
-      if (error) throw error;
-      return data;
+      if (fnErr) {
+        let detailedMsg = fnErr.message || 'Telegram Edge Function failed';
+        try {
+          const ctx = (fnErr as { context?: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const errBody = (await ctx.json()) as { error?: string };
+            if (errBody?.error) detailedMsg = errBody.error;
+          }
+        } catch {
+          // Ignore JSON parse failures on error context
+        }
+        throw new Error(detailedMsg);
+      }
+
+      if (!fnData?.delivery) {
+        throw new Error('Telegram Edge Function returned no delivery record.');
+      }
+
+      return fnData.delivery;
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

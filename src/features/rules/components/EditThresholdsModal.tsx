@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { AlertCircle, Calendar, CheckCircle2, Users, X } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, Calendar, CheckCircle2 } from 'lucide-react';
 import type { StaffingThresholdRow } from '@/features/rosters/data/rosterQueries';
 import { useUpdateStaffingThresholdsMutation } from '@/features/rosters/data/rosterQueries';
+import { Modal, useAppUiState, useToast } from '@/shared/ui';
 
 export interface EditThresholdsModalProps {
   isOpen: boolean;
@@ -51,21 +52,15 @@ function buildInitialItems(thresholds: StaffingThresholdRow[]): EditableThreshol
   });
 }
 
-interface ThresholdsFormInnerProps {
-  onClose: () => void;
-  ruleVersionId: number;
-  thresholds: StaffingThresholdRow[];
-  effectiveFrom?: string;
-  effectiveTo?: string | null;
-}
-
-function ThresholdsFormInner({
+function ThresholdsFormBody({
   onClose,
   ruleVersionId,
   thresholds,
   effectiveFrom,
   effectiveTo,
-}: ThresholdsFormInnerProps) {
+}: Omit<EditThresholdsModalProps, 'isOpen'>) {
+  const showToast = useToast();
+  const { setTallyThresholds } = useAppUiState();
   const [items, setItems] = useState<EditableThreshold[]>(() => buildInitialItems(thresholds));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -97,6 +92,19 @@ function ThresholdsFormInner({
 
     try {
       await updateMutation.mutateAsync(items);
+      const weekdayAm = items.find((i) => i.day_type === 'weekday' && i.shift_bucket === 'am');
+      const weekdayPm = items.find((i) => i.day_type === 'weekday' && i.shift_bucket === 'pm');
+      const weekdayNight = items.find(
+        (i) => i.day_type === 'weekday' && i.shift_bucket === 'night',
+      );
+      setTallyThresholds((prev) => ({
+        ...prev,
+        amMin: weekdayAm?.min_staff ?? prev.amMin,
+        pmMin: weekdayPm?.min_staff ?? prev.pmMin,
+        nightMin: weekdayNight?.min_staff ?? prev.nightMin,
+        nightMax: weekdayNight?.target_staff ?? prev.nightMax,
+      }));
+      showToast('Staffing minimums updated ✓');
       onClose();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to update staffing thresholds.');
@@ -106,149 +114,134 @@ function ThresholdsFormInner({
   const dayTypeGroups = ['weekday', 'weekend', 'holiday'] as const;
 
   return (
-    <div
-      className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all dark:border-slate-800 dark:bg-slate-900"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between border-b border-border-subtle pb-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-brand-primary" />
-            <h2 id="thresholds-modal-title" className="text-base font-bold text-text-primary">
-              Edit Staffing Minimums &amp; Targets
-            </h2>
-          </div>
-          <p className="text-xs text-text-secondary">
-            Set required minimum doctor presence per shift bucket to ensure patient safety and zone coverage.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={updateMutation.isPending}
-          className="rounded-lg p-1.5 text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors disabled:opacity-50"
-          aria-label="Close modal"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Active Scope Pill */}
-      <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-secondary/40 px-3.5 py-2 text-xs text-text-secondary border border-border-subtle">
-        <Calendar className="h-4 w-4 text-brand-primary" />
+    <form id="edit-thresholds-form" onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center gap-2 rounded-xl bg-[#FAF8F5] px-3.5 py-2 text-xs text-[#57534E] border border-[#EFECE6]">
+        <Calendar className="h-4 w-4 text-[#0F766E] shrink-0" />
         <span>
           Active Duration:{' '}
-          <strong className="text-text-primary font-mono">
-            {effectiveFrom ?? '2026-01-01'}
-          </strong>{' '}
-          to{' '}
-          <strong className="text-text-primary font-mono">
-            {effectiveTo ?? 'Ongoing / Current'}
-          </strong>
+          <strong className="text-[#18181B] font-mono">{effectiveFrom ?? '2026-01-01'}</strong> to{' '}
+          <strong className="text-[#18181B] font-mono">{effectiveTo ?? 'Ongoing / Current'}</strong>
         </span>
       </div>
 
-      {/* Error Alert */}
       {errorMessage && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">
+        <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="leading-relaxed">{errorMessage}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-5">
-        {dayTypeGroups.map((dayType) => {
-          const groupIndices = items
-            .map((item, idx) => (item.day_type === dayType ? idx : -1))
-            .filter((idx) => idx !== -1);
+      {dayTypeGroups.map((dayType) => {
+        const groupIndices = items
+          .map((item, idx) => (item.day_type === dayType ? idx : -1))
+          .filter((idx) => idx !== -1);
 
-          const title =
-            dayType === 'weekday'
-              ? 'Weekday Staffing (Monday – Friday)'
-              : dayType === 'weekend'
-                ? 'Weekend Staffing (Saturday – Sunday)'
-                : 'Public Holiday Staffing (Gazetted & Ad-hoc)';
+        const title =
+          dayType === 'weekday'
+            ? 'Weekday Staffing (Mon – Fri)'
+            : dayType === 'weekend'
+              ? 'Weekend Staffing (Sat – Sun)'
+              : 'Public Holiday Staffing';
 
-          return (
-            <div
-              key={dayType}
-              className="rounded-xl border border-border-subtle bg-surface-secondary/30 p-4 space-y-3"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                {title}
-              </h3>
+        return (
+          <div
+            key={dayType}
+            className="rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-3.5 space-y-2.5"
+          >
+            <h3 className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#18181B]">
+              {title}
+            </h3>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                {groupIndices.map((idx) => {
-                  const item = items[idx];
-                  if (!item) return null;
-                  const bucketLabel =
-                    item.shift_bucket === 'am'
-                      ? 'Morning (AM)'
-                      : item.shift_bucket === 'pm'
-                        ? 'Evening (PM)'
-                        : 'Night Duty';
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              {groupIndices.map((idx) => {
+                const item = items[idx];
+                if (!item) return null;
+                const bucketLabel =
+                  item.shift_bucket === 'am'
+                    ? 'Morning (AM)'
+                    : item.shift_bucket === 'pm'
+                      ? 'Evening (PM)'
+                      : 'Night Duty';
 
-                  return (
-                    <div
-                      key={item.shift_bucket}
-                      className="rounded-xl border border-border-default bg-surface-primary p-3 space-y-2"
-                    >
-                      <div className="font-semibold text-xs text-text-primary">
-                        {bucketLabel}
+                return (
+                  <div
+                    key={item.shift_bucket}
+                    className="rounded-xl border border-[#E7E5E4] bg-white p-2.5 space-y-2"
+                  >
+                    <div className="font-extrabold text-xs text-[#18181B]">{bucketLabel}</div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#78716C] uppercase">
+                          Min
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={20}
+                          value={item.min_staff}
+                          onChange={(e) => handleMinChange(idx, Number(e.target.value))}
+                          className="h-8 w-full rounded-lg border border-[#E7E5E4] bg-[#FAF8F5] px-2 text-xs font-extrabold text-center text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+                        />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-text-muted uppercase">
-                            Min Staff
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={item.min_staff}
-                            onChange={(e) => handleMinChange(idx, Number(e.target.value))}
-                            className="h-8 w-full rounded-lg border border-border-default bg-surface-secondary/50 px-2 text-xs font-bold text-center text-text-primary focus:border-brand-primary focus:outline-none"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-text-muted uppercase">
-                            Target
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={25}
-                            value={item.target_staff}
-                            onChange={(e) => handleTargetChange(idx, Number(e.target.value))}
-                            className="h-8 w-full rounded-lg border border-border-default bg-surface-secondary/50 px-2 text-xs text-center text-text-secondary focus:border-brand-primary focus:outline-none"
-                          />
-                        </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#78716C] uppercase">
+                          Target
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={25}
+                          value={item.target_staff}
+                          onChange={(e) => handleTargetChange(idx, Number(e.target.value))}
+                          className="h-8 w-full rounded-lg border border-[#E7E5E4] bg-[#FAF8F5] px-2 text-xs font-bold text-center text-[#57534E] focus:border-[#0F766E] focus:outline-none"
+                        />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        );
+      })}
+    </form>
+  );
+}
 
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-border-subtle">
+export function EditThresholdsModal({
+  isOpen,
+  onClose,
+  ruleVersionId,
+  thresholds,
+  effectiveFrom,
+  effectiveTo,
+}: EditThresholdsModalProps) {
+  const updateMutation = useUpdateStaffingThresholdsMutation(ruleVersionId);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Staffing Minimums & Targets"
+      description="Set required minimum doctor presence per shift bucket to ensure patient safety and zone coverage."
+      presentation="drawer"
+      maxWidth="lg"
+      footer={
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={updateMutation.isPending}
-            className="rounded-xl border border-border-default px-4 py-2 text-xs font-semibold text-text-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50"
+            className="rounded-full border border-[#E7E5E4] bg-white px-4 py-2 text-xs font-extrabold text-[#57534E] hover:bg-[#FAF8F5] transition disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
+            form="edit-thresholds-form"
             disabled={updateMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-xs font-semibold text-text-inverse hover:bg-brand-primary-hover shadow-xs transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#0F766E] px-5 py-2 text-xs font-extrabold text-white hover:bg-[#115E59] shadow-xs transition disabled:opacity-50 cursor-pointer"
           >
             {updateMutation.isPending ? (
               <>
@@ -263,40 +256,9 @@ function ThresholdsFormInner({
             )}
           </button>
         </div>
-      </form>
-    </div>
-  );
-}
-
-export function EditThresholdsModal({
-  isOpen,
-  onClose,
-  ruleVersionId,
-  thresholds,
-  effectiveFrom,
-  effectiveTo,
-}: EditThresholdsModalProps) {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="thresholds-modal-title"
-      onClick={onClose}
     >
-      <ThresholdsFormInner
+      <ThresholdsFormBody
         key={ruleVersionId}
         onClose={onClose}
         ruleVersionId={ruleVersionId}
@@ -304,6 +266,6 @@ export function EditThresholdsModal({
         effectiveFrom={effectiveFrom}
         effectiveTo={effectiveTo}
       />
-    </div>
+    </Modal>
   );
 }

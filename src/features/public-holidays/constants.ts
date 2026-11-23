@@ -95,10 +95,14 @@ export function classifyPublicHolidayShift(shift: string | null | undefined): Sh
     normalizedShift = 'PN';
   } else if (s === 'COURSE' || s.startsWith('COURSE') || s.includes('COURSE')) {
     normalizedShift = 'COURSE';
+  } else if (s === 'MEDSB' || s.startsWith('MEDSB') || s.includes('MEDSB')) {
+    normalizedShift = 'MEDSB';
   }
 
   // Active working shifts earn GHKA credits when worked on gazetted public holidays
-  if (['AM', 'M', 'PM', 'E', 'AMX', 'PMX', 'NIGHT', 'PN', 'COURSE'].includes(normalizedShift)) {
+  if (
+    ['AM', 'M', 'PM', 'E', 'AMX', 'PMX', 'NIGHT', 'PN', 'COURSE', 'MEDSB'].includes(normalizedShift)
+  ) {
     return {
       normalizedShift,
       category: 'worked',

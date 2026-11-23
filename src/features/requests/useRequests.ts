@@ -65,23 +65,30 @@ export function useTeamMembersQuery() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff_directory')
-        .select('id, staff_code, roster_name, display_name, active')
+        .select('id, staff_code, roster_name, display_name, staff_group, active')
         .eq('active', true)
-        .order('roster_name', { ascending: true });
+        .order('id', { ascending: true });
 
       if (error) {
         throw new Error(`Failed to load team members: ${error.message}`);
       }
-      return (data ?? []).map((row) => ({
-        ...row,
-        id: row.id,
-        staffCode: row.staff_code ?? '',
-        rosterName: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
-        displayName: row.display_name ?? row.roster_name ?? 'Staff',
-        staff_code: row.staff_code ?? '',
-        roster_name: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
-        display_name: row.display_name ?? row.roster_name ?? 'Staff',
-      }));
+      return (data ?? [])
+        .filter(
+          (row) =>
+            !/^(EP|PTPO)-/i.test(row.staff_code ?? '') &&
+            !/\bADMIN-PTPO\b/i.test(row.staff_group ?? '') &&
+            !(row.staff_group ?? '').toLowerCase().startsWith('ep |'),
+        )
+        .map((row) => ({
+          ...row,
+          id: row.id,
+          staffCode: row.staff_code ?? '',
+          rosterName: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
+          displayName: row.display_name ?? row.roster_name ?? 'Staff',
+          staff_code: row.staff_code ?? '',
+          roster_name: row.roster_name ?? row.display_name ?? row.staff_code ?? 'Staff',
+          display_name: row.display_name ?? row.roster_name ?? 'Staff',
+        }));
     },
     staleTime: 60_000,
   });

@@ -14,3 +14,16 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+if (
+  typeof window !== 'undefined' &&
+  'serviceWorker' in navigator &&
+  import.meta.env.MODE !== 'test'
+) {
+  window.addEventListener('load', () => {
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' }).catch(() => {
+      // Non-fatal: app functions normally without SW if blocked by browser privacy mode.
+    });
+  });
+}

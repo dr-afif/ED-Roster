@@ -70,7 +70,8 @@ describe('AppShell & Placeholder Routes', () => {
       screen.getByRole('heading', { level: 1, name: /Operations Overview/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Non-prod · staging/i)).toBeInTheDocument();
-    expect(screen.getByText('Roster Administrator')).toBeInTheDocument();
+    const desktopSidebar = screen.getByLabelText(/Primary desktop navigation/i);
+    expect(within(desktopSidebar).getByText('Roster Administrator')).toBeInTheDocument();
 
     // Skip link moves focus directly to #main-content without breaking router state.
     const skipLink = screen.getByRole('link', { name: /Skip to main content/i });
@@ -87,10 +88,9 @@ describe('AppShell & Placeholder Routes', () => {
         { timeout: 15000 },
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Comfortable/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Table View/i })).toBeInTheDocument();
 
     // Navigate via desktop sidebar to Owner Admin -> Rules & Policies.
-    const desktopSidebar = screen.getByLabelText(/Primary desktop navigation/i);
     await user.click(within(desktopSidebar).getByRole('link', { name: /Rules & Policies/i }));
     expect(
       await screen.findByRole(

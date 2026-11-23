@@ -2,9 +2,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AuthContext,
+  TEST_NORMAL_MO_USER,
   useAuthBoundary,
   type AuthBoundaryState,
   type AuthenticatedUserContext,
+  type TestPersonaMode,
   type UnapprovedReason,
 } from './authContext';
 import { AuthErrorScreen, AuthLoadingScreen, SignInScreen, UnapprovedScreen } from './AuthScreens';
@@ -12,6 +14,42 @@ import { sanitizeReturnToPath } from './oauthCallbackGuard';
 import { useSupabaseClient, useSupabaseMetadata } from '@/platform/supabase';
 
 const RETURN_TO_STORAGE_KEY = 'resq.auth.v1.returnTo';
+const TEST_PERSONA_STORAGE_KEY = 'resq.auth.v1.testPersona';
+const CACHED_AUTH_USER_STORAGE_KEY = 'resq.auth.v1.cachedUser';
+
+function readCachedAuthUser(): AuthenticatedUserContext | null {
+  try {
+    const raw = window.localStorage.getItem(CACHED_AUTH_USER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthenticatedUserContext;
+    if (!parsed || typeof parsed.authUserId !== 'string' || typeof parsed.role !== 'string') {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAuthUser(user: AuthenticatedUserContext | null) {
+  try {
+    if (!user) {
+      window.localStorage.removeItem(CACHED_AUTH_USER_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(CACHED_AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+    }
+  } catch {
+    // Ignore storage restrictions safely
+  }
+}
+
+function readStoredTestPersona(): TestPersonaMode {
+  try {
+    return window.localStorage.getItem(TEST_PERSONA_STORAGE_KEY) === 'mo' ? 'mo' : 'owner';
+  } catch {
+    return 'owner';
+  }
+}
 
 type AuthProviderProps = {
   value?: AuthBoundaryState;
@@ -36,27 +74,59 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
   const metadata = useSupabaseMetadata();
   const queryClient = useQueryClient();
 
-  const [status, setStatus] = useState<AuthBoundaryState['status']>('loading');
-  const [user, setUser] = useState<AuthenticatedUserContext | null>(null);
+  const [initialCachedUser] = useState<AuthenticatedUserContext | null>(() => readCachedAuthUser());
+  const [status, setStatus] = useState<AuthBoundaryState['status']>(() =>
+    initialCachedUser ? 'authenticated' : 'loading',
+  );
+  const [user, setUser] = useState<AuthenticatedUserContext | null>(() => initialCachedUser);
   const [unapprovedReason, setUnapprovedReason] = useState<UnapprovedReason | null>(null);
   const [unapprovedEmail, setUnapprovedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [testPersona, setTestPersona] = useState<TestPersonaMode>(readStoredTestPersona);
+
+  const updateTestPersona = useCallback((nextPersona: TestPersonaMode) => {
+    setTestPersona(nextPersona);
+    try {
+      window.localStorage.setItem(TEST_PERSONA_STORAGE_KEY, nextPersona);
+    } catch {
+      // Ignore storage restrictions safely
+    }
+  }, []);
+
+  const toggleTestMoPersona = useCallback(() => {
+    setTestPersona((prev) => {
+      const next: TestPersonaMode = prev === 'mo' ? 'owner' : 'mo';
+      try {
+        window.localStorage.setItem(TEST_PERSONA_STORAGE_KEY, next);
+      } catch {
+        // Ignore storage restrictions safely
+      }
+      return next;
+    });
+  }, []);
 
   const runBootstrap = useCallback(
-    async (emailHint: string | null = null) => {
+    async (emailHint: string | null = null, options?: { background?: boolean }) => {
+      const isBackground = Boolean(options?.background);
       try {
-        setStatus('loading');
+        if (!isBackground) {
+          setStatus('loading');
+        }
         setErrorMessage(null);
 
         const { data, error } = await supabase.rpc('bootstrap_my_session');
         if (error) {
-          setErrorMessage(error.message);
-          setStatus('error');
+          if (!isBackground) {
+            setErrorMessage(error.message);
+            setStatus('error');
+          }
           return;
         }
 
         const record = data && data.length > 0 ? data[0] : null;
         if (!record) {
+          writeCachedAuthUser(null);
+          setUser(null);
           setStatus('unapproved');
           setUnapprovedReason('unapproved');
           setUnapprovedEmail(emailHint);
@@ -66,12 +136,14 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
         if (record.access_status === 'active') {
           const authUser = (await supabase.auth.getUser()).data.user;
           if (!authUser) {
+            writeCachedAuthUser(null);
+            setUser(null);
             setStatus('unauthenticated');
             return;
           }
 
           const resolvedRole = record.role === 'owner' ? 'owner' : 'staff';
-          setUser({
+          const resolvedUser: AuthenticatedUserContext = {
             authUserId: authUser.id,
             email: authUser.email ?? null,
             role: resolvedRole,
@@ -79,7 +151,9 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
             staffCode: record.staff_code,
             displayName: record.display_name ?? 'Approved Workforce User',
             rosterName: record.roster_name,
-          });
+          };
+          writeCachedAuthUser(resolvedUser);
+          setUser(resolvedUser);
           setStatus('authenticated');
 
           // ADR-007: Restore post-login target path from sessionStorage if present.
@@ -136,8 +210,10 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (session?.user) {
-          runBootstrap(session.user.email ?? null);
+          const matchesCache = initialCachedUser?.authUserId === session.user.id;
+          runBootstrap(session.user.email ?? null, { background: matchesCache });
         } else {
+          writeCachedAuthUser(null);
           setStatus('unauthenticated');
           setUser(null);
         }
@@ -155,11 +231,13 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
 
       if (event === 'SIGNED_OUT' || !session) {
+        writeCachedAuthUser(null);
         setUser(null);
         setStatus('unauthenticated');
         queryClient.clear();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        runBootstrap(session.user.email ?? null);
+        const matchesCache = initialCachedUser?.authUserId === session.user.id;
+        runBootstrap(session.user.email ?? null, { background: matchesCache });
       }
     });
 
@@ -167,7 +245,7 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase, queryClient, runBootstrap]);
+  }, [supabase, queryClient, runBootstrap, initialCachedUser]);
 
   const signInWithGoogle = useCallback(
     async (returnToPath?: string) => {
@@ -206,13 +284,37 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
     [supabase, metadata.basePath],
   );
 
+  const signInAsTestMo = useCallback(async () => {
+    if (metadata.isProduction) return;
+    updateTestPersona('mo');
+    setStatus('loading');
+    setErrorMessage(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: 'siti@hsaas.upm.edu.my',
+        password: 'TestMo123456!',
+      });
+      if (!error && data.session?.user) {
+        await runBootstrap(data.session.user.email ?? 'siti@hsaas.upm.edu.my');
+        return;
+      }
+    } catch {
+      // Fall back to local non-production test MO session below
+    }
+    setUser(TEST_NORMAL_MO_USER);
+    setStatus('authenticated');
+  }, [metadata.isProduction, supabase, runBootstrap, updateTestPersona]);
+
   const signOut = useCallback(async () => {
     try {
       try {
         window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+        window.localStorage.removeItem(TEST_PERSONA_STORAGE_KEY);
       } catch {
         // Ignore storage restrictions
       }
+      writeCachedAuthUser(null);
+      setTestPersona('owner');
       queryClient.clear();
       await supabase.auth.signOut();
     } finally {
@@ -229,26 +331,46 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
     await runBootstrap(email);
   }, [supabase, runBootstrap]);
 
+  const canSwitchTestPersona =
+    !metadata.isProduction && status === 'authenticated' && user !== null && user.role === 'owner';
+
+  const effectiveUser = useMemo<AuthenticatedUserContext | null>(() => {
+    if (!user) return null;
+    if (metadata.isProduction) return user;
+    if (user.role === 'owner' && testPersona === 'mo') {
+      return TEST_NORMAL_MO_USER;
+    }
+    return user;
+  }, [user, metadata.isProduction, testPersona]);
+
   const stateValue: AuthBoundaryState = useMemo(
     () => ({
       status,
-      user,
+      user: effectiveUser,
       unapprovedReason,
       unapprovedEmail,
       errorMessage,
       signInWithGoogle,
       signOut,
       retryBootstrap,
+      testPersona,
+      canSwitchTestPersona,
+      toggleTestMoPersona,
+      signInAsTestMo,
     }),
     [
       status,
-      user,
+      effectiveUser,
       unapprovedReason,
       unapprovedEmail,
       errorMessage,
       signInWithGoogle,
       signOut,
       retryBootstrap,
+      testPersona,
+      canSwitchTestPersona,
+      toggleTestMoPersona,
+      signInAsTestMo,
     ],
   );
 

@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Layers,
-  Moon,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { CheckCircle2, Clock, Layers, Moon, Pencil, Plus, ShieldCheck, Users } from 'lucide-react';
 import { OwnerUxBoundary } from '@/platform/auth';
-import { PageHeader, StatusBadge, SurfaceCard } from '@/shared/ui';
+import type { Json } from '@/platform/supabase/database.types';
+import {
+  formatOrdinalDay,
+  getShiftToneClasses,
+  Modal,
+  ModuleBackBar,
+  SkeletonCardList,
+  SkeletonTableCard,
+  StatusBadge,
+  useToast,
+} from '@/shared/ui';
 import {
   type ShiftDefinitionRow,
   type ShiftSemanticRow,
@@ -21,6 +21,7 @@ import {
   useShiftDefinitionsQuery,
   useShiftSemanticsQuery,
   useStaffingThresholdsQuery,
+  useUpdateRuleVersionMutation,
 } from '../rosters/data/rosterQueries';
 import { EditPolicyModal } from './components/EditPolicyModal';
 import { EditShiftModal } from './components/EditShiftModal';
@@ -28,6 +29,7 @@ import { EditThresholdsModal } from './components/EditThresholdsModal';
 import { getShiftColorClass } from './domain/shiftThemes';
 
 export function RulesAdminRoute() {
+  const showToast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const initialTab =
@@ -52,20 +54,96 @@ export function RulesAdminRoute() {
     });
   };
 
-  const { data: ruleVersion } = useRuleVersionQuery();
-  const { data: thresholds = [] } = useStaffingThresholdsQuery(ruleVersion?.id);
-  const { data: shiftDefs = [] } = useShiftDefinitionsQuery(true);
+  const { data: ruleVersion, isLoading: isRulesLoading } = useRuleVersionQuery();
+  const { data: thresholds = [], isLoading: isThresholdsLoading } = useStaffingThresholdsQuery(
+    ruleVersion?.id,
+  );
+  const { data: shiftDefs = [], isLoading: isShiftsLoading } = useShiftDefinitionsQuery(true);
   const { data: shiftSemantics = [] } = useShiftSemanticsQuery();
+  const updateRuleMutation = useUpdateRuleVersionMutation();
 
   // Modals
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isThresholdsModalOpen, setIsThresholdsModalOpen] = useState(false);
+  const [isRequestQuotaModalOpen, setIsRequestQuotaModalOpen] = useState(false);
 
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{
     def: ShiftDefinitionRow | null;
     semantics: ShiftSemanticRow | null;
   } | null>(null);
+
+  const rawConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
+  const weeklyOffPolicy = (rawConfig.weekly_off_policy as string) ?? 'policy_b';
+  const maxConsecutive = Number(rawConfig.max_consecutive_days ?? 6);
+  const minRestHours = Number(rawConfig.min_rest_hours_after_night ?? 24);
+  const requestMonthlyLimit = Number(rawConfig.request_monthly_limit ?? 10);
+  const requestWeekendLimit = Number(rawConfig.request_weekend_limit ?? 4);
+  const requestDailyOffLimit = Number(rawConfig.request_daily_off_limit ?? 3);
+  const requestOn1DailyLimit = Number(rawConfig.request_on1_daily_limit ?? 1);
+
+  const [quotaMonthlyDraft, setQuotaMonthlyDraft] = useState(requestMonthlyLimit);
+  const [quotaWeekendDraft, setQuotaWeekendDraft] = useState(requestWeekendLimit);
+  const [quotaDailyOffDraft, setQuotaDailyOffDraft] = useState(requestDailyOffLimit);
+  const [quotaOn1DailyDraft, setQuotaOn1DailyDraft] = useState(requestOn1DailyLimit);
+
+  const handleOpenQuotaModal = () => {
+    setQuotaMonthlyDraft(requestMonthlyLimit);
+    setQuotaWeekendDraft(requestWeekendLimit);
+    setQuotaDailyOffDraft(requestDailyOffLimit);
+    setQuotaOn1DailyDraft(requestOn1DailyLimit);
+    setIsRequestQuotaModalOpen(true);
+  };
+
+  const handleSaveRequestQuotas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ruleVersion) return;
+    try {
+      await updateRuleMutation.mutateAsync({
+        id: ruleVersion.id,
+        effectiveFrom: ruleVersion.effective_from,
+        effectiveTo: ruleVersion.effective_to,
+        config: {
+          ...rawConfig,
+          request_monthly_limit: Math.max(1, quotaMonthlyDraft),
+          request_weekend_limit: Math.max(0, quotaWeekendDraft),
+          request_daily_off_limit: Math.max(1, quotaDailyOffDraft),
+          request_on1_daily_limit: Math.max(1, quotaOn1DailyDraft),
+        } as Json,
+        changeSummary: 'Updated request quota caps',
+      });
+      setIsRequestQuotaModalOpen(false);
+      showToast('Request quota thresholds updated ✓');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update request quotas.');
+    }
+  };
+
+  const handleQuickPolicySwitch = async (nextPolicy: 'policy_a' | 'policy_b') => {
+    if (!ruleVersion || weeklyOffPolicy === nextPolicy) return;
+    try {
+      await updateRuleMutation.mutateAsync({
+        id: ruleVersion.id,
+        effectiveFrom: ruleVersion.effective_from,
+        effectiveTo: ruleVersion.effective_to,
+        config: {
+          ...rawConfig,
+          weekly_off_policy: nextPolicy,
+        } as Json,
+        changeSummary:
+          nextPolicy === 'policy_a'
+            ? 'Switched Weekly OFF Policy to Policy A'
+            : 'Switched Weekly OFF Policy to Policy B (Standard ED)',
+      });
+      showToast(
+        nextPolicy === 'policy_a'
+          ? 'Switched to Policy A ✓'
+          : 'Switched to Policy B (Standard ED) ✓',
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to switch weekly OFF policy.');
+    }
+  };
 
   const handleOpenCreateShift = () => {
     setSelectedShiftForEdit({ def: null, semantics: null });
@@ -78,45 +156,69 @@ export function RulesAdminRoute() {
     setIsShiftModalOpen(true);
   };
 
-  const rawConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
-  const weeklyOffPolicy = (rawConfig.weekly_off_policy as string) ?? 'policy_b';
-  const maxConsecutive = Number(rawConfig.max_consecutive_days ?? 6);
-  const minRestHours = Number(rawConfig.min_rest_hours_after_night ?? 24);
-
   const effectiveDurationText = ruleVersion?.effective_to
     ? `${ruleVersion.effective_from} to ${ruleVersion.effective_to}`
     : `From ${ruleVersion?.effective_from ?? '2026-01-01'} (Ongoing)`;
 
+  const isPolB = weeklyOffPolicy === 'policy_b';
+  const fatigueDayOrd = formatOrdinalDay(maxConsecutive + 1);
+
+  const thresholdMatrix = (['am', 'pm', 'night'] as const).map((bucket) => {
+    const rowLabel =
+      bucket === 'am' ? 'Morning (AM)' : bucket === 'pm' ? 'Evening (PM)' : 'Night (ON/ND)';
+    const getCell = (
+      dayType: 'weekday' | 'weekend' | 'holiday',
+    ): StaffingThresholdRow | undefined =>
+      thresholds.find((t) => t.shift_bucket === bucket && t.day_type === dayType);
+    return {
+      bucket,
+      rowLabel,
+      weekday: getCell('weekday'),
+      weekend: getCell('weekend'),
+      holiday: getCell('holiday'),
+    };
+  });
+
   return (
     <OwnerUxBoundary areaName="Versioned Rules">
-      <div className="space-y-6">
-        <PageHeader
-          eyebrow="Owner Administration"
-          title="Roster Rules & Thresholds"
-          description="View and manage deterministic rules governing weekly OFF policies, shift classifications, working hours, and staffing minimums."
-          actions={
-            <>
-              <StatusBadge
-                label={`Rule Version ${ruleVersion?.version ?? 1} (Active)`}
-                tone="brand"
-                icon={ShieldCheck}
-              />
-              <span className="text-xs font-mono text-text-muted">
-                Active: {effectiveDurationText}
-              </span>
-            </>
-          }
-        />
+      <div className="max-w-[1040px] space-y-4">
+        <ModuleBackBar title="Rules & Policies" />
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-border-default">
+        {/* Desktop Header */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="hidden lg:block text-[11px] font-bold uppercase tracking-[0.08em] text-[#0F766E]">
+              Owner Administration
+            </p>
+            <h1 className="sr-only lg:not-sr-only text-[26px] font-extrabold tracking-tight text-[#18181B]">
+              Roster Rules &amp; Thresholds
+            </h1>
+            <p className="hidden lg:block mt-0.5 text-[13px] font-medium text-[#78716C]">
+              Manage weekly OFF policies, request quota thresholds, staffing minimums, and shift
+              timings.
+            </p>
+          </div>
+          <div className="hidden lg:flex flex-wrap items-center gap-2">
+            <StatusBadge
+              label={`Rule Version ${ruleVersion?.version ?? 1} (Active)`}
+              tone="teal"
+              icon={ShieldCheck}
+            />
+            <span className="rounded-full border border-[#E7E5E4] bg-white px-3 py-1 text-[11px] font-mono font-bold text-[#57534E]">
+              Active: {effectiveDurationText}
+            </span>
+          </div>
+        </div>
+
+        {/* Scrollable Tab Switcher */}
+        <div className="flex border-b border-[#EFECE6] overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('policies')}
-            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex shrink-0 items-center gap-2 border-b-[2.5px] px-4 py-2.5 text-xs font-extrabold whitespace-nowrap transition-colors -mb-px cursor-pointer ${
               activeTab === 'policies'
-                ? 'border-brand-primary text-brand-primary'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
+                ? 'border-[#0F766E] text-[#0F766E]'
+                : 'border-transparent text-[#78716C] hover:text-[#18181B]'
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
@@ -125,10 +227,10 @@ export function RulesAdminRoute() {
           <button
             type="button"
             onClick={() => setActiveTab('thresholds')}
-            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex shrink-0 items-center gap-2 border-b-[2.5px] px-4 py-2.5 text-xs font-extrabold whitespace-nowrap transition-colors -mb-px cursor-pointer ${
               activeTab === 'thresholds'
-                ? 'border-brand-primary text-brand-primary'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
+                ? 'border-[#0F766E] text-[#0F766E]'
+                : 'border-transparent text-[#78716C] hover:text-[#18181B]'
             }`}
           >
             <Users className="h-4 w-4" />
@@ -137,10 +239,10 @@ export function RulesAdminRoute() {
           <button
             type="button"
             onClick={() => setActiveTab('shifts')}
-            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex shrink-0 items-center gap-2 border-b-[2.5px] px-4 py-2.5 text-xs font-extrabold whitespace-nowrap transition-colors -mb-px cursor-pointer ${
               activeTab === 'shifts'
-                ? 'border-brand-primary text-brand-primary'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
+                ? 'border-[#0F766E] text-[#0F766E]'
+                : 'border-transparent text-[#78716C] hover:text-[#18181B]'
             }`}
           >
             <Layers className="h-4 w-4" />
@@ -149,340 +251,522 @@ export function RulesAdminRoute() {
         </div>
 
         {/* TAB 1: POLICIES */}
-        {activeTab === 'policies' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-text-primary">
-                  Scheduling Policies, Fatigue Limits &amp; Active Duration
-                </h3>
-                <p className="text-xs text-text-secondary">
-                  Active policy constraints evaluated deterministically across weekly Monday–Sunday boundaries.
-                </p>
+        {activeTab === 'policies' &&
+          (isRulesLoading ? (
+            <SkeletonCardList count={2} srLabel="Loading scheduling policies..." />
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-[22px] border border-[#E7E5E4] bg-white p-4 sm:p-5 space-y-4 shadow-[0_2px_10px_rgba(28,25,23,0.03)]">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h2 className="text-[15px] font-extrabold text-[#18181B]">
+                      Scheduling Policies, Fatigue Limits &amp; Active Duration
+                    </h2>
+                    <p className="text-xs font-medium text-[#78716C]">
+                      Active Scope:{' '}
+                      <strong className="text-[#18181B]">{effectiveDurationText}</strong> &middot;
+                      Evaluated Monday–Sunday.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPolicyModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 self-start rounded-full bg-[#0F766E] px-3.5 py-1.5 text-xs font-extrabold text-white hover:bg-[#0D655E] shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Edit Policies &amp; Duration</span>
+                  </button>
+                </div>
+
+                {/* Left-Accented Fatigue & Rest Guardrails */}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[#EFECE6] border-l-[3px] border-l-[#0F766E] bg-[#FAF8F5] px-4 py-3">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-[#78716C]">
+                        <Clock className="h-3.5 w-3.5 text-[#0F766E]" />
+                        <span>Consecutive Work Limit</span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-[#57534E]">
+                        {fatigueDayOrd} consecutive day triggers fatigue warning. Resets on OFF /
+                        GOFF / leave.
+                      </p>
+                    </div>
+                    <span className="text-2xl font-extrabold text-[#0F766E] tabular-nums shrink-0">
+                      {maxConsecutive}d
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[#EFECE6] border-l-[3px] border-l-[#D97706] bg-[#FAF8F5] px-4 py-3">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-[#78716C]">
+                        <Moon className="h-3.5 w-3.5 text-[#D97706]" />
+                        <span>Night Shift Bundles &amp; Rest</span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-[#57534E]">
+                        Bundles <code className="font-mono font-bold">ON1→ON2→PN</code>,{' '}
+                        <code className="font-mono font-bold">ON1→PN</code>,{' '}
+                        <code className="font-mono font-bold">ON→PN</code> protect recovery window.
+                      </p>
+                    </div>
+                    <span className="text-2xl font-extrabold text-[#B45309] tabular-nums shrink-0">
+                      {minRestHours}h
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1-Tap Clickable Weekly OFF Policy Cards */}
+                <div>
+                  <p className="text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-[#78716C] mb-2">
+                    Weekly OFF Policy (1-Tap Switch)
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      disabled={updateRuleMutation.isPending}
+                      onClick={() => void handleQuickPolicySwitch('policy_a')}
+                      className={`rounded-[16px] border-[1.5px] p-3.5 text-left transition cursor-pointer disabled:opacity-60 ${
+                        !isPolB
+                          ? 'border-[#0F766E] bg-[#F0FDFA]'
+                          : 'border-[#E7E5E4] bg-[#FAF8F5] hover:border-[#A8A29E]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span
+                          className={`text-[13px] font-extrabold ${
+                            !isPolB ? 'text-[#0F766E]' : 'text-[#18181B]'
+                          }`}
+                        >
+                          Policy A
+                        </span>
+                        {!isPolB ? (
+                          <span className="rounded-full border border-[#99F6E4] bg-white px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F766E]">
+                            ✓ Active
+                          </span>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-[#78716C]">
+                            Tap to Activate
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium text-[#57534E]">
+                        Exactly 1 normal weekly OFF for all staff regardless of night shifts.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={updateRuleMutation.isPending}
+                      onClick={() => void handleQuickPolicySwitch('policy_b')}
+                      className={`rounded-[16px] border-[1.5px] p-3.5 text-left transition cursor-pointer disabled:opacity-60 ${
+                        isPolB
+                          ? 'border-[#0F766E] bg-[#F0FDFA]'
+                          : 'border-[#E7E5E4] bg-[#FAF8F5] hover:border-[#A8A29E]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span
+                          className={`text-[13px] font-extrabold ${
+                            isPolB ? 'text-[#0F766E]' : 'text-[#18181B]'
+                          }`}
+                        >
+                          Policy B (Standard ED)
+                        </span>
+                        {isPolB ? (
+                          <span className="rounded-full border border-[#99F6E4] bg-white px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F766E]">
+                            ✓ Active
+                          </span>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-[#78716C]">
+                            Tap to Activate
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium text-[#57534E]">
+                        1 normal OFF after night block (ON/ON1/ON2/PN/ND); 2 normal OFFs otherwise.
+                      </p>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPolicyModalOpen(true)}
-                className="inline-flex items-center gap-1.5 self-start rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-brand-primary-hover shadow-xs transition-colors"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                <span>Edit Policies &amp; Duration</span>
-              </button>
-            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Weekly OFF Policy Card */}
-              <SurfaceCard variant="solid" className="p-5 space-y-3">
-                <div className="flex items-center gap-2 text-brand-primary">
-                  <Calendar className="h-5 w-5" />
-                  <h3 className="font-semibold text-text-primary">Weekly OFF Policy</h3>
-                </div>
-                <div className="space-y-1">
-                  <div className="inline-block rounded-md bg-brand-primary/10 px-2 py-0.5 text-xs font-bold text-brand-primary">
-                    {weeklyOffPolicy === 'policy_b' ? 'Policy B (Standard ED)' : 'Policy A'}
+              {/* Request Quota Thresholds Summary Card */}
+              <div className="rounded-[22px] border border-[#E7E5E4] bg-white p-4 sm:p-5 space-y-3 shadow-[0_2px_10px_rgba(28,25,23,0.03)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-[15px] font-extrabold text-[#18181B]">
+                      Request Quota Thresholds
+                    </h3>
+                    <p className="text-xs font-medium text-[#78716C]">
+                      Default monthly &amp; daily guardrails enforced on staff shift request
+                      submissions.
+                    </p>
                   </div>
-                  <p className="text-xs text-text-secondary">
-                    {weeklyOffPolicy === 'policy_b'
-                      ? 'Staff working night duties (ON, ON1, ON2, PN, NIGHT, ND) are entitled to 1 normal OFF per week; staff without night duties are entitled to 2 normal OFFs.'
-                      : 'Requires exactly 1 normal OFF per week for all staff.'}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={handleOpenQuotaModal}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-1.5 text-[11px] font-extrabold text-[#18181B] hover:bg-[#EFECE6] cursor-pointer"
+                  >
+                    ✏️ Edit Thresholds
+                  </button>
                 </div>
-                <div className="text-[11px] text-text-muted">
-                  Evaluated strictly across Monday–Sunday boundaries.
-                </div>
-              </SurfaceCard>
-
-              {/* Consecutive Days Card */}
-              <SurfaceCard variant="solid" className="p-5 space-y-3">
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                  <Clock className="h-5 w-5" />
-                  <h3 className="font-semibold text-text-primary">Consecutive Work Limit</h3>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-bold text-text-primary">
-                    {maxConsecutive}{' '}
-                    <span className="text-xs font-normal text-text-muted">days max</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="rounded-[16px] border border-[#EFECE6] border-t-[3px] border-t-[#D97706] bg-[#FAF8F5] p-3.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#78716C]">
+                      Monthly Cap
+                    </p>
+                    <div className="mt-1.5 flex items-baseline justify-between">
+                      <span className="text-2xl font-extrabold text-[#18181B] tabular-nums">
+                        {requestMonthlyLimit}
+                      </span>
+                      <span className="text-[10.5px] font-bold text-[#B45309]">reqs / mo</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-text-secondary">
-                    A 7th consecutive worked day triggers an advisory fatigue warning. Post-night (PN)
-                    is transparent and does not reset the count.
-                  </p>
-                </div>
-                <div className="text-[11px] text-text-muted">
-                  Sequence resets only upon rest days (OFF, GOFF) or approved leave (AL, MC).
-                </div>
-              </SurfaceCard>
-
-              {/* Night Bundles Card */}
-              <SurfaceCard variant="solid" className="p-5 space-y-3">
-                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-                  <Moon className="h-5 w-5" />
-                  <h3 className="font-semibold text-text-primary">Night Shift Bundles &amp; Rest</h3>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-text-primary">
-                    {minRestHours} Hours Rest
+                  <div className="rounded-[16px] border border-[#EFECE6] border-t-[3px] border-t-[#0F766E] bg-[#FAF8F5] p-3.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#78716C]">
+                      Weekend Cap
+                    </p>
+                    <div className="mt-1.5 flex items-baseline justify-between">
+                      <span className="text-2xl font-extrabold text-[#0F766E] tabular-nums">
+                        {requestWeekendLimit}
+                      </span>
+                      <span className="text-[10.5px] font-bold text-[#0F766E]">Fri–Sun / mo</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-text-secondary">
-                    Recognized bundles: <code className="font-mono">ON1 → ON2 → PN</code>,{' '}
-                    <code className="font-mono">ON1 → PN</code>,{' '}
-                    <code className="font-mono">ON → PN</code>.
-                  </p>
+                  <div className="rounded-[16px] border border-[#EFECE6] border-t-[3px] border-t-[#15803D] bg-[#FAF8F5] p-3.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#78716C]">
+                      OFF Group / Day
+                    </p>
+                    <div className="mt-1.5 flex items-baseline justify-between">
+                      <span className="text-2xl font-extrabold text-[#15803D] tabular-nums">
+                        {requestDailyOffLimit}
+                      </span>
+                      <span className="text-[10.5px] font-bold text-[#15803D]">reqs / day</span>
+                    </div>
+                  </div>
+                  <div className="rounded-[16px] border border-[#EFECE6] border-t-[3px] border-t-[#E06D53] bg-[#FAF8F5] p-3.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#78716C]">
+                      ON1 / Day
+                    </p>
+                    <div className="mt-1.5 flex items-baseline justify-between">
+                      <span className="text-2xl font-extrabold text-[#E06D53] tabular-nums">
+                        {requestOn1DailyLimit}
+                      </span>
+                      <span className="text-[10.5px] font-bold text-[#C2410C]">req / day</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[11px] text-text-muted">
-                  Directly following a night shift with a working shift triggers an immediate error.
-                </div>
-              </SurfaceCard>
-            </div>
-
-            {/* Scope / Duration Card */}
-            <SurfaceCard variant="glass" className="p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-text-primary">
-                  <Calendar className="h-4 w-4 text-brand-primary" />
-                  <span>Duration of Active Use:</span>
-                  <span className="font-mono font-semibold text-brand-primary">
-                    {effectiveDurationText}
-                  </span>
-                </div>
-                <span className="rounded-md bg-brand-primary/10 px-2 py-0.5 text-[10px] font-bold text-brand-primary">
-                  {ruleVersion?.effective_to ? 'Month / Date Scoped' : 'Ongoing Active'}
-                </span>
               </div>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                {ruleVersion?.change_summary ?? 'Standard baseline policy for emergency department roster planning.'}
-              </p>
-            </SurfaceCard>
-          </div>
-        )}
+            </div>
+          ))}
 
-        {/* TAB 2: STAFFING THRESHOLDS */}
+        {/* TAB 2: COMPACT 3-ROW PIVOTED STAFFING THRESHOLDS */}
         {activeTab === 'thresholds' && (
-          <SurfaceCard variant="solid" className="space-y-4 p-5">
+          <div className="rounded-[22px] border border-[#E7E5E4] bg-white space-y-4 p-4 sm:p-5 shadow-[0_2px_10px_rgba(28,25,23,0.03)]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-text-primary">Minimum Staffing Thresholds</h3>
-                <p className="text-xs text-text-secondary">
-                  Required number of on-duty doctors per shift bucket and day type (Active: {effectiveDurationText}).
+                <h2 className="text-[15px] font-extrabold text-[#18181B]">
+                  Minimum Staffing Thresholds
+                </h2>
+                <p className="text-xs font-medium text-[#78716C]">
+                  Required on-duty MOs per shift bucket (Min / Target · Active:{' '}
+                  {effectiveDurationText}).
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsThresholdsModalOpen(true)}
-                className="inline-flex items-center gap-1.5 self-start rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-brand-primary-hover shadow-xs transition-colors"
+                className="inline-flex items-center gap-1.5 self-start rounded-full bg-[#0F766E] px-3.5 py-1.5 text-xs font-extrabold text-white hover:bg-[#0D655E] shadow-2xs transition-colors cursor-pointer"
               >
                 <Pencil className="h-3.5 w-3.5" />
                 <span>Edit Staffing Minimums</span>
               </button>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-border-default bg-surface-secondary/70">
-                  <tr>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">Day Type</th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">Shift Bucket</th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Minimum Staff
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Target Staff
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {thresholds.length === 0 ? (
+            {isThresholdsLoading ? (
+              <SkeletonTableCard
+                rows={3}
+                cols={4}
+                hasHeaderBar={false}
+                srLabel="Loading staffing minimums..."
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-[16px] border border-[#EFECE6]">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-[#EFECE6] bg-[#FAF8F5]">
                     <tr>
-                      <td colSpan={4} className="px-4 py-4 text-center text-text-muted">
-                        No threshold records found.
-                      </td>
+                      <th className="px-3.5 py-2.5 font-extrabold text-[#18181B]">Shift Bucket</th>
+                      <th className="px-3 py-2.5 font-extrabold text-[#18181B] text-center">
+                        Weekday
+                      </th>
+                      <th className="px-3 py-2.5 font-extrabold text-[#18181B] text-center">
+                        Weekend
+                      </th>
+                      <th className="px-3 py-2.5 font-extrabold text-[#18181B] text-center">
+                        Holiday
+                      </th>
                     </tr>
-                  ) : (
-                    thresholds.map((t: StaffingThresholdRow) => (
-                      <tr key={t.id} className="hover:bg-surface-secondary/30">
-                        <td className="px-4 py-2 font-medium capitalize text-text-primary">
-                          {t.day_type}
+                  </thead>
+                  <tbody className="divide-y divide-[#EFECE6]">
+                    {thresholdMatrix.map((row) => (
+                      <tr key={row.bucket} className="hover:bg-[#FAF8F5]/70">
+                        <td className="px-3.5 py-3 font-extrabold text-[#0F766E]">
+                          {row.rowLabel}
                         </td>
-                        <td className="px-4 py-2 font-mono uppercase text-brand-primary">
-                          {t.shift_bucket}
-                        </td>
-                        <td className="px-4 py-2 text-center font-bold text-text-primary">
-                          {t.min_staff}
-                        </td>
-                        <td className="px-4 py-2 text-center text-text-secondary">
-                          {t.target_staff}
-                        </td>
+                        {(['weekday', 'weekend', 'holiday'] as const).map((dt) => {
+                          const cell = row[dt];
+                          return (
+                            <td key={dt} className="px-3 py-3 text-center">
+                              {cell ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[#EFECE6] bg-[#FAF8F5] px-2.5 py-0.5 font-extrabold text-[#18181B] tabular-nums">
+                                  <span>{cell.min_staff}</span>
+                                  <span className="text-[#78716C] font-semibold">
+                                    / {cell.target_staff}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="text-[#A8A29E]">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </SurfaceCard>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* TAB 3: SHIFTS & TIMINGS */}
+        {/* TAB 3: RESPONSIVE TAP-TO-EDIT SHIFTS & TIMINGS CARDS */}
         {activeTab === 'shifts' && (
-          <SurfaceCard variant="solid" className="space-y-4 p-5">
+          <div className="rounded-[22px] border border-[#E7E5E4] bg-white space-y-4 p-4 sm:p-5 shadow-[0_2px_10px_rgba(28,25,23,0.03)]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-text-primary">
+                <h2 className="text-[15px] font-extrabold text-[#18181B]">
                   Shift Definitions, Hours &amp; Timings
-                </h3>
-                <p className="text-xs text-text-secondary">
-                  Manage department shift timing hours, working windows, color badges, rest displacement and coverage rules.
+                </h2>
+                <p className="text-xs font-medium text-[#78716C]">
+                  Manage department shift timing hours, working windows, color badges, and GOFF
+                  eligibility.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleOpenCreateShift}
-                className="inline-flex items-center gap-1.5 self-start rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-semibold text-text-inverse hover:bg-brand-primary-hover shadow-xs transition-colors"
+                className="inline-flex items-center gap-1.5 self-start rounded-full bg-[#0F766E] px-3.5 py-1.5 text-xs font-extrabold text-white hover:bg-[#0D655E] shadow-2xs transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Add Shift Definition</span>
               </button>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-border-default bg-surface-secondary/70">
-                  <tr>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">Shift</th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">
-                      Description &amp; Short Label
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">
-                      Working Hours &amp; Timings
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary">
-                      Duty Classification
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Coverage
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary text-center">
-                      Status
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold text-text-primary text-right">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {shiftDefs.map((s: ShiftDefinitionRow) => {
-                    const sem = shiftSemantics.find(
-                      (semRow: ShiftSemanticRow) => semRow.shift_code === s.code,
-                    );
-                    const colorClass = getShiftColorClass(s.color_token);
+            {isShiftsLoading ? (
+              <SkeletonTableCard
+                rows={6}
+                cols={5}
+                hasHeaderBar={false}
+                srLabel="Loading shift definitions..."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {shiftDefs.map((s: ShiftDefinitionRow) => {
+                  const sem = shiftSemantics.find(
+                    (semRow: ShiftSemanticRow) => semRow.shift_code === s.code,
+                  );
+                  const canonicalTone = getShiftToneClasses(s.code);
+                  const themeFallback = getShiftColorClass(s.color_token);
 
-                    const timingDisplay =
-                      s.start_time && s.end_time ? (
-                        <div className="flex items-center gap-1.5 font-mono text-xs">
-                          <Clock className="h-3.5 w-3.5 text-text-muted" />
-                          <span>
-                            {s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}
-                          </span>
-                          <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-[10px] font-bold text-text-secondary">
-                            {s.duration_hours ? `${Number(s.duration_hours)}h` : ''}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-text-muted text-[11px]">Full-Day Rest / Leave</span>
-                      );
-
-                    return (
-                      <tr key={s.code} className="hover:bg-surface-secondary/30">
-                        <td className="px-4 py-2.5 font-mono">
-                          <div
-                            className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-xs font-bold border ${colorClass}`}
+                  return (
+                    <div
+                      key={s.code}
+                      onClick={() => handleOpenEditShift(s)}
+                      className="rounded-[18px] border border-[#E7E5E4] bg-[#FAF8F5]/60 p-3.5 hover:border-[#0F766E] hover:bg-white transition cursor-pointer space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`inline-flex shrink-0 items-center justify-center rounded-xl px-2.5 py-1 text-xs font-extrabold font-mono border ${
+                              canonicalTone ? `${canonicalTone} border-[#E7E5E4]` : themeFallback
+                            }`}
                           >
                             {s.code}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="font-medium text-text-primary">{s.label}</div>
-                          {s.short_label && s.short_label !== s.code && (
-                            <div className="text-[11px] text-text-muted">
-                              Grid Code: {s.short_label}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-[#18181B] truncate">
+                              {s.label}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">{timingDisplay}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                                sem?.semantic_class === 'worked'
-                                  ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                                  : sem?.semantic_class === 'transparent'
-                                    ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
-                                    : 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              {sem?.semantic_class === 'worked'
-                                ? 'Worked Duty'
-                                : sem?.semantic_class === 'transparent'
-                                  ? 'Post-Night Buffer'
-                                  : 'Rest / Leave'}
-                            </span>
-                            {sem?.night_policy_b_qualifying && (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
-                                <Moon className="h-3 w-3" />
-                                Night
-                              </span>
-                            )}
+                            <div className="text-[10.5px] font-semibold text-[#78716C]">
+                              {s.start_time && s.end_time
+                                ? `${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}${
+                                    s.duration_hours ? ` · ${Number(s.duration_hours)}h` : ''
+                                  }`
+                                : 'Full-Day Rest / Leave'}
+                              {s.short_label && s.short_label !== s.code
+                                ? ` · Grid: ${s.short_label}`
+                                : ''}
+                            </div>
                           </div>
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          {sem?.provides_coverage ? (
-                            <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                          ) : (
-                            <span className="text-text-muted">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          {s.is_active ? (
-                            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                              Active
-                            </span>
-                          ) : (
-                            <span className="rounded-md bg-slate-500/15 px-2 py-0.5 text-[10px] font-bold text-text-muted">
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditShift(s)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-primary px-2.5 py-1 text-xs font-semibold text-text-primary hover:bg-surface-secondary transition-colors"
-                            aria-label={`Edit ${s.code}`}
-                          >
-                            <Pencil className="h-3 w-3 text-brand-primary" />
-                            <span>Edit</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </SurfaceCard>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditShift(s);
+                          }}
+                          className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#18181B] hover:bg-[#EFECE6] cursor-pointer"
+                          aria-label={`Edit ${s.code}`}
+                        >
+                          <Pencil className="h-3 w-3 text-[#0F766E]" />
+                          <span>Edit</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
+                        <span
+                          className={`rounded-full px-2 py-0.5 ${
+                            sem?.semantic_class === 'worked'
+                              ? 'bg-[#DCE7F9] text-[#1E3A8A]'
+                              : sem?.semantic_class === 'transparent'
+                                ? 'bg-[#E9E4FA] text-[#4C1D95]'
+                                : 'bg-[#F5F5F4] text-[#57534E]'
+                          }`}
+                        >
+                          {sem?.semantic_class === 'worked'
+                            ? 'Worked Duty'
+                            : sem?.semantic_class === 'transparent'
+                              ? 'Post-Night Buffer'
+                              : 'Rest / Leave'}
+                        </span>
+
+                        {sem?.night_policy_b_qualifying && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#FCE7F1] text-[#9D174D] px-2 py-0.5">
+                            <Moon className="h-2.5 w-2.5" />
+                            Night
+                          </span>
+                        )}
+
+                        {sem?.provides_coverage && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#F0FDFA] text-[#0F766E] px-2 py-0.5">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            Coverage
+                          </span>
+                        )}
+
+                        {sem?.displaces_off_earns_goff && (
+                          <span className="rounded-full bg-[#FAF0CA] text-[#78350F] px-2 py-0.5">
+                            GOFF Eligible
+                          </span>
+                        )}
+
+                        <span
+                          className={`rounded-full px-2 py-0.5 ${
+                            s.is_active
+                              ? 'bg-[#D1FAE5] text-[#065F46]'
+                              : 'bg-[#F5F5F4] text-[#78716C]'
+                          }`}
+                        >
+                          {s.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Blueprint Architecture Note */}
-        <SurfaceCard variant="glass" className="p-4 space-y-1">
-          <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
-            <ShieldCheck className="h-4 w-4 text-brand-primary" />
-            ADR-005: Versioned, Immutable Rule Sets
-          </div>
-          <p className="text-[11px] leading-relaxed text-text-secondary">
-            Roster calculation rules and parameter thresholds are versioned. Active policies and
-            thresholds are scoped by month or date duration to preserve historical acceptance
-            fixtures while dynamically governing future scheduling cycles.
-          </p>
-        </SurfaceCard>
+        {/* Request Quota Thresholds Edit Modal */}
+        <Modal
+          isOpen={isRequestQuotaModalOpen}
+          onClose={() => setIsRequestQuotaModalOpen(false)}
+          title="Edit Request Quota Thresholds"
+          description="Set monthly and daily request submission caps for Medical Officers."
+          presentation="drawer"
+          maxWidth="md"
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsRequestQuotaModalOpen(false)}
+                className="rounded-full border border-[#E7E5E4] bg-white px-4 py-2 text-xs font-extrabold text-[#57534E] hover:bg-[#FAF8F5] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-request-quotas-form"
+                disabled={updateRuleMutation.isPending}
+                className="rounded-full bg-[#0F766E] px-5 py-2 text-xs font-extrabold text-white hover:bg-[#115E59] disabled:opacity-50 cursor-pointer"
+              >
+                {updateRuleMutation.isPending ? 'Saving...' : 'Save Quota Thresholds'}
+              </button>
+            </div>
+          }
+        >
+          <form
+            id="edit-request-quotas-form"
+            onSubmit={handleSaveRequestQuotas}
+            className="space-y-3.5"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-extrabold text-[#18181B] mb-1">
+                  Monthly Cap (reqs / mo)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={quotaMonthlyDraft}
+                  onChange={(e) => setQuotaMonthlyDraft(Number(e.target.value))}
+                  className="h-10 w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 text-sm font-extrabold text-[#18181B]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-[#18181B] mb-1">
+                  Weekend Cap (Fri–Sun)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={12}
+                  value={quotaWeekendDraft}
+                  onChange={(e) => setQuotaWeekendDraft(Number(e.target.value))}
+                  className="h-10 w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 text-sm font-extrabold text-[#18181B]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-[#18181B] mb-1">
+                  OFF Group / Day
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={quotaDailyOffDraft}
+                  onChange={(e) => setQuotaDailyOffDraft(Number(e.target.value))}
+                  className="h-10 w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 text-sm font-extrabold text-[#18181B]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-[#18181B] mb-1">
+                  ON1 / Day Cap
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={quotaOn1DailyDraft}
+                  onChange={(e) => setQuotaOn1DailyDraft(Number(e.target.value))}
+                  className="h-10 w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 text-sm font-extrabold text-[#18181B]"
+                />
+              </div>
+            </div>
+          </form>
+        </Modal>
 
         {/* Edit Shift Modal */}
         <EditShiftModal

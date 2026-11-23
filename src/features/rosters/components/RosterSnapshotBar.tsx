@@ -199,17 +199,26 @@ export function RosterSnapshotBar({
   const handleConfirmSendTelegram = async () => {
     if (!latestSnapshot) return;
     try {
+      setActionMessage(null);
       await telegramMutation.mutateAsync({
         snapshotId: latestSnapshot.id,
       });
       setIsTelegramModalOpen(false);
       setActionMessage(`Snapshot v${latestSnapshot.snapshot_version} sent to owner Telegram chat.`);
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to send to Telegram.');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Failed to send to Telegram.';
+      setActionMessage(msg);
     }
   };
 
-  const isArchivedForCurrentRevision = Boolean(currentSnapshot);
+  const isArchivedForCurrentRevision = Boolean(
+    currentSnapshot && !(currentSnapshot.drive_file_id ?? '').startsWith('drive_'),
+  );
 
   return (
     <SurfaceCard
@@ -225,11 +234,11 @@ export function RosterSnapshotBar({
               Roster Document Archive &amp; Telegram Workflow
             </h3>
             {isArchivedForCurrentRevision ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                 <CheckCircle2 className="h-3 w-3" />v{currentSnapshot?.snapshot_version} Archived
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                 Revision {periodRevision} (Unarchived Delta)
               </span>
             )}
@@ -257,7 +266,7 @@ export function RosterSnapshotBar({
             onClick={() => setIsPdfModalOpen(true)}
             disabled={isPreviewing}
             aria-label="PDF Export / Preview PDF"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 hover:border-teal-500 shadow-2xs transition-all duration-150 cursor-pointer disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E5E4] bg-white px-3.5 py-1.5 text-xs font-bold text-[#18181B] hover:bg-[#FAF8F5] hover:border-[#0F766E] shadow-2xs transition-all duration-150 cursor-pointer disabled:opacity-50"
           >
             {isPreviewing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-600" />
@@ -302,8 +311,8 @@ export function RosterSnapshotBar({
                 !latestSnapshot
                   ? 'border-border-default bg-surface-secondary/40 text-text-muted cursor-not-allowed opacity-50'
                   : isDeliveredToTelegram
-                    ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 hover:bg-indigo-500/20 dark:text-indigo-300'
-                    : 'border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-700'
+                    ? 'border-teal-500/30 bg-[#F0FDFA] text-[#0F766E] hover:bg-teal-100/60'
+                    : 'border-[#0F766E] bg-[#0F766E] text-white hover:bg-[#115E59]'
               }`}
             >
               <Send className="h-3.5 w-3.5" />
@@ -317,7 +326,7 @@ export function RosterSnapshotBar({
       {actionMessage && (
         <div className="flex items-center justify-between rounded-xl bg-surface-primary/80 px-3 py-2 text-xs border border-border-subtle animate-in fade-in">
           <div className="flex items-center gap-2 text-text-primary">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span>{actionMessage}</span>
           </div>
           <button
@@ -338,11 +347,11 @@ export function RosterSnapshotBar({
           aria-modal="true"
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 dark:border-slate-800 dark:bg-slate-900"
+            className="w-full max-w-md rounded-t-[28px] sm:rounded-[24px] border border-[#E7E5E4] bg-white p-6 shadow-2xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-              <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+              <div className="flex items-center gap-2 text-[#0F766E]">
                 <Send className="h-5 w-5" />
                 <h3 className="font-bold text-base text-text-primary">Send Snapshot to Telegram</h3>
               </div>
@@ -371,6 +380,12 @@ export function RosterSnapshotBar({
                 SHA-256: {latestSnapshot.pdf_sha256}
               </div>
             </div>
+
+            {actionMessage ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 break-words">
+                {actionMessage}
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -406,8 +421,8 @@ export function RosterSnapshotBar({
 
       {/* PDF Format Selector Modal */}
       {isPdfModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18181B]/55 p-4 backdrop-blur-[3px]">
+          <div className="w-full max-w-lg rounded-[24px] border border-[#E7E5E4] bg-white p-6 shadow-2xl animate-in">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
               <div className="flex items-center gap-2">
                 <Eye className="h-5 w-5 text-brand-primary" />

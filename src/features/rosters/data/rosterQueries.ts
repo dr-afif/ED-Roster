@@ -168,7 +168,7 @@ export function useRosterStaffQuery() {
         .from('staff_directory')
         .select('id, staff_code, roster_name, display_name, staff_group, active')
         .eq('active', true)
-        .order('roster_name', { ascending: true });
+        .order('id', { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map(
@@ -232,28 +232,95 @@ export function useUpsertDraftAssignmentMutation(periodId: number) {
       shiftCode: string;
       cellNote?: string;
     }) => {
-      const { data, error } = await supabase
-        .from('roster_draft_assignments')
-        .upsert(
+      const attemptUpsert = () =>
+        supabase
+          .from('roster_draft_assignments')
+          .upsert(
+            {
+              period_id: periodId,
+              staff_id: payload.staffId,
+              duty_date: payload.dutyDate,
+              shift_code: payload.shiftCode,
+              cell_note: payload.cellNote ?? null,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'period_id,staff_id,duty_date',
+            },
+          )
+          .select()
+          .single();
+
+      let { data, error } = await attemptUpsert();
+
+      // Ensure MEDSB and modifier variants (e.g. "OFF (S)", "AM (X)") exist in shift_definitions
+      if (error && error.code === '23503' && /shift_code_fkey/i.test(error.message ?? '')) {
+        const cleanCode = payload.shiftCode.trim();
+        const isBaseMedsb = cleanCode.toUpperCase() === 'MEDSB';
+        const { error: defError } = await supabase.from('shift_definitions').upsert(
           {
+            code: cleanCode,
+            label: isBaseMedsb ? 'Medical Standby' : cleanCode,
+            short_label: cleanCode,
+            color_token: isBaseMedsb ? 'amber' : 'neutral',
+            is_active: isBaseMedsb,
+            sort_order: isBaseMedsb ? 55 : 999,
+          },
+          { onConflict: 'code' },
+        );
+        if (!defError) {
+          ({ data, error } = await attemptUpsert());
+        }
+      }
+
+      if (error) throw error;
+      return data;
+    },
+    onMutate: async (payload) => {
+      const key = queryKeys.rosters.draftAssignments(periodId);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<DraftAssignmentRow[]>(key);
+      queryClient.setQueryData<DraftAssignmentRow[]>(key, (old = []) => {
+        const idx = old.findIndex(
+          (r) => r.staff_id === payload.staffId && r.duty_date === payload.dutyDate,
+        );
+        if (idx >= 0) {
+          const updated = [...old];
+          const existing = updated[idx];
+          if (existing) {
+            updated[idx] = {
+              ...existing,
+              shift_code: payload.shiftCode,
+              cell_note: payload.cellNote ?? existing.cell_note,
+            };
+          }
+          return updated;
+        }
+        return [
+          ...old,
+          {
+            id: -Date.now(),
             period_id: periodId,
             staff_id: payload.staffId,
             duty_date: payload.dutyDate,
             shift_code: payload.shiftCode,
             cell_note: payload.cellNote ?? null,
+            source_type: 'manual_edit',
+            request_id: null,
+            created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'period_id,staff_id,duty_date',
-          },
-        )
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+            updated_by: null,
+          } as unknown as DraftAssignmentRow,
+        ];
+      });
+      return { previous };
     },
-    onSuccess: () => {
+    onError: (_err, _payload, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKeys.rosters.draftAssignments(periodId), context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.rosters.draftAssignments(periodId),
       });
@@ -274,6 +341,94 @@ export function useDeleteDraftAssignmentMutation(periodId: number) {
         .eq('duty_date', payload.dutyDate);
 
       if (error) throw error;
+    },
+    onMutate: async (payload) => {
+      const key = queryKeys.rosters.draftAssignments(periodId);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<DraftAssignmentRow[]>(key);
+      queryClient.setQueryData<DraftAssignmentRow[]>(key, (old = []) =>
+        old.filter((r) => !(r.staff_id === payload.staffId && r.duty_date === payload.dutyDate)),
+      );
+      return { previous };
+    },
+    onError: (_err, _payload, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKeys.rosters.draftAssignments(periodId), context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.rosters.draftAssignments(periodId),
+      });
+    },
+  });
+}
+
+export function useBatchSaveDraftAssignmentsMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      upserts: Array<{ staffId: number; dutyDate: string; shiftCode: string }>;
+      deletes: Array<{ staffId: number; dutyDate: string }>;
+    }) => {
+      const nowIso = new Date().toISOString();
+
+      if (payload.upserts.length > 0) {
+        const rows = payload.upserts.map((u) => ({
+          period_id: periodId,
+          staff_id: u.staffId,
+          duty_date: u.dutyDate,
+          shift_code: u.shiftCode,
+          updated_at: nowIso,
+        }));
+
+        const attemptBatchUpsert = () =>
+          supabase
+            .from('roster_draft_assignments')
+            .upsert(rows, { onConflict: 'period_id,staff_id,duty_date' })
+            .select();
+
+        let { error } = await attemptBatchUpsert();
+
+        if (error && error.code === '23503' && /shift_code_fkey/i.test(error.message ?? '')) {
+          const uniqueCodes = Array.from(new Set(payload.upserts.map((u) => u.shiftCode.trim())));
+          const defRows = uniqueCodes.map((cleanCode) => {
+            const isBaseMedsb = cleanCode.toUpperCase() === 'MEDSB';
+            return {
+              code: cleanCode,
+              label: isBaseMedsb ? 'Medical Standby' : cleanCode,
+              short_label: cleanCode,
+              color_token: isBaseMedsb ? 'amber' : 'neutral',
+              is_active: isBaseMedsb,
+              sort_order: isBaseMedsb ? 55 : 999,
+            };
+          });
+          const { error: defError } = await supabase
+            .from('shift_definitions')
+            .upsert(defRows, { onConflict: 'code' });
+          if (!defError) {
+            ({ error } = await attemptBatchUpsert());
+          }
+        }
+
+        if (error) throw error;
+      }
+
+      if (payload.deletes.length > 0) {
+        const results = await Promise.all(
+          payload.deletes.map((d) =>
+            supabase
+              .from('roster_draft_assignments')
+              .delete()
+              .eq('period_id', periodId)
+              .eq('staff_id', d.staffId)
+              .eq('duty_date', d.dutyDate),
+          ),
+        );
+        const firstErr = results.find((r) => r.error)?.error;
+        if (firstErr) throw firstErr;
+      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -758,7 +913,7 @@ export interface EpAssignmentRow {
   id: number;
   period_id: number;
   duty_date: string;
-  slot_type: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+  slot_type: 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE';
   physician_names: string;
   updated_at: string;
   updated_by: string | null;
@@ -791,7 +946,7 @@ export function useUpsertEpAssignmentMutation(periodId: number) {
   return useMutation({
     mutationFn: async (payload: {
       dutyDate: string;
-      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+      slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE';
       physicianNames: string;
     }) => {
       const { data, error } = await supabase
@@ -822,6 +977,36 @@ export function useUpsertEpAssignmentMutation(periodId: number) {
   });
 }
 
+export function usePeriodShiftRequestsQuery(periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['rosters', 'period-requests', periodStart ?? '', periodEnd ?? ''] as const,
+    queryFn: async (): Promise<
+      Array<{ staff_id?: number | string; date: string; request: string }>
+    > => {
+      if (!periodStart || !periodEnd) return [];
+      try {
+        const { data, error } = await supabase
+          .from('roster_requests')
+          .select('staff_id, start_date, requested_shift_code')
+          .gte('start_date', periodStart)
+          .lte('start_date', periodEnd)
+          .in('status', ['active', 'submitted', 'approved']);
+
+        if (error) return [];
+        return (data ?? []).map((row) => ({
+          staff_id: row.staff_id,
+          date: row.start_date,
+          request: (row.requested_shift_code || '').toUpperCase(),
+        }));
+      } catch {
+        return [];
+      }
+    },
+    enabled: Boolean(periodStart && periodEnd),
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useBatchUpsertEpAssignmentsMutation(periodId: number) {
   const queryClient = useQueryClient();
 
@@ -829,7 +1014,7 @@ export function useBatchUpsertEpAssignmentsMutation(periodId: number) {
     mutationFn: async (
       payloads: Array<{
         dutyDate: string;
-        slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL';
+        slotType: 'EP_OFFICE_HOUR' | 'EP_ONCALL' | 'EP_PASSIVE';
         physicianNames: string;
       }>,
     ) => {

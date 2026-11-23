@@ -25,6 +25,18 @@ export type AuthenticatedUserContext = {
   readonly rosterName: string | null;
 };
 
+export type TestPersonaMode = 'owner' | 'mo';
+
+export const TEST_NORMAL_MO_USER: AuthenticatedUserContext = Object.freeze({
+  authUserId: '00000000-0000-4000-8000-000000000002',
+  email: 'siti@hsaas.upm.edu.my',
+  role: 'staff',
+  staffId: 2,
+  staffCode: 'MO-02',
+  displayName: 'Dr. Siti Nurhaliza',
+  rosterName: 'Dr. Siti',
+});
+
 export type AuthBoundaryState = {
   readonly status: AuthBootstrapStatus;
   readonly user: AuthenticatedUserContext | null;
@@ -34,9 +46,17 @@ export type AuthBoundaryState = {
   readonly signInWithGoogle: (returnToPath?: string) => Promise<void>;
   readonly signOut: () => Promise<void>;
   readonly retryBootstrap: () => Promise<void>;
+  readonly testPersona?: TestPersonaMode;
+  readonly canSwitchTestPersona?: boolean;
+  readonly toggleTestMoPersona?: () => void;
+  readonly signInAsTestMo?: () => Promise<void>;
 };
 
 const NOOP_ASYNC = async () => {
+  /* noop */
+};
+
+const NOOP_SYNC = () => {
   /* noop */
 };
 
@@ -49,6 +69,10 @@ export const DEFAULT_AUTH_STATE: AuthBoundaryState = Object.freeze({
   signInWithGoogle: NOOP_ASYNC,
   signOut: NOOP_ASYNC,
   retryBootstrap: NOOP_ASYNC,
+  testPersona: 'owner',
+  canSwitchTestPersona: false,
+  toggleTestMoPersona: NOOP_SYNC,
+  signInAsTestMo: NOOP_ASYNC,
 });
 
 export const AuthContext = createContext<AuthBoundaryState>(DEFAULT_AUTH_STATE);

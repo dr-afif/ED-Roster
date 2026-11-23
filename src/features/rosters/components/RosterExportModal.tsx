@@ -10,10 +10,8 @@ import {
   X,
 } from 'lucide-react';
 import type { EpAssignmentRow, ShiftDefinitionRow } from '../data/rosterQueries';
-import {
-  type LivePdfContact,
-  openLiveRosterPdfExport,
-} from '../domain/livePdfExport';
+import { computeAutoPassiveEps } from './RosterCalendarView';
+import { type LivePdfContact, openLiveRosterPdfExport } from '../domain/livePdfExport';
 import { generateCalendarRosterPdf, generateRosterPdf } from '../domain/pdfGenerator';
 import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
 
@@ -25,6 +23,7 @@ export interface RosterExportModalProps {
   periodStart: string;
   periodRevision: number;
   staffList: readonly StaffRosterIdentity[];
+  allStaffList?: readonly StaffRosterIdentity[];
   assignments: readonly Assignment[];
   shiftDefinitions: readonly ShiftDefinitionRow[];
   epAssignments?: readonly EpAssignmentRow[];
@@ -54,6 +53,7 @@ export function RosterExportModal({
   periodStart,
   periodRevision,
   staffList,
+  allStaffList,
   assignments,
   shiftDefinitions,
   epAssignments = [],
@@ -63,9 +63,44 @@ export function RosterExportModal({
   const monthName = MONTH_NAMES[monthIdx] ?? periodMonth;
   const defaultMonthYear = `${monthName.toUpperCase()} ${periodYear}`;
 
-  const [rosterType, setRosterType] = useState<'MO ROSTER' | 'MO & EP ROSTER' | 'EP ROSTER'>(
-    'MO ROSTER',
+  const directorySource = (
+    allStaffList && allStaffList.length > 0 ? allStaffList : staffList
+  ).filter((s) => s.active !== false);
+
+  const adminPreparedByOptions = Array.from(
+    new Set(
+      directorySource
+        .filter((s) => {
+          const group = (s.staffGroup || '').toUpperCase();
+          const code = (s.staffCode || '').toUpperCase();
+          const role = ((s as unknown as { role?: string }).role || '').toLowerCase();
+          const isPtpo = group.includes('PTPO') || code.startsWith('PTPO-');
+          if (isPtpo) return false;
+          return group.includes('SUPER-ADMIN') || group.includes('ADMIN-MO') || role === 'owner';
+        })
+        .map((s) => s.displayName || s.rosterName)
+        .filter(Boolean),
+    ),
   );
+  if (adminPreparedByOptions.length === 0) {
+    adminPreparedByOptions.push('Dr. Muhammad Afif');
+  }
+
+  const epStaffMembers = directorySource.filter((s) => {
+    const group = (s.staffGroup || '').toUpperCase();
+    const code = (s.staffCode || '').toUpperCase();
+    return code.startsWith('EP-') || group.startsWith('EP |') || group === 'EP';
+  });
+  const epSignOffOptions = Array.from(
+    new Set(epStaffMembers.map((s) => s.displayName || s.rosterName).filter(Boolean)),
+  );
+  if (epSignOffOptions.length === 0) {
+    epSignOffOptions.push('Emergency Physician IC', 'Head of Emergency Medicine Department');
+  }
+
+  const [rosterType, setRosterType] = useState<
+    'MO ROSTER' | 'MO & EP ROSTER' | 'EP ROSTER' | 'EP+ ROSTER'
+  >('MO ROSTER');
   const [mainTitle, setMainTitle] = useState(
     'HOSPITAL SULTAN ABDUL AZIZ SHAH (HSAAS) — EMERGENCY MEDICINE DEPARTMENT',
   );
@@ -73,9 +108,13 @@ export function RosterExportModal({
   const [version, setVersion] = useState(
     periodRevision === 0 ? 'DRAFT' : `FINAL (Rev ${periodRevision})`,
   );
-  const [preparedBy, setPreparedBy] = useState('Dr. Muhammad Afif (MO IC Roster)');
-  const [checkedBy, setCheckedBy] = useState('Emergency Physician IC');
-  const [approvedBy, setApprovedBy] = useState('Head of Emergency Medicine Department');
+  const [preparedBy, setPreparedBy] = useState<string>(
+    adminPreparedByOptions[0] ?? 'Dr. Muhammad Afif',
+  );
+  const [checkedBy, setCheckedBy] = useState<string>(epSignOffOptions[0] ?? '');
+  const [approvedBy, setApprovedBy] = useState<string>(
+    epSignOffOptions[1] ?? epSignOffOptions[0] ?? '',
+  );
   const [notes, setNotes] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -156,6 +195,25 @@ export function RosterExportModal({
         }
       }
 
+      const epAmVal =
+        epMap.get(`${d.dateStr}:EP_OFFICE_HOUR`) || epMap.get(`${d.dateStr}:AM`) || '';
+      const epOncallVal =
+        epMap.get(`${d.dateStr}:EP_ONCALL`) || epMap.get(`${d.dateStr}:ONCALL`) || '';
+      const hasManualPassive =
+        epMap.has(`${d.dateStr}:EP_PASSIVE`) ||
+        epMap.has(`${d.dateStr}:EP_OFFICE_HOUR_PASSIVE`) ||
+        epMap.has(`${d.dateStr}:PASSIVE`);
+      const epPassiveVal = hasManualPassive
+        ? (epMap.get(`${d.dateStr}:EP_PASSIVE`) ??
+          epMap.get(`${d.dateStr}:EP_OFFICE_HOUR_PASSIVE`) ??
+          epMap.get(`${d.dateStr}:PASSIVE`) ??
+          '')
+        : computeAutoPassiveEps(
+            epStaffMembers.map((s) => s.rosterName || s.displayName),
+            epAmVal,
+            epOncallVal,
+          ).join(', ');
+
       return {
         date: d.dayNum,
         day: d.dayName,
@@ -163,8 +221,9 @@ export function RosterExportModal({
         moAm: amNames.join('\n'),
         moPm: pmNames.join('\n'),
         moNight: nightNames.join('\n'),
-        epAm: epMap.get(`${d.dateStr}:EP_OFFICE_HOUR`) || epMap.get(`${d.dateStr}:AM`) || '',
-        epOncall: epMap.get(`${d.dateStr}:EP_ONCALL`) || epMap.get(`${d.dateStr}:ONCALL`) || '',
+        epAm: epAmVal,
+        epOncall: epOncallVal,
+        epPassive: epPassiveVal,
       };
     });
 
@@ -173,12 +232,16 @@ export function RosterExportModal({
       name: s.rosterName || s.displayName,
       phone: (s as unknown as { mobileNumber?: string }).mobileNumber || undefined,
     }));
+    const epContacts: LivePdfContact[] = epStaffMembers.map((s) => ({
+      name: s.rosterName || s.displayName,
+      phone: (s as unknown as { mobileNumber?: string }).mobileNumber || undefined,
+    }));
 
     return {
       spreadsheetDays,
       spreadsheetDoctors,
       calendarRows,
-      contacts: { mo: moContacts, ep: [] },
+      contacts: { mo: moContacts, ep: epContacts },
     };
   };
 
@@ -189,6 +252,11 @@ export function RosterExportModal({
       setErrorMessage(null);
 
       const { spreadsheetDays, spreadsheetDoctors, calendarRows, contacts } = buildExportData();
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+      const logoUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${base}ed-crest.png`
+          : '/ed-crest.png';
 
       openLiveRosterPdfExport({
         mainTitle,
@@ -196,6 +264,7 @@ export function RosterExportModal({
         monthYear,
         version,
         notes,
+        logoUrl,
         spreadsheetDays,
         spreadsheetDoctors,
         rows: calendarRows,
@@ -292,64 +361,69 @@ export function RosterExportModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="roster-pdf-export-title"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#18181B]/55 p-0 sm:p-4 backdrop-blur-[3px]"
     >
-      <div className="w-full max-w-xl rounded-t-[28px] sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl space-y-5 dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="no-scrollbar w-full max-w-xl rounded-t-[28px] sm:rounded-[24px] border border-[#E7E5E4] bg-white p-5 sm:p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto sheet-slide-up sm:animate-in"
+      >
         {/* Mobile drag handle */}
-        <div className="mx-auto -mt-1 h-1 w-10 rounded-full bg-stone-300 sm:hidden" />
+        <div className="mx-auto -mt-1 h-1 w-10 rounded-full bg-[#D6D3D1] sm:hidden" />
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div className="flex items-start justify-between border-b border-[#F4EFE6] pb-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 mb-1">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F0FDFA] px-2.5 py-0.5 text-[10.5px] font-extrabold text-[#0F766E] mb-1">
               <Sparkles className="h-3 w-3" />
               <span>Official Department Document</span>
             </div>
             <h2
               id="roster-pdf-export-title"
-              className="text-lg font-bold text-slate-900 dark:text-white tracking-tight"
+              className="text-lg font-extrabold text-[#18181B] tracking-tight"
             >
               Roster PDF Export &amp; Print
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-[#78716C] mt-0.5">
               Generate pixel-perfect clinical roster documents with HSAAS department letterhead.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer transition-colors"
+            aria-label="Close export modal"
+            className="rounded-xl border border-[#E7E5E4] p-1.5 text-[#57534E] hover:bg-[#FAF8F5] hover:text-[#18181B] cursor-pointer transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {errorMessage && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+          <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-xs font-semibold text-[#B91C1C]">
             {errorMessage}
           </div>
         )}
 
         {/* Format Selector Pills */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+          <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#78716C] mb-2">
             Roster Document Layout
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => setRosterType('MO ROSTER')}
-              className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${
+              className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition-all cursor-pointer ${
                 rosterType === 'MO ROSTER'
-                  ? 'border-teal-600 bg-teal-50/70 dark:bg-teal-950/30 text-teal-950 dark:text-teal-100 ring-2 ring-teal-600'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800'
+                  ? 'border-[#0F766E] bg-[#F0FDFA] text-[#18181B] ring-2 ring-[#0F766E]'
+                  : 'border-[#E7E5E4] bg-white hover:bg-[#FAF8F5]'
               }`}
             >
-              <FileSpreadsheet className="h-5 w-5 text-teal-600 shrink-0 mt-0.5" />
+              <FileSpreadsheet className="h-5 w-5 text-[#0F766E] shrink-0 mt-0.5" />
               <div>
-                <div className="text-xs font-bold">Staff Spreadsheet (Landscape A4)</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
-                  Complete 31-day doctor matrix, shift badges, public holiday list &amp; sign-off blocks.
+                <div className="text-xs font-extrabold">MO Roster</div>
+                <div className="text-[11px] text-[#78716C] leading-tight mt-0.5">
+                  Table view in Landscape A4 · 31-day MO matrix, holidays &amp; sign-off blocks.
                 </div>
               </div>
             </button>
@@ -357,17 +431,53 @@ export function RosterExportModal({
             <button
               type="button"
               onClick={() => setRosterType('MO & EP ROSTER')}
-              className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${
+              className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition-all cursor-pointer ${
                 rosterType === 'MO & EP ROSTER'
-                  ? 'border-teal-600 bg-teal-50/70 dark:bg-teal-950/30 text-teal-950 dark:text-teal-100 ring-2 ring-teal-600'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800'
+                  ? 'border-[#0F766E] bg-[#F0FDFA] text-[#18181B] ring-2 ring-[#0F766E]'
+                  : 'border-[#E7E5E4] bg-white hover:bg-[#FAF8F5]'
               }`}
             >
-              <FileText className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+              <FileText className="h-5 w-5 text-[#0F766E] shrink-0 mt-0.5" />
               <div>
-                <div className="text-xs font-bold">Daily Coverage Schedule (Portrait A4)</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
-                  Day-by-day AM, PM, Night MO coverage and EP Office Hour &amp; On-Call assignments.
+                <div className="text-xs font-extrabold">EP &amp; MO Roster</div>
+                <div className="text-[11px] text-[#78716C] leading-tight mt-0.5">
+                  Month view in Portrait A4 · Daily MO AM/PM/Night and EP Office Hour &amp; On-Call.
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRosterType('EP ROSTER')}
+              className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition-all cursor-pointer ${
+                rosterType === 'EP ROSTER'
+                  ? 'border-[#0F766E] bg-[#F0FDFA] text-[#18181B] ring-2 ring-[#0F766E]'
+                  : 'border-[#E7E5E4] bg-white hover:bg-[#FAF8F5]'
+              }`}
+            >
+              <FileText className="h-5 w-5 text-[#0F766E] shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-extrabold">EP</div>
+                <div className="text-[11px] text-[#78716C] leading-tight mt-0.5">
+                  EP-only month view in Portrait A4 · AM (8AM–4PM) &amp; On-Call (4PM–8AM).
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRosterType('EP+ ROSTER')}
+              className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition-all cursor-pointer ${
+                rosterType === 'EP+ ROSTER'
+                  ? 'border-[#0F766E] bg-[#F0FDFA] text-[#18181B] ring-2 ring-[#0F766E]'
+                  : 'border-[#E7E5E4] bg-white hover:bg-[#FAF8F5]'
+              }`}
+            >
+              <FileText className="h-5 w-5 text-[#0F766E] shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-extrabold">EP+</div>
+                <div className="text-[11px] text-[#78716C] leading-tight mt-0.5">
+                  Portrait A4 with extra EP column: Office Hour (8AM–5PM).
                 </div>
               </div>
             </button>
@@ -377,87 +487,117 @@ export function RosterExportModal({
         {/* Configuration Fields */}
         <div className="space-y-3.5">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+            <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#78716C] mb-1">
               Hospital &amp; Department Header
             </label>
             <input
               type="text"
               value={mainTitle}
               onChange={(e) => setMainTitle(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-teal-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-xs font-bold text-[#18181B] outline-none focus:border-[#0F766E] focus:bg-white"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#78716C] mb-1">
                 Month / Year
               </label>
               <input
                 type="text"
                 value={monthYear}
                 onChange={(e) => setMonthYear(e.target.value.toUpperCase())}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-teal-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-xs font-bold text-[#18181B] outline-none focus:border-[#0F766E] focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#78716C] mb-1">
                 Version / Revision
               </label>
               <input
                 type="text"
                 value={version}
                 onChange={(e) => setVersion(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-teal-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-xs font-bold text-[#18181B] outline-none focus:border-[#0F766E] focus:bg-white"
               />
             </div>
           </div>
 
           {/* Signature Configuration */}
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-800/40">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-              <UserCheck className="h-3.5 w-3.5 text-teal-600" />
+          <div className="rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] p-3.5 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-[#57534E]">
+              <UserCheck className="h-3.5 w-3.5 text-[#0F766E]" />
               <span>Official Sign-Off Panels</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                <label
+                  htmlFor="signoff-prepared-by"
+                  className="block text-[10px] font-bold text-[#78716C] mb-0.5"
+                >
                   Prepared By
                 </label>
-                <input
-                  type="text"
+                <select
+                  id="signoff-prepared-by"
+                  aria-label="Prepared By"
                   value={preparedBy}
                   onChange={(e) => setPreparedBy(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                />
+                  className="w-full rounded-lg border border-[#E7E5E4] bg-white px-2 py-1.5 text-xs font-medium text-[#18181B] outline-none focus:border-[#0F766E] cursor-pointer"
+                >
+                  {adminPreparedByOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                <label
+                  htmlFor="signoff-checked-by"
+                  className="block text-[10px] font-bold text-[#78716C] mb-0.5"
+                >
                   Checked By
                 </label>
-                <input
-                  type="text"
+                <select
+                  id="signoff-checked-by"
+                  aria-label="Checked By"
                   value={checkedBy}
                   onChange={(e) => setCheckedBy(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                />
+                  className="w-full rounded-lg border border-[#E7E5E4] bg-white px-2 py-1.5 text-xs font-medium text-[#18181B] outline-none focus:border-[#0F766E] cursor-pointer"
+                >
+                  {epSignOffOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                <label
+                  htmlFor="signoff-approved-by"
+                  className="block text-[10px] font-bold text-[#78716C] mb-0.5"
+                >
                   Approved By
                 </label>
-                <input
-                  type="text"
+                <select
+                  id="signoff-approved-by"
+                  aria-label="Approved By"
                   value={approvedBy}
                   onChange={(e) => setApprovedBy(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                />
+                  className="w-full rounded-lg border border-[#E7E5E4] bg-white px-2 py-1.5 text-xs font-medium text-[#18181B] outline-none focus:border-[#0F766E] cursor-pointer"
+                >
+                  {epSignOffOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+            <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#78716C] mb-1">
               Optional Administrative Notes
             </label>
             <textarea
@@ -465,17 +605,17 @@ export function RosterExportModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Any shift swap must be submitted via amendment request form 48 hours in advance."
-              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-teal-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="w-full resize-none rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-xs font-medium text-[#18181B] outline-none focus:border-[#0F766E] focus:bg-white"
             />
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-[#F4EFE6] pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 cursor-pointer transition-colors"
+            className="w-full sm:w-auto rounded-full border border-[#E7E5E4] bg-white px-4 py-2 text-xs font-bold text-[#57534E] hover:bg-[#FAF8F5] cursor-pointer transition-colors"
           >
             Cancel
           </button>
@@ -485,12 +625,12 @@ export function RosterExportModal({
               type="button"
               disabled={isExporting}
               onClick={handleDownloadBinaryPdf}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer shadow-2xs transition-all active:scale-[0.98]"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full border border-[#E7E5E4] bg-white px-4 py-2 text-xs font-bold text-[#18181B] hover:bg-[#FAF8F5] cursor-pointer shadow-2xs transition-all active:scale-[0.98]"
             >
               {isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-[#57534E]" />
               ) : (
-                <Download className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                <Download className="h-4 w-4 text-[#57534E]" />
               )}
               <span>Download .pdf</span>
             </button>
@@ -499,7 +639,7 @@ export function RosterExportModal({
               type="button"
               disabled={isExporting}
               onClick={handlePrintLiveLayout}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-teal-700/20 hover:bg-teal-800 cursor-pointer transition-all active:scale-[0.98] dark:bg-teal-600 dark:hover:bg-teal-500"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#14867D,#0F766E)] px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(15,118,110,0.28)] cursor-pointer transition-all active:scale-[0.98]"
             >
               {isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -41,6 +41,7 @@ const mockActiveEvents: AmendmentEvent[] = [
 ];
 
 vi.mock('../data/rosterQueries', () => ({
+  usePeriodShiftRequestsQuery: () => ({ data: [], isLoading: false }),
   useRosterPeriodQuery: () => ({
     data: {
       id: 1,
@@ -268,6 +269,10 @@ vi.mock('../data/rosterQueries', () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useBatchSaveDraftAssignmentsMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
   usePublishRosterMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
@@ -344,12 +349,14 @@ describe('Roster Operational Lifecycle & Amendments Integration', () => {
   it('renders published roster with three operational view tabs and owner actions', () => {
     renderPublishedWorkspace('owner');
 
-    expect(screen.getByText('PUBLISHED')).toBeDefined();
+    expect(screen.getByText(/31 Days · Published/i)).toBeDefined();
     expect(screen.getByRole('button', { name: /Live Schedule \(Current\)/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /Original Planned/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /Changes & Audit/i })).toBeDefined();
 
-    expect(screen.getByRole('button', { name: /Amend Roster/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /Changes & Audit/i }));
+    expect(screen.getByRole('button', { name: /Amend Shift/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /Live Schedule \(Current\)/i }));
     expect(screen.getByRole('button', { name: /Close Period/i })).toBeDefined();
   });
 
@@ -360,7 +367,9 @@ describe('Roster Operational Lifecycle & Amendments Integration', () => {
     const changesTab = screen.getByRole('button', { name: /Changes & Audit/i });
     fireEvent.click(changesTab);
 
-    expect(screen.getByRole('heading', { level: 2, name: /Audit Trail/i })).toBeDefined();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Audit Trail|Amendment History/i }),
+    ).toBeDefined();
     expect(screen.getByText(/Event #1/i)).toBeDefined();
     expect(screen.getByText(/Medical Leave covered by Dr Siti/i)).toBeDefined();
 
@@ -375,7 +384,8 @@ describe('Roster Operational Lifecycle & Amendments Integration', () => {
     mockSubmitAmendment.mockResolvedValueOnce(2);
     renderPublishedWorkspace('owner');
 
-    const amendBtn = screen.getByRole('button', { name: /Amend Roster/i });
+    fireEvent.click(screen.getByRole('button', { name: /Changes & Audit/i }));
+    const amendBtn = screen.getByRole('button', { name: /Amend Shift/i });
     fireEvent.click(amendBtn);
 
     expect(screen.getByRole('dialog')).toBeDefined();

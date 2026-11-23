@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { getShiftToneClasses } from '@/shared/ui';
 import {
   ADMIN_ALL_SHIFT_TYPES,
   DEFAULT_LIMIT_GROUPS,
@@ -47,32 +48,7 @@ export interface NewRequestFormProps {
 }
 
 const LEGACY_HIDDEN_SHIFTS = new Set(['ON', 'NIGHT', 'ND']);
-
-function getShiftTileTone(code: string, isSelected: boolean, isCapped: boolean): string {
-  if (isSelected) {
-    return 'bg-[#18181B] border-[#18181B] text-white shadow-sm font-extrabold';
-  }
-  if (isCapped) {
-    return 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-55';
-  }
-  const c = code.toUpperCase().trim();
-  if (c === 'AM' || c === 'OH') {
-    return 'bg-[#E5EED8] border-[#C6D8B6] text-[#2D4A22] hover:brightness-95';
-  }
-  if (c === 'PM') {
-    return 'bg-[#DCE7F9] border-[#B8CEF2] text-[#1E3A8A] hover:brightness-95';
-  }
-  if (c === 'ON1' || c === 'ON2' || c === 'PN') {
-    return 'bg-[#FCE7F1] border-[#F8B9D4] text-[#9D174D] hover:brightness-95';
-  }
-  if (c === 'AL' || c === 'MC' || c === 'EL' || c === 'HKA' || c === 'GHKA') {
-    return 'bg-[#D1FAE5] border-[#A7F3D0] text-[#065F46] hover:brightness-95';
-  }
-  if (c === 'COURSE' || c === 'COURT') {
-    return 'bg-[#FEF3C7] border-[#FDE047] text-[#854D0E] hover:brightness-95';
-  }
-  return 'bg-[#FAF8F5] border-stone-200 text-stone-700 hover:bg-stone-100';
-}
+const OFF_GROUP_CODES = new Set(['OFF', 'GOFF', 'AL', 'MC', 'EL', 'HKA', 'GHKA', 'COURSE']);
 
 export function NewRequestForm({
   selectedName,
@@ -88,8 +64,6 @@ export function NewRequestForm({
   const [isStaffPickerOpen, setIsStaffPickerOpen] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
 
-  // If user is owner/admin, provide full catalog of departmental shifts (excluding legacy ON/NIGHT/ND).
-  // Regular doctors are constrained to standard requestable types (DEFAULT_SHIFT_TYPES).
   const availableShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
     if (!isOwner) {
       return DEFAULT_SHIFT_TYPES;
@@ -97,14 +71,15 @@ export function NewRequestForm({
     if (dbShiftDefs.length > 0) {
       const mapped = dbShiftDefs
         .filter((s) => s.is_active && !LEGACY_HIDDEN_SHIFTS.has(s.code.toUpperCase()))
-        .map((s) => ({
-          ID: s.code,
-          Name: s.code,
-          GroupID: ['OFF', 'AL', 'MC', 'EL', 'HKA', 'GOFF'].includes(s.code.toUpperCase())
-            ? 'OFF'
-            : null,
-          IsPublic: true,
-        }));
+        .map((s) => {
+          const upper = s.code.toUpperCase();
+          return {
+            ID: s.code,
+            Name: s.code,
+            GroupID: upper === 'ON1' ? 'ON1' : OFF_GROUP_CODES.has(upper) ? 'OFF' : null,
+            IsPublic: true,
+          };
+        });
       for (const extra of ['OH', 'COURT']) {
         if (!mapped.some((m) => m.Name.toUpperCase() === extra)) {
           mapped.push({ ID: extra, Name: extra, GroupID: null, IsPublic: false });
@@ -163,6 +138,11 @@ export function NewRequestForm({
     return found?.roster_name || found?.display_name || selectedName;
   }, [teamMembers, targetStaffId, selectedName]);
 
+  const isEditing = Boolean(initialValues?.id);
+  const upperReq = request.toUpperCase().trim();
+  const isCommentRequired = upperReq === 'COURSE' || upperReq === 'MEDSB';
+  const showAmberRequiredBorder = isCommentRequired && !comment.trim();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
@@ -185,7 +165,7 @@ export function NewRequestForm({
       return;
     }
 
-    // Check monthly total limit (skip if Owner/Admin)
+    // Check monthly total & weekend limits (skip if Owner/Admin)
     if (!isOwner) {
       const monthlyCount = getMonthlyRequestCount({
         requests,
@@ -200,7 +180,6 @@ export function NewRequestForm({
         return;
       }
 
-      // Check weekend limit
       const d = new Date(date);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       if (isWeekend) {
@@ -221,6 +200,15 @@ export function NewRequestForm({
       }
     }
 
+    if (upperReq === 'COURSE' && !comment.trim()) {
+      setValidationError('Please enter Course Name & Place in the comment field.');
+      return;
+    }
+    if (upperReq === 'MEDSB' && !comment.trim()) {
+      setValidationError('Please enter Medical Standby Event & Venue in the comment field.');
+      return;
+    }
+
     try {
       await onSubmit({
         id: initialValues?.id,
@@ -234,7 +222,6 @@ export function NewRequestForm({
     }
   };
 
-  // Monthly Limit Card computation
   const monthlyCard = useMemo(() => {
     if (!date) return null;
     const monthlyCount = getMonthlyRequestCount({
@@ -245,11 +232,11 @@ export function NewRequestForm({
     });
     const isOverLimit = monthlyCount >= DEFAULT_MONTHLY_LIMIT;
 
-    let colorClasses = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    let colorClasses = 'text-[#065F46] bg-[#D1FAE5]/60 border-[#A7F3D0]';
     if (isOverLimit) {
-      colorClasses = 'text-rose-700 bg-rose-50 border-rose-200 font-bold';
+      colorClasses = 'text-[#991B1B] bg-[#FEF2F2] border-[#FECACA] font-bold';
     } else if (monthlyCount >= DEFAULT_MONTHLY_LIMIT - 2) {
-      colorClasses = 'text-amber-700 bg-amber-50 border-amber-200';
+      colorClasses = 'text-[#92400E] bg-[#FFFBEB] border-[#FDE68A]';
     }
 
     let displayMonth = 'this month';
@@ -283,40 +270,40 @@ export function NewRequestForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl bg-white p-4 shadow-xs ring-1 ring-stone-200/80"
+      className="rounded-[22px] bg-[#FAF8F5] p-3.5 border border-[#EFECE6]"
     >
-      <fieldset className="flex flex-col gap-3.5" disabled={isSubmitting}>
-        <legend className="text-sm font-extrabold text-stone-900">
-          {initialValues?.id ? 'Update Request' : 'New Request'}
-        </legend>
+      <fieldset className="flex flex-col gap-3" disabled={isSubmitting}>
+        <legend className="sr-only">{isEditing ? 'Update Request' : 'New Request'}</legend>
 
         {isOwner ? (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between rounded-2xl border border-stone-200/80 bg-[#FAF8F5] px-3 py-2 text-xs">
+            <div className="flex items-center justify-between rounded-[14px] border border-[#E7E5E4] bg-white px-3 py-2 text-xs">
               <div className="min-w-0">
-                <span className="font-semibold text-stone-500">Submit on behalf of: </span>
-                <span className="font-extrabold text-stone-900 truncate">{targetMemberName}</span>
+                <span className="font-semibold text-[#78716C]">Submit on behalf of: </span>
+                <span className="font-extrabold text-[#18181B] truncate">{targetMemberName}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setStaffSearch('');
-                  setIsStaffPickerOpen((v) => !v);
-                }}
-                className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1 text-[11px] font-bold text-stone-800 shadow-2xs hover:bg-stone-100 transition cursor-pointer"
-              >
-                {isStaffPickerOpen ? 'Done' : 'Change'}
-              </button>
+              {!isEditing ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffSearch('');
+                    setIsStaffPickerOpen((v) => !v);
+                  }}
+                  className="shrink-0 rounded-full border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-1 text-[11px] font-bold text-[#18181B] hover:bg-[#EFECE6] transition cursor-pointer"
+                >
+                  {isStaffPickerOpen ? 'Done' : 'Change'}
+                </button>
+              ) : null}
             </div>
 
-            {isStaffPickerOpen && (
-              <div className="rounded-2xl border border-stone-200 bg-white p-2.5 shadow-md space-y-2">
+            {isStaffPickerOpen && !isEditing ? (
+              <div className="rounded-[16px] border border-[#E7E5E4] bg-white p-2.5 shadow-md space-y-2">
                 <input
                   type="search"
                   placeholder="Search MO name or code..."
                   value={staffSearch}
                   onChange={(e) => setStaffSearch(e.target.value)}
-                  className="w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-1.5 text-xs font-medium text-stone-900 focus:border-teal-600 focus:outline-none"
+                  className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-1.5 text-xs font-medium text-[#18181B] focus:border-[#0F766E] focus:outline-none"
                 />
                 <div className="max-h-40 overflow-y-auto space-y-1">
                   {filteredMembers.map((member) => {
@@ -333,71 +320,59 @@ export function NewRequestForm({
                         }}
                         className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-bold transition cursor-pointer ${
                           isActive
-                            ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-200'
-                            : 'text-stone-800 hover:bg-stone-50'
+                            ? 'bg-[#F0FDFA] text-[#0F766E] ring-1 ring-[#99F6E4]'
+                            : 'text-[#18181B] hover:bg-[#FAF8F5]'
                         }`}
                       >
                         <span>
                           {label}{' '}
-                          <span className="text-[10px] font-normal text-stone-400">
+                          <span className="text-[10px] font-normal text-[#A8A29E]">
                             ({member.staff_code})
                           </span>
                         </span>
-                        {isActive && <span className="text-[10px] text-teal-700">Selected ✓</span>}
+                        {isActive ? (
+                          <span className="text-[10px] text-[#0F766E]">Selected ✓</span>
+                        ) : null}
                       </button>
                     );
                   })}
-                  {filteredMembers.length === 0 && (
-                    <p className="py-3 text-center text-xs text-stone-400">No matching MO</p>
-                  )}
+                  {filteredMembers.length === 0 ? (
+                    <p className="py-3 text-center text-xs text-[#A8A29E]">No matching MO</p>
+                  ) : null}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl bg-[#FAF8F5] border border-stone-200/70 px-3 py-2 text-xs text-stone-600">
-            <span className="font-semibold text-stone-500">Team member: </span>
-            <span className="text-stone-900 font-extrabold">{selectedName}</span>
+          <div className="rounded-[14px] bg-white border border-[#E7E5E4] px-3 py-2 text-xs text-[#57534E]">
+            <span className="font-semibold text-[#78716C]">Team member: </span>
+            <span className="text-[#18181B] font-extrabold">{selectedName}</span>
           </div>
         )}
 
-        <label className="text-xs font-bold text-stone-700">
-          Date
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setValidationError('');
-              setDate(e.target.value);
-            }}
-            className="mt-1 w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none"
-            required
-          />
-        </label>
-
         {/* Live Monthly Limit Summary Card */}
-        {monthlyCard && (
+        {monthlyCard ? (
           <div
-            className={`flex items-center justify-between rounded-xl border p-2.5 text-xs ${monthlyCard.colorClasses}`}
+            className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${monthlyCard.colorClasses}`}
           >
             <span>Monthly total for {monthlyCard.displayMonth}:</span>
-            <span className="font-bold">
+            <span className="font-extrabold">
               {monthlyCard.monthlyCount} / {DEFAULT_MONTHLY_LIMIT} used
             </span>
           </div>
-        )}
+        ) : null}
 
         {/* Shift Type Grid */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-700">Request Type</span>
-            {isOwner && (
-              <span className="rounded-lg bg-teal-50 border border-teal-200/70 px-2 py-0.5 text-[10px] font-extrabold text-teal-800">
+            <span className="text-xs font-extrabold text-[#18181B]">Request Type</span>
+            {isOwner ? (
+              <span className="rounded-full bg-[#F0FDFA] border border-[#99F6E4] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F766E]">
                 Admin Mode: Full Shift Catalog ({availableShiftTypes.length})
               </span>
-            )}
+            ) : null}
           </div>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {availableShiftTypes.map((st) => {
               const status = getLimitStatusForType({
                 type: st.Name,
@@ -417,12 +392,6 @@ export function NewRequestForm({
               const isCapped = !isOwner && status.isLimited && Boolean(status.isAtLimit);
               const isSelected = request === st.Name;
 
-              const btnClass = `border text-[11px] font-extrabold py-2.5 rounded-xl text-center transition duration-150 active:scale-[0.96] flex items-center justify-center min-w-0 px-1 cursor-pointer ${getShiftTileTone(
-                st.Name,
-                isSelected,
-                isCapped,
-              )}`;
-
               return (
                 <button
                   key={st.Name}
@@ -433,7 +402,13 @@ export function NewRequestForm({
                     setValidationError('');
                     setRequest(st.Name);
                   }}
-                  className={btnClass}
+                  className={`rounded-[14px] py-2.5 px-2 text-center text-[12px] font-extrabold transition active:scale-[0.96] cursor-pointer ${
+                    isCapped
+                      ? 'border border-[#E7E5E4] bg-stone-100 text-stone-400 opacity-55 cursor-not-allowed'
+                      : `${getShiftToneClasses(st.Name)} ${
+                          isSelected ? 'ring-2 ring-[#18181B] ring-offset-2' : ''
+                        }`
+                  }`}
                 >
                   <span className="truncate">{st.Name}</span>
                 </button>
@@ -441,7 +416,7 @@ export function NewRequestForm({
             })}
           </div>
 
-          <p className="mt-1 text-[11px] font-medium text-stone-500">
+          <p className="mt-0.5 text-[11px] font-semibold text-[#78716C]">
             {selectedDateKey && selectedTypeStatus.isLimited ? (
               <>
                 {selectedTypeStatus.usage}/{selectedTypeStatus.limit} requests for group &apos;
@@ -456,33 +431,59 @@ export function NewRequestForm({
           </p>
         </div>
 
-        <label className="text-xs font-bold text-stone-700">
-          Comment (optional)
+        <label className="text-xs font-extrabold text-[#18181B]">
+          {upperReq === 'COURSE' ? (
+            <>
+              Course Name &amp; Place <span className="text-[#D97706]">*Required</span>
+            </>
+          ) : upperReq === 'MEDSB' ? (
+            <>
+              Medical Standby Event &amp; Venue <span className="text-[#D97706]">*Required</span>
+            </>
+          ) : (
+            'Comment (optional)'
+          )}
           <textarea
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e) => {
+              setComment(e.target.value);
+              e.currentTarget.style.height = 'auto';
+              e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 120)}px`;
+            }}
             rows={2}
-            placeholder="Add context for this request"
-            className="mt-1 w-full rounded-xl border border-stone-200 bg-[#FAF8F5] px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none"
+            placeholder={
+              upperReq === 'COURSE'
+                ? 'Course Name: ...\nPlace: ...'
+                : upperReq === 'MEDSB'
+                  ? 'Event: ...\nVenue: ...'
+                  : 'Add context for this request'
+            }
+            className={`mt-1 min-h-[54px] max-h-32 w-full resize-none overflow-y-auto rounded-[14px] border bg-white px-3 py-2 text-xs font-medium text-[#18181B] focus:outline-none ${
+              showAmberRequiredBorder
+                ? 'border-[#F59E0B] ring-1 ring-[#F59E0B]/40'
+                : 'border-[#E7E5E4] focus:border-[#0F766E]'
+            }`}
           />
         </label>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-[#18181B] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-stone-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-stone-300 cursor-pointer"
-        >
-          {isSubmitting ? 'Saving...' : initialValues?.id ? 'Update Request' : 'Save Request'}
-        </button>
-
-        {validationError && (
+        {validationError ? (
           <div
             role="alert"
-            className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+            className="rounded-[14px] border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-xs font-semibold text-[#B91C1C]"
           >
             {validationError}
           </div>
-        )}
+        ) : null}
+
+        <div className="sticky bottom-0 z-10 -mx-1 bg-gradient-to-t from-[#FAF8F5] via-[#FAF8F5]/95 to-transparent px-1 pt-2 pb-0.5">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex w-full items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#14867D,#0F766E)] px-4 py-3 text-[13px] font-extrabold text-white shadow-[0_8px_18px_rgba(15,118,110,0.28)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          >
+            {isSubmitting ? 'Saving...' : isEditing ? 'Update Request' : 'Save Request'}
+          </button>
+        </div>
       </fieldset>
     </form>
   );

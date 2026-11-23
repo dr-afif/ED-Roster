@@ -81,9 +81,14 @@ describe('RosterExportModal & livePdfExport', () => {
     );
 
     expect(screen.getByRole('heading', { name: /Roster PDF Export & Print/i })).toBeDefined();
-    expect(screen.getByText(/Staff Spreadsheet \(Landscape A4\)/i)).toBeDefined();
-    expect(screen.getByText(/Daily Coverage Schedule \(Portrait A4\)/i)).toBeDefined();
+    expect(screen.getByText('MO Roster')).toBeDefined();
+    expect(screen.getByText('EP & MO Roster')).toBeDefined();
+    expect(screen.getByText('EP')).toBeDefined();
+    expect(screen.getByText('EP+')).toBeDefined();
     expect(screen.getByText(/Official Sign-Off Panels/i)).toBeDefined();
+    expect(screen.getByLabelText('Prepared By').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('Checked By').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('Approved By').tagName).toBe('SELECT');
     expect(screen.getByRole('button', { name: /Print \/ Live Layout/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /Download \.pdf/i })).toBeDefined();
   });
@@ -104,8 +109,8 @@ describe('RosterExportModal & livePdfExport', () => {
       />,
     );
 
-    const dailyScheduleCard = screen.getByText(/Daily Coverage Schedule \(Portrait A4\)/i);
-    await user.click(dailyScheduleCard);
+    await user.click(screen.getByText('EP & MO Roster'));
+    await user.click(screen.getByText('EP+'));
 
     // Verify modal remains open and responsive
     expect(screen.getByRole('button', { name: /Print \/ Live Layout/i })).toBeDefined();
@@ -123,9 +128,7 @@ describe('RosterExportModal & livePdfExport', () => {
       spreadsheetDays: [
         { dateStr: '2027-01-01', dayNum: 1, dayName: 'FRI', holidayName: "New Year's Day" },
       ],
-      spreadsheetDoctors: [
-        { name: 'Dr Afif', shifts: { '2027-01-01': { value: 'AM' } } },
-      ],
+      spreadsheetDoctors: [{ name: 'Dr Afif', shifts: { '2027-01-01': { value: 'AM' } } }],
     });
 
     expect(html).toContain('HOSPITAL SULTAN ABDUL AZIZ SHAH (HSAAS)');
@@ -134,7 +137,7 @@ describe('RosterExportModal & livePdfExport', () => {
     expect(html).toContain('Dr Muhammad Afif');
     expect(html).toContain('Emergency Physician IC');
     expect(html).toContain('Head of Department');
-    expect(html).toContain("New Year&#39;s Day");
+    expect(html).toContain('New Year&#39;s Day');
     expect(html).toContain('shift-cell-am');
   });
 });

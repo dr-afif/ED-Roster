@@ -1,12 +1,4 @@
 import { useState } from 'react';
-import {
-  AlertCircle,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  ShieldCheck,
-} from 'lucide-react';
 import type { RosterIssue } from '../domain/types';
 
 interface RosterIssuesPanelProps {
@@ -26,154 +18,110 @@ export function RosterIssuesPanel({ issues, onSelectIssue }: RosterIssuesPanelPr
     filterSeverity === 'all' ? issues : issues.filter((i) => i.severity === filterSeverity);
 
   return (
-    <div className="rounded-xl border border-border-default bg-surface-primary shadow-xs">
-      {/* Header bar */}
-      <div
+    <div
+      id="rules-guidance"
+      className="overflow-hidden rounded-[22px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]"
+    >
+      {/* Warm Editorial Header bar */}
+      <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-surface-secondary/40"
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? 'Collapse issues panel' : 'Expand issues panel'}
+        className={`flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 bg-[#FAFAF9] px-4 py-3 text-left ${
+          isExpanded ? 'border-b border-[#E7E5E4]' : ''
+        }`}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            {errors.length > 0 ? (
-              <AlertCircle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-            ) : warnings.length > 0 ? (
-              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            ) : (
-              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            )}
-            <h3 className="text-sm font-semibold text-text-primary">Rules Engine Guidance</h3>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-xs">
-            {errors.length > 0 && (
-              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-medium text-rose-700 dark:text-rose-300">
-                {errors.length} {errors.length === 1 ? 'Error' : 'Errors'}
-              </span>
-            )}
-            {warnings.length > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300">
-                {warnings.length} {warnings.length === 1 ? 'Warning' : 'Warnings'}
-              </span>
-            )}
-            {infos.length > 0 && (
-              <span className="rounded-full bg-sky-500/15 px-2 py-0.5 font-medium text-sky-700 dark:text-sky-300">
-                {infos.length} Info
-              </span>
-            )}
-            {issues.length === 0 && (
-              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-300">
-                All Roster Rules Satisfied
-              </span>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[13px] font-extrabold text-[#18181B]">🛡️ Rules Engine Guidance</h3>
+          {errors.length > 0 ? (
+            <span className="rounded-full bg-[#FEE2E2] px-2.5 py-0.5 text-[10px] font-extrabold text-[#991B1B]">
+              {errors.length} {errors.length === 1 ? 'Error' : 'Errors'}
+            </span>
+          ) : null}
+          {warnings.length > 0 ? (
+            <span className="rounded-full tone-am px-2.5 py-0.5 text-[10px] font-extrabold">
+              {warnings.length} {warnings.length === 1 ? 'Warning' : 'Warnings'}
+            </span>
+          ) : null}
+          {infos.length > 0 ? (
+            <span className="rounded-full tone-pm px-2.5 py-0.5 text-[10px] font-extrabold">
+              {infos.length} Info
+            </span>
+          ) : null}
+          {issues.length === 0 ? (
+            <span className="rounded-full tone-leave px-2.5 py-0.5 text-[10px] font-extrabold">
+              All Roster Rules Satisfied
+            </span>
+          ) : null}
         </div>
 
-        <button
-          type="button"
-          aria-label={isExpanded ? 'Collapse issues panel' : 'Expand issues panel'}
-          className="text-text-muted hover:text-text-primary"
-        >
-          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
-      </div>
+        <span className="text-[11px] font-bold text-[#57534E]">
+          {isExpanded ? 'Hide ▲' : 'Show ▼'}
+        </span>
+      </button>
 
       {/* Expanded body */}
-      {isExpanded && (
-        <div className="border-t border-border-subtle p-4 space-y-3">
-          {/* Severity filter tabs */}
-          {issues.length > 0 && (
-            <div className="flex items-center gap-1 border-b border-border-subtle pb-2 text-xs">
-              <button
-                type="button"
-                onClick={() => setFilterSeverity('all')}
-                className={`rounded-md px-2.5 py-1 font-medium ${
-                  filterSeverity === 'all'
-                    ? 'bg-surface-secondary text-text-primary'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                All ({issues.length})
-              </button>
-              {errors.length > 0 && (
+      {isExpanded ? (
+        <div className="p-3.5 space-y-2.5">
+          {/* Obsidian Pill Filters */}
+          {issues.length > 0 ? (
+            <div className="no-scrollbar flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
+              {(['all', 'error', 'warning', 'info'] as const).map((sev) => (
                 <button
+                  key={sev}
                   type="button"
-                  onClick={() => setFilterSeverity('error')}
-                  className={`rounded-md px-2.5 py-1 font-medium ${
-                    filterSeverity === 'error'
-                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
-                      : 'text-text-muted hover:text-text-primary'
+                  onClick={() => setFilterSeverity(sev)}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase transition cursor-pointer ${
+                    filterSeverity === sev
+                      ? 'border-[#18181B] bg-[#18181B] text-white'
+                      : 'border-[#E7E5E4] bg-white text-[#57534E] hover:border-stone-400 hover:text-[#18181B]'
                   }`}
                 >
-                  Errors ({errors.length})
+                  {sev}
                 </button>
-              )}
-              {warnings.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilterSeverity('warning')}
-                  className={`rounded-md px-2.5 py-1 font-medium ${
-                    filterSeverity === 'warning'
-                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  Warnings ({warnings.length})
-                </button>
-              )}
-              {infos.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilterSeverity('info')}
-                  className={`rounded-md px-2.5 py-1 font-medium ${
-                    filterSeverity === 'info'
-                      ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  Info ({infos.length})
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Issues list */}
-          {filteredIssues.length === 0 ? (
-            <p className="py-2 text-xs text-text-muted">No issues in this filter category.</p>
-          ) : (
-            <ul className="max-h-64 space-y-2 overflow-y-auto divide-y divide-border-subtle text-xs">
-              {filteredIssues.map((issue) => (
-                <li
-                  key={issue.id}
-                  onClick={() => onSelectIssue?.(issue)}
-                  className="flex cursor-pointer items-start gap-2.5 pt-2 first:pt-0 hover:bg-surface-secondary/40 rounded-lg p-1.5 transition-colors"
-                >
-                  <div className="mt-0.5 shrink-0">
-                    {issue.severity === 'error' && (
-                      <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                    )}
-                    {issue.severity === 'warning' && (
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    )}
-                    {issue.severity === 'info' && (
-                      <Info className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                    )}
-                  </div>
-
-                  <div className="space-y-0.5 flex-1">
-                    <p className="font-medium text-text-primary">{issue.message}</p>
-                    {issue.suggestion && (
-                      <p className="text-[11px] text-text-secondary">
-                        <span className="font-semibold text-text-muted">Suggestion:</span>{' '}
-                        {issue.suggestion}
-                      </p>
-                    )}
-                  </div>
-                </li>
               ))}
+            </div>
+          ) : null}
+
+          {/* Tinted Issues Cards */}
+          {filteredIssues.length === 0 ? (
+            <p className="py-1 text-xs font-bold text-[#15803D]">
+              ✓ All rules satisfied for current filter.
+            </p>
+          ) : (
+            <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+              {filteredIssues.map((issue) => {
+                const boxStyle =
+                  issue.severity === 'error'
+                    ? 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
+                    : issue.severity === 'warning'
+                      ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]'
+                      : 'border-[#BAE6FD] bg-[#F0F9FF] text-[#0369A1]';
+
+                return (
+                  <li key={issue.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectIssue?.(issue)}
+                      className={`w-full rounded-[10px] border px-3 py-2 text-left transition hover:brightness-[0.98] cursor-pointer ${boxStyle}`}
+                    >
+                      <div className="text-[11.5px] font-extrabold leading-snug">
+                        {issue.message}
+                      </div>
+                      {issue.suggestion ? (
+                        <div className="mt-0.5 text-[10.5px] font-medium text-[#57534E]">
+                          {issue.suggestion}
+                        </div>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

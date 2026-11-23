@@ -5,6 +5,7 @@ import { MyProfileRoute } from '../MyProfileRoute';
 import { AuthContext, type AuthBoundaryState } from '@/platform/auth/authContext';
 
 const mockMutateAsync = vi.fn().mockResolvedValue({});
+let mockRegistrationNumber = 'MMC 88888';
 
 vi.mock('../useMyProfile', () => ({
   useMyProfileQuery: () => ({
@@ -13,7 +14,7 @@ vi.mock('../useMyProfile', () => ({
       full_name: 'Dr Muhammad Afif',
       email: 'afif@example.com',
       phone: '+60123456789',
-      registration_number: 'MMC 88888',
+      registration_number: mockRegistrationNumber,
       verification_status: 'verified',
       verified_at: '2026-11-03T09:00:00Z',
       directory: {
@@ -101,5 +102,30 @@ describe('MyProfileRoute', () => {
         registration_number: 'MMC 88888',
       });
     });
+  });
+
+  it('preserves trailing | TG tag in registration_number when saving profile changes', async () => {
+    mockRegistrationNumber = 'MMC 88888 | TG';
+    mockMutateAsync.mockClear();
+    try {
+      renderProfile();
+
+      const mmcInput = screen.getByLabelText(/malaysian medical council/i);
+      expect(mmcInput).toHaveValue('MMC 88888');
+      fireEvent.change(mmcInput, { target: { value: 'MMC 99887' } });
+
+      const saveButton = screen.getByRole('button', { name: /save profile details/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith({
+          full_name: 'Dr Muhammad Afif',
+          phone: '+60123456789',
+          registration_number: 'MMC 99887 | TG',
+        });
+      });
+    } finally {
+      mockRegistrationNumber = 'MMC 88888';
+    }
   });
 });

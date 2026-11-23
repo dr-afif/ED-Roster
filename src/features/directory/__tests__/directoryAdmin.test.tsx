@@ -17,8 +17,26 @@ vi.mock('../useDirectoryAdmin', () => ({
         staff_group: 'Emergency Physician',
         employment_status: 'active',
         active: true,
-        start_date: null,
+        start_date: '2025-01-01',
         end_date: null,
+        service_periods: [
+          {
+            id: 101,
+            staff_id: 1,
+            start_date: '2022-05-01',
+            end_date: '2024-04-30',
+            end_reason: 'switched_department',
+            end_comment: 'ICU rotation',
+          },
+          {
+            id: 102,
+            staff_id: 1,
+            start_date: '2025-01-01',
+            end_date: null,
+            end_reason: null,
+            end_comment: null,
+          },
+        ],
         allowed_user: {
           id: 1,
           email: 'admin@example.com',
@@ -42,8 +60,26 @@ vi.mock('../useDirectoryAdmin', () => ({
         staff_group: 'Medical Officer',
         employment_status: 'active',
         active: true,
-        start_date: null,
+        start_date: '2025-01-01',
         end_date: null,
+        service_periods: [
+          {
+            id: 101,
+            staff_id: 1,
+            start_date: '2022-05-01',
+            end_date: '2024-04-30',
+            end_reason: 'switched_department',
+            end_comment: 'ICU rotation',
+          },
+          {
+            id: 102,
+            staff_id: 1,
+            start_date: '2025-01-01',
+            end_date: null,
+            end_reason: null,
+            end_comment: null,
+          },
+        ],
         allowed_user: {
           id: 2,
           email: 'sarah@example.com',
@@ -159,5 +195,25 @@ describe('StaffDirectoryAdminRoute', () => {
 
     expect(screen.getByText(/owner administration required/i)).toBeInTheDocument();
     expect(screen.queryByText('Invite Staff Member')).not.toBeInTheDocument();
+  });
+
+  it('displays separate service periods, active duration, and end-date reason controls in edit modal', () => {
+    renderWithProviders(<StaffDirectoryAdminRoute />);
+
+    expect(screen.getAllByText(/Jan 2025 – Current/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/May 2022 – Apr 2024/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Switched Department/i).length).toBeGreaterThanOrEqual(1);
+
+    const [firstEditBtn] = screen.getAllByRole('button', { name: /edit/i });
+    if (!firstEditBtn) throw new Error('Edit button not found');
+    fireEvent.click(firstEditBtn);
+
+    expect(screen.getByRole('button', { name: /\+ Add Period/i })).toBeInTheDocument();
+    const endReasonSelect = screen.getByLabelText(/Period 2 End Reason/i);
+    expect(endReasonSelect).toBeInTheDocument();
+    fireEvent.change(endReasonSelect, { target: { value: 'masters_program' } });
+    expect((endReasonSelect as HTMLSelectElement).value).toBe('masters_program');
+    expect(screen.getByRole('option', { name: /Quit Hospital/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Masters Program/i })).toBeInTheDocument();
   });
 });

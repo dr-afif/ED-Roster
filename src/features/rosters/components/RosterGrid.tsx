@@ -1,54 +1,36 @@
-import { useState } from 'react';
+import { getShiftToneClasses, stripShiftModifiers } from '@/shared/ui';
 import type { ShiftDefinitionRow } from '../data/rosterQueries';
 import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
 
-interface RosterGridProps {
+export interface RosterGridProps {
   periodDates: readonly string[];
   staffList: readonly StaffRosterIdentity[];
   assignments: readonly Assignment[];
   shiftDefinitions: readonly ShiftDefinitionRow[];
   holidays: readonly PublicHolidayEntry[];
-  density: 'comfortable' | 'compact';
   isEditable: boolean;
-  onSelectCell: (staff: StaffRosterIdentity, date: string, currentCode?: string) => void;
+  isTableEditEnabled?: boolean;
+  rosterEditMode?: 'normal' | 'fast' | 'standby' | 'extended';
+  onSelectCell: (
+    staff: StaffRosterIdentity,
+    date: string,
+    currentCode?: string,
+    shiftKey?: boolean,
+  ) => void;
+  onBlockedEditTap?: () => void;
   selectedCell?: { staffId: number; date: string } | null;
+  selectedRangeKeys?: ReadonlySet<string>;
+  requests?: ReadonlyArray<{
+    staff_id?: number | string;
+    date: string;
+    request: string;
+    note?: string;
+  }>;
+  amendedCellKeys?: ReadonlySet<string>;
+  dirtyCellKeys?: ReadonlySet<string>;
 }
 
-function getShiftBadgeStyle(shiftCode?: string): string {
-  if (!shiftCode) return 'text-stone-300 hover:text-stone-500';
-  const c = shiftCode.toUpperCase().trim();
-  if (c.includes('AM')) {
-    return 'bg-[#E5EED8] text-[#2D4A22] border border-[#C6D8B6] font-bold shadow-2xs';
-  }
-  if (c.includes('PM')) {
-    return 'bg-[#DCE7F9] text-[#1E3A8A] border border-[#B8CEF2] font-bold shadow-2xs';
-  }
-  if (c.includes('ND') || c.includes('NIGHT')) {
-    return 'bg-[#FCE7F1] text-[#9D174D] border border-[#F8B9D4] font-bold shadow-2xs';
-  }
-  if (c.includes('ON')) {
-    return 'bg-[#FEF3C7] text-[#854D0E] border border-[#FDE047] font-bold shadow-2xs';
-  }
-  if (c.includes('PN')) {
-    return 'bg-[#EDE9FE] text-[#5B21B6] border border-[#DDD6FE] font-bold shadow-2xs';
-  }
-  if (c.includes('OFF') || c.includes('GOFF')) {
-    return 'bg-[#F5F5F4] text-[#57534E] border border-[#E7E5E4] font-bold';
-  }
-  if (
-    c.includes('AL') ||
-    c.includes('EL') ||
-    c.includes('MC') ||
-    c.includes('HKA') ||
-    c.includes('GHKA')
-  ) {
-    return 'bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0] font-bold shadow-2xs';
-  }
-  if (c.includes('COURSE') || c.includes('COURT')) {
-    return 'bg-[#E0F2FE] text-[#0369A1] border border-[#BAE6FD] font-bold shadow-2xs';
-  }
-  return 'bg-[#FAF8F5] text-stone-800 border border-stone-200 font-semibold';
-}
+const WORKING_SHIFTS = new Set(['AM', 'PM', 'ON1', 'ON2', 'PN', 'MEDSB']);
 
 export function RosterGrid({
   periodDates,
@@ -56,12 +38,18 @@ export function RosterGrid({
   assignments,
   shiftDefinitions,
   holidays,
-  density,
   isEditable,
+  isTableEditEnabled = false,
+  rosterEditMode = 'normal',
   onSelectCell,
+  onBlockedEditTap,
   selectedCell,
+  selectedRangeKeys,
+  requests = [],
+  amendedCellKeys,
+  dirtyCellKeys,
 }: RosterGridProps) {
-  const [filterQuery, setFilterQuery] = useState('');
+  void shiftDefinitions;
 
   // Map assignments by `staffId:date`
   const cellMap = new Map<string, Assignment>();
@@ -69,182 +57,298 @@ export function RosterGrid({
     cellMap.set(`${a.staffId}:${a.dutyDate}`, a);
   }
 
-  // Map shift colors
-  const colorMap = new Map<string, string>();
-  for (const s of shiftDefinitions) {
-    colorMap.set(s.code.toUpperCase(), s.color_token);
+  // Map requests by `staffId:date`
+  const requestMap = new Map<string, { request: string; note?: string }>();
+  for (const r of requests) {
+    if (r.staff_id != null && r.date && r.request) {
+      requestMap.set(`${r.staff_id}:${r.date}`, {
+        request: r.request.toUpperCase().trim(),
+        note: r.note,
+      });
+    }
   }
 
-  // Filter staff list defensively
-  const filteredStaff = staffList.filter((s) => {
-    const q = (filterQuery || '').toLowerCase().trim();
-    if (!q) return true;
-    const rName = String(
-      s.rosterName ?? (s as unknown as { roster_name?: string }).roster_name ?? '',
-    ).toLowerCase();
-    const sCode = String(
-      s.staffCode ?? (s as unknown as { staff_code?: string }).staff_code ?? '',
-    ).toLowerCase();
-    const dName = String(
-      s.displayName ?? (s as unknown as { display_name?: string }).display_name ?? '',
-    ).toLowerCase();
-    return rName.includes(q) || sCode.includes(q) || dName.includes(q);
-  });
+  // Prototype adaptive mobile row height
+  const rowTargetH =
+    staffList.length <= 15 ? 36 : Math.max(27, Math.floor(540 / Math.max(1, staffList.length)));
+  const cellH = Math.max(22, rowTargetH - 5);
+  const cellPadY = Math.max(2, Math.floor((rowTargetH - 18) / 2));
+  const needsVScroll = staffList.length * rowTargetH > 505;
 
   return (
-    <div className="space-y-3">
-      {/* Search / Filter toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <input
-            type="search"
-            placeholder="Search staff by name or code..."
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            className="h-9 w-full sm:w-64 rounded-xl border border-border-default bg-surface-primary px-3 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none"
-          />
-          {filterQuery && (
-            <button
-              type="button"
-              onClick={() => setFilterQuery('')}
-              className="text-xs text-text-muted hover:text-text-primary shrink-0"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className="text-xs text-text-secondary">
-          Showing {filteredStaff.length} of {staffList.length} staff members
-        </div>
-      </div>
-
-      {/* Grid container with sticky scroll */}
-      <div className="overflow-x-auto rounded-xl border border-border-default bg-surface-primary shadow-xs">
-        <table className="w-full border-collapse text-left text-xs">
+    <div className="space-y-2">
+      {/* Prototype Matrix Card */}
+      <div
+        className={`overflow-x-auto lg:overflow-hidden rounded-[20px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)] ${
+          needsVScroll ? 'max-h-[530px] lg:max-h-none overflow-y-auto lg:overflow-y-visible' : ''
+        }`}
+      >
+        <table className="w-max min-w-full lg:w-full lg:table-fixed border-collapse text-center">
           <thead>
-            <tr className="border-b border-border-default bg-surface-secondary/70">
-              {/* Sticky Staff Header */}
+            <tr className="border-b border-[#E7E5E4] bg-[#FAF8F5] text-[9.5px] font-extrabold text-[#57534E]">
               <th
                 scope="col"
-                className="sticky left-0 z-20 min-w-28 sm:min-w-44 bg-surface-secondary px-3 py-2.5 font-semibold text-text-primary shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
+                className="sticky top-0 left-0 z-20 w-[108px] min-w-[96px] bg-[#FAF8F5] px-2.5 py-2 text-left font-extrabold text-[#57534E] border-r border-[#E7E5E4]"
               >
                 Staff Member
               </th>
 
-              {/* Day Columns */}
               {periodDates.map((date) => {
                 const dayNum = parseInt(date.slice(8, 10), 10);
-                const d = new Date(date + 'T00:00:00Z');
-                const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
-                const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6;
+                const d = new Date(`${date}T00:00:00Z`);
+                const utcDay = d.getUTCDay();
+                const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][utcDay];
+                const isWeekend = utcDay === 0 || utcDay === 6;
+                const isSunday = utcDay === 0;
                 const holiday = holidays.find((h) => h.date === date);
 
                 return (
                   <th
                     key={date}
                     scope="col"
-                    className={`min-w-10 border-l border-border-subtle px-1 py-1.5 text-center font-medium ${
+                    title={
+                      holiday ? `${date}: ${holiday.name}` : isWeekend ? `${date}: Weekend` : date
+                    }
+                    className={`sticky top-0 z-10 min-w-[38px] lg:min-w-0 py-1.5 px-0.5 text-center font-extrabold ${
                       holiday
-                        ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                        ? 'bg-[#FFE4E6] text-[#BE123C]'
                         : isWeekend
-                          ? 'bg-surface-secondary/90 text-text-secondary'
-                          : 'text-text-primary'
+                          ? 'bg-[#FEF3C7] text-[#B45309]'
+                          : 'bg-[#FAF8F5] text-[#57534E]'
+                    } ${
+                      isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'
                     }`}
-                    title={holiday ? `${date}: ${holiday.name}` : date}
                   >
-                    <div className="text-[11px] font-bold leading-none">{dayNum}</div>
-                    <div className="text-[9px] uppercase tracking-wider text-text-muted">
-                      {dayName}
+                    <div className="text-[10px] font-extrabold leading-tight">{dayNum}</div>
+                    <div
+                      className={`text-[7px] font-extrabold leading-tight ${
+                        holiday ? 'text-[#E11D48]' : isWeekend ? 'text-[#D97706]' : 'text-[#A8A29E]'
+                      }`}
+                    >
+                      {holiday ? 'PH' : dayName}
                     </div>
-                    {holiday && (
-                      <span
-                        className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500"
-                        title={holiday.name}
-                      />
-                    )}
                   </th>
                 );
               })}
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-border-subtle">
-            {filteredStaff.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={periodDates.length + 1}
-                  className="px-4 py-8 text-center text-sm text-text-muted"
+          <tbody>
+            {staffList.map((staff) => {
+              const rosterName =
+                staff.rosterName ||
+                (staff as unknown as { roster_name?: string }).roster_name ||
+                'Staff';
+              const staffCode =
+                staff.staffCode || (staff as unknown as { staff_code?: string }).staff_code || '';
+              const staffGroup =
+                staff.staffGroup ||
+                (staff as unknown as { staff_group?: string }).staff_group ||
+                '';
+
+              return (
+                <tr
+                  key={staff.id}
+                  className="border-b border-[#F4EFE6] hover:bg-[#FAF8F5]/60 transition-colors"
                 >
-                  No staff members match &quot;{filterQuery}&quot;.
-                </td>
-              </tr>
-            ) : (
-              filteredStaff.map((staff) => {
-                const rosterName =
-                  staff.rosterName ||
-                  (staff as unknown as { roster_name?: string }).roster_name ||
-                  'Staff';
-                const staffCode =
-                  staff.staffCode || (staff as unknown as { staff_code?: string }).staff_code || '';
-                const staffGroup =
-                  staff.staffGroup ||
-                  (staff as unknown as { staff_group?: string }).staff_group ||
-                  '';
+                  <th
+                    scope="row"
+                    title={`${rosterName}${staffCode ? ` · ${staffCode}` : ''}${staffGroup ? ` · ${staffGroup}` : ''}`}
+                    style={{ paddingTop: cellPadY, paddingBottom: cellPadY }}
+                    className="sticky left-0 z-10 w-[112px] min-w-[100px] bg-white px-2.5 text-left text-[11.5px] font-extrabold text-[#18181B] border-r border-[#E7E5E4] truncate"
+                  >
+                    {rosterName}
+                  </th>
 
-                return (
-                  <tr key={staff.id} className="hover:bg-surface-secondary/40">
-                    {/* Sticky Staff Name Cell */}
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 min-w-28 sm:min-w-44 max-w-[130px] sm:max-w-none bg-surface-primary px-3 py-2 font-normal shadow-[1px_0_0_0_rgba(0,0,0,0.06)]"
-                    >
-                      <div className="font-semibold text-text-primary truncate">{rosterName}</div>
-                      <div className="text-[10px] text-text-muted truncate">
-                        {staffCode ? `${staffCode} · ` : ''}
-                        {staffGroup}
-                      </div>
-                    </th>
+                  {periodDates.map((date) => {
+                    const d = new Date(`${date}T00:00:00Z`);
+                    const utcDay = d.getUTCDay();
+                    const isWeekend = utcDay === 0 || utcDay === 6;
+                    const isSunday = utcDay === 0;
+                    const holiday = holidays.find((h) => h.date === date);
 
-                    {/* Day Cells */}
-                    {periodDates.map((date) => {
-                      const assignment = cellMap.get(`${staff.id}:${date}`);
-                      const shiftCode = assignment?.shiftCode;
-                      const isSelected =
-                        selectedCell?.staffId === staff.id && selectedCell?.date === date;
+                    const assignment = cellMap.get(`${staff.id}:${date}`);
+                    const shiftCode = assignment?.shiftCode;
+                    const parsed = stripShiftModifiers(shiftCode);
+                    const reqEntry = requestMap.get(`${staff.id}:${date}`);
+                    const isHonoredRequest = Boolean(
+                      reqEntry && parsed.cleanShift && parsed.cleanShift === reqEntry.request,
+                    );
+                    const isOverride = Boolean(reqEntry && parsed.cleanShift !== reqEntry.request);
+                    const hasMoNote = Boolean(reqEntry?.note && reqEntry.note.trim());
+                    const hasAdminNote = Boolean(assignment?.note && assignment.note.trim());
+                    const isAmended = Boolean(amendedCellKeys?.has(`${staff.id}:${date}`));
+                    const isDirty = Boolean(dirtyCellKeys?.has(`${staff.id}:${date}`));
+                    const isSelected =
+                      (selectedCell?.staffId === staff.id && selectedCell?.date === date) ||
+                      Boolean(selectedRangeKeys?.has(`${staff.id}:${date}`));
 
-                      return (
-                        <td
-                          key={date}
-                          onClick={() => {
-                            if (isEditable) {
-                              onSelectCell(staff, date, shiftCode);
-                            }
-                          }}
-                          className={`border-l border-slate-100 dark:border-slate-800 p-0.5 text-center transition-colors ${
-                            isSelected ? 'ring-2 ring-teal-600 ring-inset z-10' : ''
-                          } ${isEditable ? 'cursor-pointer hover:bg-teal-50/30 dark:hover:bg-teal-950/20' : ''}`}
-                        >
-                          <div
-                            className={`flex items-center justify-center rounded-lg font-semibold tracking-tight transition-transform ${
-                              density === 'comfortable' ? 'h-8 text-xs' : 'h-6 text-[11px]'
-                            } ${getShiftBadgeStyle(shiftCode)} ${isEditable ? 'hover:scale-[1.04] active:scale-[0.96]' : ''}`}
-                            title={
-                              shiftCode
-                                ? `${rosterName} on ${date}: ${shiftCode}`
-                                : `${rosterName} on ${date}: No assignment`
-                            }
-                          >
-                            {shiftCode ?? '·'}
-                          </div>
-                        </td>
+                    const isWorking = WORKING_SHIFTS.has(parsed.cleanShift);
+                    const isCellDisabled =
+                      isEditable &&
+                      isTableEditEnabled &&
+                      ((rosterEditMode === 'standby' && (!parsed.cleanShift || isWorking)) ||
+                        (rosterEditMode === 'extended' && !isWorking));
+
+                    const tdBg = holiday
+                      ? 'bg-[#FFF5F6]'
+                      : isWeekend
+                        ? 'bg-[#FFFDF2]'
+                        : 'bg-transparent';
+
+                    const tipParts: string[] = [];
+                    tipParts.push(
+                      shiftCode
+                        ? `${rosterName} on ${date}: ${shiftCode}`
+                        : `${rosterName} on ${date}: No assignment`,
+                    );
+                    if (isHonoredRequest) {
+                      tipParts.push(`Request Honored: ${reqEntry?.request}`);
+                    }
+                    if (isOverride) {
+                      tipParts.push(
+                        `Override: Requested ${reqEntry?.request} → Assigned ${parsed.cleanShift || 'None'}`,
                       );
-                    })}
-                  </tr>
-                );
-              })
-            )}
+                    }
+                    if (hasMoNote) tipParts.push(`MO Note: ${reqEntry?.note}`);
+                    if (hasAdminNote) tipParts.push(`Admin Note: ${assignment?.note}`);
+                    if (isAmended) tipParts.push('Post-publication amendment');
+                    if (isDirty) tipParts.push('Unsaved edit');
+
+                    const modOutlineClass = isDirty
+                      ? 'outline outline-[1.5px] outline-dashed outline-[#E06D53]'
+                      : parsed.isStandby && parsed.isExtended
+                        ? 'outline outline-[1.5px] outline-dashed outline-[#0F766E]'
+                        : parsed.isStandby
+                          ? 'outline outline-[1.5px] outline-[#D97706]'
+                          : parsed.isExtended
+                            ? 'outline outline-[1.5px] outline-[#0F766E]'
+                            : '';
+
+                    return (
+                      <td
+                        key={date}
+                        data-cell-key={`${staff.id}:${date}`}
+                        onClick={(e) => {
+                          if (!isEditable) return;
+                          if (!isTableEditEnabled) {
+                            onBlockedEditTap?.();
+                            return;
+                          }
+                          if (isCellDisabled) return;
+                          onSelectCell(staff, date, shiftCode, e.shiftKey);
+                        }}
+                        className={`${tdBg} p-[1.5px] text-center transition-colors ${
+                          isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'
+                        } ${isSelected ? 'ring-2 ring-[#0F766E] ring-inset z-10' : ''} ${
+                          isEditable
+                            ? isCellDisabled
+                              ? 'cursor-not-allowed'
+                              : 'cursor-pointer'
+                            : ''
+                        }`}
+                      >
+                        <div
+                          title={tipParts.join('\n')}
+                          style={{ height: cellH }}
+                          className={`relative flex items-center justify-center rounded-[6px] tracking-tight transition-transform overflow-hidden font-extrabold text-[10.5px] sm:text-[11px] lg:text-[10.5px] ${getShiftToneClasses(
+                            shiftCode,
+                            isHonoredRequest,
+                          )} ${modOutlineClass} ${
+                            isCellDisabled
+                              ? 'opacity-35'
+                              : isEditable && isTableEditEnabled
+                                ? 'hover:scale-[1.04] active:scale-[0.96]'
+                                : ''
+                          }`}
+                        >
+                          {hasAdminNote ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute top-[2px] left-[2px] h-[4.5px] w-[4.5px] rounded-full bg-[#7C3AED]"
+                            />
+                          ) : null}
+                          {hasMoNote ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute top-[2px] right-[2px] h-[4.5px] w-[4.5px] rounded-full bg-[#0284C7]"
+                            />
+                          ) : null}
+                          {isHonoredRequest ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-[2px] right-[2px] h-[4.5px] w-[4.5px] rounded-full bg-[#16A34A]"
+                            />
+                          ) : isOverride ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-[2px] right-[2px] h-[4.5px] w-[4.5px] rounded-full bg-[#D97706]"
+                            />
+                          ) : null}
+                          {isAmended ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-[1px] left-[2px] text-[6px] font-extrabold text-[#E11D48] leading-none"
+                            >
+                              Δ
+                            </span>
+                          ) : null}
+                          <span>{parsed.cleanShift || '·'}</span>
+                          {parsed.isStandby ? (
+                            <span className="ml-0.5 rounded-[3px] bg-[#D97706] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
+                              S
+                            </span>
+                          ) : null}
+                          {parsed.isExtended ? (
+                            <span className="ml-0.5 rounded-[3px] bg-[#0F766E] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
+                              EX
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      {/* Inline Prototype Legend Bar */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-[10px] font-bold text-[#57534E]">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-[#0F766E]" />
+          <span>Solid Fill = Requested Shift (Honored)</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D97706]" />
+          <span>Override</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0284C7]" />
+          <span>MO Comment</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
+          <span>Admin Note</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="font-extrabold text-[#E11D48]">Δ</span>
+          <span>Amended</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="rounded-[3px] bg-[#D97706] px-1 text-[7.5px] font-extrabold text-white">
+            S
+          </span>
+          <span>Standby</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="rounded-[3px] bg-[#0F766E] px-1 text-[7.5px] font-extrabold text-white">
+            EX
+          </span>
+          <span>Extended</span>
+        </span>
       </div>
     </div>
   );

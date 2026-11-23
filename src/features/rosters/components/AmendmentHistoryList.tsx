@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, ArrowRight, Clock, History, RotateCcw, ShieldCheck } from 'lucide-react';
-import { Button, Modal, StatusBadge, SurfaceCard } from '@/shared/ui';
+import { Button, Modal, SkeletonCardList, StatusBadge, SurfaceCard } from '@/shared/ui';
 import { useReverseAmendmentMutation } from '../data/rosterQueries';
 import { formatAmendmentCategoryLabel } from '../domain/amendments';
 import type { AmendmentEvent, StaffRosterIdentity } from '../domain/types';
@@ -11,6 +11,7 @@ type AmendmentHistoryListProps = {
   staffList: StaffRosterIdentity[];
   events: AmendmentEvent[];
   isLoading?: boolean;
+  onOpenAmend?: () => void;
 };
 
 export function AmendmentHistoryList({
@@ -19,6 +20,7 @@ export function AmendmentHistoryList({
   staffList,
   events,
   isLoading,
+  onOpenAmend,
 }: AmendmentHistoryListProps) {
   const [reversingEvent, setReversingEvent] = useState<AmendmentEvent | null>(null);
   const [reversalReason, setReversalReason] = useState<string>('');
@@ -50,36 +52,54 @@ export function AmendmentHistoryList({
   };
 
   if (isLoading) {
-    return (
-      <SurfaceCard variant="solid" className="p-8 text-center text-sm text-text-muted">
-        Loading amendment history...
-      </SurfaceCard>
-    );
+    return <SkeletonCardList count={3} srLabel="Loading amendment history..." />;
   }
 
   if (events.length === 0) {
     return (
-      <SurfaceCard variant="solid" className="p-8 text-center space-y-2">
+      <SurfaceCard variant="solid" className="p-8 text-center space-y-3">
         <ShieldCheck className="mx-auto h-8 w-8 text-success" />
         <h3 className="text-sm font-semibold text-text-primary">Clean Operational Baseline</h3>
         <p className="text-xs text-text-secondary max-w-md mx-auto">
           No operational amendments have been submitted for this period. The live operational
           schedule matches the original planned publication 100%.
         </p>
+        {isOwner && onOpenAmend ? (
+          <button
+            type="button"
+            onClick={onOpenAmend}
+            className="inline-flex items-center gap-1 rounded-full bg-[#18181B] px-3.5 py-1.5 text-xs font-extrabold text-white cursor-pointer hover:bg-stone-800"
+          >
+            + Amend Shift
+          </button>
+        ) : null}
       </SurfaceCard>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-brand-primary" />
           <h2 className="text-sm font-semibold text-text-primary">
-            Audit Trail ({events.length} {events.length === 1 ? 'event' : 'events'})
+            Amendment History ({events.length})
           </h2>
         </div>
-        <span className="text-xs text-text-muted font-mono">Append-only audit ledger</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted font-mono hidden sm:inline">
+            Append-only audit ledger
+          </span>
+          {isOwner && onOpenAmend ? (
+            <button
+              type="button"
+              onClick={onOpenAmend}
+              className="rounded-full bg-[#18181B] px-3.5 py-1.5 text-xs font-extrabold text-white cursor-pointer hover:bg-stone-800"
+            >
+              + Amend Shift
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-3">

@@ -19,24 +19,14 @@ describe('SegmentedArcGauge', () => {
   });
 
   it('renders exactly 16 discrete SVG arc line segments', () => {
-    const { container } = render(
-      <SegmentedArcGauge
-        value={50}
-        maxValue={100}
-      />,
-    );
+    const { container } = render(<SegmentedArcGauge value={50} maxValue={100} />);
 
     const lines = container.querySelectorAll('svg line');
     expect(lines).toHaveLength(16);
   });
 
   it('calculates default percentage title when none is supplied', () => {
-    render(
-      <SegmentedArcGauge
-        value={15}
-        maxValue={20}
-      />,
-    );
+    render(<SegmentedArcGauge value={15} maxValue={20} />);
 
     // 15/20 = 75%
     expect(screen.getByText('75%')).toBeInTheDocument();

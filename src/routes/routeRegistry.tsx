@@ -35,13 +35,13 @@ export const appChildRoutes: RouteObject[] = [
   {
     path: 'holidays',
     lazy: async () => ({
-      Component: (await import('@/features/public-holidays')).PublicHolidayTrackerRoute,
+      Component: (await import('@/features/professional-records')).ProfessionalRecordsRoute,
     }),
   },
   {
     path: 'ph-tracker',
     lazy: async () => ({
-      Component: (await import('@/features/public-holidays')).PublicHolidayTrackerRoute,
+      Component: (await import('@/features/professional-records')).ProfessionalRecordsRoute,
     }),
   },
   {

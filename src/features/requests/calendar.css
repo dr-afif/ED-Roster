@@ -1,20 +1,16 @@
-/* ─── Design tokens ─────────────────────────────────────────────────── */
+/* ─── Design tokens (Warm Editorial / Alabaster & Obsidian) ──────────── */
 :root {
-  --calendar-border: #e2e8f0;
-  --calendar-muted: #64748b;
-  --calendar-bg: #ffffff;
-  --calendar-chip-radius: 999px;
+  --calendar-border: #e7e5e4;
+  --calendar-muted: #a8a29e;
+  --calendar-bg: #faf8f5;
   --panel-width: 420px;
   --panel-z: 55;
   --backdrop-z: 54;
 }
 
-/* ─── Calendar frame ─────────────────────────────────────────────────── */
+/* ─── Calendar frame (Airy Rounded Tiles matching prototype) ─────────── */
 .calendar__frame {
-  border-radius: 1.5rem;
-  overflow: hidden;
-  border: 1px solid var(--calendar-border);
-  background: var(--calendar-bg);
+  background: transparent;
 }
 
 .calendar__header {
@@ -22,141 +18,129 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   text-align: center;
   text-transform: uppercase;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  background: #f1f5f9;
+  font-size: 10px;
+  font-weight: 800;
   color: var(--calendar-muted);
+  padding-bottom: 6px;
 }
 
 .calendar__header-cell {
-  padding: 0.75rem 0.25rem;
+  padding: 2px 0;
 }
 
 .calendar__grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--calendar-border);
+  gap: 4px;
+  align-items: stretch;
 }
 
 /* ─── Calendar cells ─────────────────────────────────────────────────── */
 .calendar__cell {
-  min-height: 110px;
+  min-height: 76px;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem 0.5rem;
-  background: var(--calendar-bg);
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 5px 3px 6px;
+  border-radius: 12px;
+  background: #faf8f5;
+  border: 1px solid #efece6;
   position: relative;
-  border: none;
   text-align: left;
   cursor: default;
   font: inherit;
+  transition: all 0.14s ease;
 }
 
 .calendar__cell--empty {
-  background: var(--calendar-bg);
+  background: transparent;
+  border-color: transparent;
 }
 
 .calendar__cell--clickable {
   cursor: pointer;
-  transition: background 140ms ease;
 }
 
 .calendar__cell--clickable:hover {
-  background: #f8fafc;
+  border-color: #d6d3d1;
 }
 
 .calendar__cell--clickable:focus-visible {
-  outline: 2px solid #6366f1;
-  outline-offset: -2px;
+  outline: 2px solid #0f766e;
+  outline-offset: 1px;
   z-index: 2;
 }
 
-/* Today highlight */
 .calendar__cell--today {
-  background: #eff6ff;
+  background: #f0fdfa;
+  border-color: #99f6e4;
 }
 
-.calendar__cell--today:hover {
-  background: #dbeafe;
-}
-
-/* Selected state */
-.calendar__cell--selected {
-  background: #eef2ff;
-  box-shadow: inset 0 0 0 2px #6366f1;
-  z-index: 1;
-}
-
-.calendar__cell--selected:hover {
-  background: #e0e7ff;
-}
-
-/* Holiday highlight */
 .calendar__cell--holiday {
-  background: #fff5f5;
+  background: #fff1f2;
+  border-color: #fecdd3;
 }
 
-.calendar__cell--holiday:hover {
-  background: #ffe3e3;
+.calendar__cell--selected {
+  border-color: #e06d53;
+  box-shadow: 0 0 0 2px rgba(224, 109, 83, 0.28);
+  background: #fff7f5;
+  z-index: 1;
 }
 
 /* ─── Cell header & date number ──────────────────────────────────────── */
 .calendar__cell-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  gap: 2px;
+  width: 100%;
 }
 
 .calendar__date {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #0f172a;
-  width: 1.8rem;
-  height: 1.8rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #1c1917;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .calendar__date--today {
-  background: #6366f1;
-  color: #ffffff;
+  color: #0f766e;
 }
 
-.calendar__date--selected:not(.calendar__date--today) {
-  background: #c7d2fe;
-  color: #3730a3;
+.calendar__date--selected {
+  color: #c2410c;
 }
 
-/* ─── Request chips ──────────────────────────────────────────────────── */
+/* ─── Request chips (Unified Canonical Palette) ───────────────────────── */
 .calendar__requests {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 2.5px;
+  width: 100%;
 }
 
 .req {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0.3rem 0.65rem;
-  border-radius: var(--calendar-chip-radius);
+  gap: 3px;
+  padding: 2px 3px;
+  border-radius: 5px;
   border-width: 1px;
   border-style: solid;
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1.1;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.15;
   text-align: center;
-  background: #f8fafc;
-  color: #0f172a;
   max-width: 100%;
+  background: #f5f5f4;
+  color: #57534e;
+  border-color: #e7e5e4;
 }
 
 .req__comment {
@@ -164,62 +148,65 @@
 }
 
 .req__tag {
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 800;
 }
 
 .req__name {
-  font-weight: 500;
-  color: #475569;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Chip colour variants */
+/* Exact Prototype Tokens */
 .req--am {
-  background: #ecfdf5;
-  border-color: #34d399;
-  color: #047857;
+  background: #e5eed8;
+  border-color: #c6d8b6;
+  color: #2d4a22;
 }
 .req--pm {
-  background: #fef3c7;
-  border-color: #facc15;
-  color: #b45309;
+  background: #dce7f9;
+  border-color: #b8cef2;
+  color: #1e3a8a;
 }
 .req--night {
-  background: #fee2e2;
-  border-color: #f87171;
-  color: #b91c1c;
+  background: #fce7f1;
+  border-color: #f8b9d4;
+  color: #9d174d;
+}
+.req--leave {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
 }
 .req--course {
-  background: #dbeafe;
-  border-color: #60a5fa;
-  color: #1d4ed8;
+  background: #fef3c7;
+  border-color: #fde047;
+  color: #854d0e;
 }
 .req--off {
-  background: #ede9fe;
-  border-color: #a855f7;
-  color: #5b21b6;
+  background: #f5f5f4;
+  border-color: #e7e5e4;
+  color: #57534e;
 }
 .req--hka {
-  background: #f3e8ff;
-  border-color: #c084fc;
-  color: #7c3aed;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
 }
 .req--ghka {
-  background: #e0e7ff;
-  border-color: #6366f1;
-  color: #4338ca;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
 }
 .req--default {
-  background: #f8fafc;
-  border-color: var(--calendar-border);
-  color: #0f172a;
+  background: #f5f5f4;
+  border-color: #e7e5e4;
+  color: #57534e;
 }
 
 /* Desktop tooltip on hover */
 @media (min-width: 601px) and (hover: hover) and (pointer: fine) {
-  .calendar__frame {
-    overflow: visible;
-  }
   .req:hover,
   .req:focus-visible {
     z-index: 20;
@@ -234,13 +221,13 @@
     width: max-content;
     max-width: min(18rem, 70vw);
     padding: 0.45rem 0.6rem;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #27272a;
     border-radius: 0.5rem;
-    background: #0f172a;
+    background: #18181b;
     color: #ffffff;
-    box-shadow: 0 10px 24px rgb(15 23 42 / 0.18);
+    box-shadow: 0 10px 24px rgba(24, 24, 27, 0.22);
     font-size: 0.72rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.35;
     opacity: 0;
     pointer-events: none;
@@ -252,19 +239,6 @@
     white-space: normal;
   }
 
-  .req__comment::after {
-    position: absolute;
-    left: 50%;
-    bottom: -0.32rem;
-    width: 0.6rem;
-    height: 0.6rem;
-    border-right: 1px solid #cbd5e1;
-    border-bottom: 1px solid #cbd5e1;
-    background: #0f172a;
-    content: '';
-    transform: translateX(-50%) rotate(45deg);
-  }
-
   .req:hover .req__comment,
   .req:focus-visible .req__comment {
     opacity: 1;
@@ -272,47 +246,45 @@
   }
 }
 
-/* ─── Date Detail Panel — shared ─────────────────────────────────────── */
+/* ─── Date Detail Panel — Warm Editorial Sheet / Drawer ──────────────── */
 .date-panel__backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--backdrop-z);
-  background: rgb(15 23 42 / 0);
+  background: rgba(24, 24, 27, 0);
   backdrop-filter: blur(0px);
   transition:
-    background 300ms ease,
-    backdrop-filter 300ms ease;
+    background 260ms ease,
+    backdrop-filter 260ms ease;
   pointer-events: none;
 }
 
 .date-panel__backdrop--open {
-  background: rgb(15 23 42 / 0.35);
-  backdrop-filter: blur(2px);
+  background: rgba(24, 24, 27, 0.52);
+  backdrop-filter: blur(3px);
   pointer-events: auto;
 }
 
-/* ─── Panel — Mobile: bottom sheet ───────────────────────────────────── */
 .date-panel {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: var(--panel-z);
-  max-height: 85vh;
+  max-height: 85dvh;
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  border-radius: 1.5rem 1.5rem 0 0;
-  box-shadow: 0 -8px 40px rgb(15 23 42 / 0.18);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.22);
   transform: translateY(100%);
-  transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .date-panel--open {
   transform: translateY(0);
 }
 
-/* ─── Panel — Desktop: right drawer ──────────────────────────────────── */
 @media (min-width: 768px) {
   .date-panel {
     top: 0;
@@ -320,11 +292,11 @@
     left: auto;
     right: 0;
     width: var(--panel-width);
+    max-width: 92vw;
     max-height: 100vh;
     border-radius: 0;
-    box-shadow: -8px 0 40px rgb(15 23 42 / 0.14);
+    box-shadow: -10px 0 36px rgba(0, 0, 0, 0.2);
     transform: translateX(100%);
-    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .date-panel--open {
@@ -335,10 +307,10 @@
 .date-panel__handle {
   flex-shrink: 0;
   width: 2.5rem;
-  height: 0.3rem;
+  height: 0.25rem;
   border-radius: 999px;
-  background: #cbd5e1;
-  margin: 0.6rem auto 0;
+  background: #d6d3d1;
+  margin: 0.65rem auto 0;
 }
 
 @media (min-width: 768px) {
@@ -353,68 +325,66 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.25rem 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0.9rem 1.25rem 0.75rem;
+  border-bottom: 1px solid #f4efe6;
 }
 
 .date-panel__header-eyebrow {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6366f1;
+  color: #0f766e;
   margin-bottom: 0.15rem;
 }
 
 .date-panel__header-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #0f172a;
-  line-height: 1.3;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #18181b;
+  line-height: 1.25;
 }
 
 .date-panel__close-btn {
   flex-shrink: 0;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 0.85rem;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 12px;
+  border: 1px solid #e7e5e4;
+  background: #ffffff;
+  color: #1c1917;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-  line-height: 1;
+  transition: background 140ms ease;
 }
 
 .date-panel__close-btn:hover {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
+  background: #faf8f5;
 }
 
 .date-panel__body {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 1rem 1.25rem calc(2.5rem + env(safe-area-inset-bottom, 20px));
+  scrollbar-width: none;
+  padding: 1rem 1.25rem calc(2rem + env(safe-area-inset-bottom, 16px));
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+}
+.date-panel__body::-webkit-scrollbar {
+  display: none;
 }
 
 .date-panel__section-title {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 0.65rem;
+  color: #a8a29e;
+  margin-bottom: 0.55rem;
 }
 
 /* ─── Request list inside panel ──────────────────────────────────────── */
@@ -431,17 +401,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
   padding: 0.65rem 0.85rem;
-  border-radius: 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  transition: background 140ms ease;
+  border-radius: 16px;
+  background: #faf8f5;
+  border: 1px solid #efece6;
 }
 
 .date-panel__request-item--own {
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: #f0fdfa;
+  border-color: #99f6e4;
 }
 
 .date-panel__request-info {
@@ -459,59 +428,59 @@
   border-radius: 999px;
   border-width: 1px;
   border-style: solid;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 
 .date-panel__request-name {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #18181b;
 }
 
 .date-panel__request-comment {
-  font-size: 0.75rem;
-  color: #64748b;
-  font-style: italic;
+  font-size: 0.72rem;
+  color: #57534e;
+  font-weight: 600;
   width: 100%;
 }
 
 .date-panel__request-actions {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-shrink: 0;
 }
 
 .date-panel__btn {
   padding: 0.25rem 0.65rem;
-  min-height: 32px;
+  min-height: 30px;
   border-radius: 999px;
   border-width: 1px;
   border-style: solid;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 120ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .date-panel__btn--edit {
-  border-color: #fcd34d;
-  background: #fefce8;
-  color: #92400e;
+  border-color: #e7e5e4;
+  background: #ffffff;
+  color: #18181b;
 }
 
 .date-panel__btn--edit:hover {
-  background: #fef3c7;
+  border-color: #0f766e;
+  color: #0f766e;
 }
 
 .date-panel__btn--delete {
-  border-color: #fca5a5;
-  background: #fff1f2;
+  border-color: #fecaca;
+  background: #fef2f2;
   color: #b91c1c;
 }
 
@@ -521,59 +490,28 @@
 
 .date-panel__error {
   padding: 0.65rem 0.85rem;
-  border-radius: 1rem;
-  border: 1px solid #fca5a5;
-  background: #fff1f2;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
   color: #b91c1c;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
-/* ─── Mobile overrides ────────────────────────────────────────────────── */
+/* ─── Mobile overrides (Prototype airy 54px tile density) ─────────────── */
 @media (max-width: 600px) {
-  .calendar__header {
-    font-size: 0.6rem;
-  }
-  .calendar__header-cell {
-    padding: 0.55rem 0.2rem;
-  }
-  .calendar__grid {
-    gap: 1px;
-    align-items: stretch;
-  }
   .calendar__cell {
-    min-height: 68px;
-    padding: 0.35rem 0.2rem 0.45rem;
-    gap: 0.2rem;
-    justify-content: flex-start;
-  }
-  .calendar__date {
-    font-size: 0.78rem;
-    width: 1.35rem;
-    height: 1.35rem;
-  }
-  .calendar__requests {
-    gap: 0.2rem;
-    width: 100%;
+    min-height: 54px;
+    padding: 4px 2px 5px;
+    gap: 2.5px;
   }
   .req {
-    padding: 0.16rem 0.25rem;
-    font-size: 0.58rem;
+    padding: 2px 2px;
+    font-size: 7.5px;
     gap: 0;
-    line-height: 1.15;
     width: 100%;
-    border-radius: 6px;
   }
   .req__tag {
     display: none;
-  }
-  .req__name {
-    display: inline;
-    font-weight: 700;
-    color: inherit;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
   }
 }

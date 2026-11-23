@@ -1631,6 +1631,47 @@ export type Database = {
           },
         ];
       };
+      staff_service_periods: {
+        Row: {
+          created_at: string;
+          end_comment: string | null;
+          end_date: string | null;
+          end_reason: string | null;
+          id: number;
+          start_date: string;
+          staff_id: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          end_comment?: string | null;
+          end_date?: string | null;
+          end_reason?: string | null;
+          id?: never;
+          start_date: string;
+          staff_id: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          end_comment?: string | null;
+          end_date?: string | null;
+          end_reason?: string | null;
+          id?: never;
+          start_date?: string;
+          staff_id?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'staff_service_periods_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       staffing_thresholds: {
         Row: {
           created_at: string;

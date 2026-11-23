@@ -1,7 +1,7 @@
 import { AlertCircle, LogIn, LogOut, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useAuthBoundary } from './authContext';
 import { useSupabaseMetadata } from '@/platform/supabase';
-import { Button, StatusBadge, SurfaceCard } from '@/shared/ui';
+import { Button, Skeleton, StatusBadge, SurfaceCard } from '@/shared/ui';
 
 export function AuthLoadingScreen() {
   return (
@@ -10,9 +10,9 @@ export function AuthLoadingScreen() {
         variant="glass"
         role="status"
         aria-live="polite"
-        className="w-full max-w-md space-y-4 p-8 text-center"
+        className="w-full max-w-md space-y-5 p-8 text-center"
       >
-        <div className="mx-auto inline-flex h-12 w-12 animate-pulse items-center justify-center rounded-2xl bg-brand-primary/10 text-brand-primary">
+        <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-primary/10 text-brand-primary">
           <ShieldCheck className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
         </div>
         <div className="space-y-1">
@@ -23,17 +23,28 @@ export function AuthLoadingScreen() {
             Connecting to Supabase Staging and validating allowlist status...
           </p>
         </div>
+        <div className="space-y-2.5 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-3.5 text-left">
+          <Skeleton rounded="full" className="h-3 w-2/3" />
+          <Skeleton rounded="full" className="h-2.5 w-full" />
+          <Skeleton rounded="full" className="h-2.5 w-4/5" />
+        </div>
       </SurfaceCard>
     </main>
   );
 }
 
 export function SignInScreen() {
-  const { signInWithGoogle } = useAuthBoundary();
+  const { signInWithGoogle, signInAsTestMo } = useAuthBoundary();
   const metadata = useSupabaseMetadata();
 
   const handleSignIn = async () => {
     await signInWithGoogle();
+  };
+
+  const handleTestMoSignIn = async () => {
+    if (signInAsTestMo) {
+      await signInAsTestMo();
+    }
   };
 
   return (
@@ -78,6 +89,21 @@ export function SignInScreen() {
             <LogIn className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden="true" />
             <span>Sign in with Google</span>
           </Button>
+          {!metadata.isProduction && signInAsTestMo ? (
+            <div className="space-y-2 border-t border-border-subtle pt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleTestMoSignIn}
+                className="w-full justify-center gap-2 py-2.5 text-xs font-extrabold text-[#0F766E] border-[#99F6E4] bg-[#F0FDFA] hover:bg-[#CCFBF1]"
+              >
+                <span>🩺 Try as Test Normal MO (Dr. Siti · MO-02)</span>
+              </Button>
+              <p className="text-center text-[10.5px] text-text-muted">
+                Staging Test Account: <span className="font-mono">siti@hsaas.upm.edu.my</span>
+              </p>
+            </div>
+          ) : null}
           <p className="text-center text-[11px] text-text-muted">
             Uses Google OAuth via Supabase Auth PKCE flow.
           </p>
