@@ -184,7 +184,7 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
 
     // Find date cell button
     const calendarCells = screen.getAllByRole('button', {
-      name: /\d{1,2} [A-Z][a-z]+ \d{4}/i,
+      name: /(?:\d{1,2} [A-Z][a-z]+ \d{4}|[A-Z][a-z]+ \d{1,2}, \d{4})/i,
     });
     expect(calendarCells.length).toBeGreaterThan(0);
 
