@@ -599,61 +599,62 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EFECE6]">
-                    {doctorCredits
-                      .filter((c) => c.source === 'opening_balance')
-                      .map((c, idx) => {
-                        const isUsed = c.status === 'USED' && Boolean(c.matchedGhkaDate);
-                        const memoKey = `${c.staffId}_${c.matchedGhkaDate}`;
-                        const isMemoSubmitted = Boolean(memoSubmissionsMap.get(memoKey));
-                        const repDateObj = c.matchedGhkaDate ? new Date(c.matchedGhkaDate) : null;
-                        const claimedLabel =
-                          repDateObj && !Number.isNaN(repDateObj.getTime())
-                            ? repDateObj.toLocaleDateString('en-GB', {
-                                day: 'numeric',
-                                month: 'short',
-                              })
-                            : c.matchedGhkaDate || '';
+                    {isOwner &&
+                      doctorCredits
+                        .filter((c) => c.source === 'opening_balance')
+                        .map((c, idx) => {
+                          const isUsed = c.status === 'USED' && Boolean(c.matchedGhkaDate);
+                          const memoKey = `${c.staffId}_${c.matchedGhkaDate}`;
+                          const isMemoSubmitted = Boolean(memoSubmissionsMap.get(memoKey));
+                          const repDateObj = c.matchedGhkaDate ? new Date(c.matchedGhkaDate) : null;
+                          const claimedLabel =
+                            repDateObj && !Number.isNaN(repDateObj.getTime())
+                              ? repDateObj.toLocaleDateString('en-GB', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                })
+                              : c.matchedGhkaDate || '';
 
-                        return (
-                          <tr key={`ob-${idx}`} className="hover:bg-[#FAF8F5]/60 transition">
-                            <td className="sticky left-0 z-10 bg-white py-2 px-3 border-r border-[#EFECE6] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                              <p className="text-[11px] font-extrabold text-[#18181B] truncate">
-                                Carry-Forward Opening
-                              </p>
-                              <p className="text-[9.5px] text-[#78716C] font-semibold">
-                                Prior Year Balance
-                              </p>
-                            </td>
-                            <td
-                              onClick={() => setDetailCredit(c)}
-                              className="py-1.5 px-2 text-center align-middle border-b border-[#EFECE6] cursor-pointer"
-                            >
-                              {!isUsed ? (
-                                <div className="mx-auto max-w-[160px] rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-2 py-1 text-[9.5px] leading-tight text-[#92400E] shadow-2xs">
-                                  <div className="font-extrabold">Opening Credit</div>
-                                  <div className="font-bold opacity-85">Unclaimed</div>
-                                </div>
-                              ) : (
-                                <div
-                                  className={`mx-auto max-w-[160px] rounded-lg border px-2 py-1 text-[9.5px] leading-tight shadow-2xs ${
-                                    isMemoSubmitted
-                                      ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#166534]'
-                                      : 'border-[#FDBA74] bg-[#FFF7ED] text-[#C2410C]'
-                                  }`}
-                                >
-                                  <div className="font-extrabold">Opening Credit</div>
-                                  <div className="font-bold opacity-90 whitespace-nowrap">
-                                    Claimed: {claimedLabel}
+                          return (
+                            <tr key={`ob-${idx}`} className="hover:bg-[#FAF8F5]/60 transition">
+                              <td className="sticky left-0 z-10 bg-white py-2 px-3 border-r border-[#EFECE6] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                                <p className="text-[11px] font-extrabold text-[#18181B] truncate">
+                                  Carry-Forward Opening
+                                </p>
+                                <p className="text-[9.5px] text-[#78716C] font-semibold">
+                                  Prior Year Balance
+                                </p>
+                              </td>
+                              <td
+                                onClick={() => setDetailCredit(c)}
+                                className="py-1.5 px-2 text-center align-middle border-b border-[#EFECE6] cursor-pointer"
+                              >
+                                {!isUsed ? (
+                                  <div className="mx-auto max-w-[160px] rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-2 py-1 text-[9.5px] leading-tight text-[#92400E] shadow-2xs">
+                                    <div className="font-extrabold">Opening Credit</div>
+                                    <div className="font-bold opacity-85">Unclaimed</div>
                                   </div>
-                                  <div className="font-extrabold">
-                                    Memo {isMemoSubmitted ? '✓' : '✕'}
+                                ) : (
+                                  <div
+                                    className={`mx-auto max-w-[160px] rounded-lg border px-2 py-1 text-[9.5px] leading-tight shadow-2xs ${
+                                      isMemoSubmitted
+                                        ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#166534]'
+                                        : 'border-[#FDBA74] bg-[#FFF7ED] text-[#C2410C]'
+                                    }`}
+                                  >
+                                    <div className="font-extrabold">Opening Credit</div>
+                                    <div className="font-bold opacity-90 whitespace-nowrap">
+                                      Claimed: {claimedLabel}
+                                    </div>
+                                    <div className="font-extrabold">
+                                      Memo {isMemoSubmitted ? '✓' : '✕'}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
 
                     {matrixRows.map((row) => {
                       const d = new Date(row.date);
