@@ -75,6 +75,6 @@ export function writeSessionRosterPeriod(year: string, month: string): void {
 }
 
 export function getSessionOrUpcomingRosterPath(referenceInstant: Date = new Date()): string {
-  const chosen = readSessionRosterPeriod() ?? getUpcomingMalaysiaRosterPeriod(referenceInstant);
+  const chosen = readSessionRosterPeriod() ?? getMalaysiaYearMonth(referenceInstant);
   return `/rosters/${chosen.year}/${chosen.month}`;
 }
