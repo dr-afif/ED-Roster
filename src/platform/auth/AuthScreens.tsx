@@ -16,12 +16,8 @@ export function AuthLoadingScreen() {
           <ShieldCheck className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
         </div>
         <div className="space-y-1">
-          <h1 className="text-base font-semibold text-text-primary">
-            Verifying Workforce Identity
-          </h1>
-          <p className="text-xs text-text-secondary">
-            Connecting to Supabase Staging and validating allowlist status...
-          </p>
+          <h1 className="text-base font-semibold text-text-primary">Verifying Staff Identity</h1>
+          <p className="text-xs text-text-secondary">Validating session and allowlist status...</p>
         </div>
         <div className="space-y-2.5 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-3.5 text-left">
           <Skeleton rounded="full" className="h-3 w-2/3" />
@@ -51,14 +47,14 @@ export function SignInScreen() {
     <main className="flex min-h-dvh items-center justify-center p-4">
       <SurfaceCard variant="glass" className="w-full max-w-md space-y-6 p-8">
         <div className="space-y-3 text-center">
-          <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-primary text-xl font-bold text-text-inverse shadow-sm">
-            RQ
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}ed-crest.png`}
+            alt="Emergency Department HSAAS UPM"
+            className="mx-auto h-16 w-16 rounded-full object-cover shadow-sm"
+          />
           <div className="space-y-1">
-            <h1 className="text-xl font-bold tracking-tight text-text-primary">RESQ Workforce</h1>
-            <p className="text-xs text-text-secondary">
-              Emergency Department Roster &amp; Operational Management
-            </p>
+            <h1 className="text-xl font-bold tracking-tight text-text-primary">ED Roster</h1>
+            <p className="text-xs text-text-secondary">Emergency Department · HSAAS UPM</p>
           </div>
           {!metadata.isProduction ? (
             <div className="flex justify-center pt-1">
@@ -75,7 +71,7 @@ export function SignInScreen() {
           <p className="font-semibold text-text-primary">Approved Identity Access Only</p>
           <p>
             Access is strictly gated by the Emergency Department Google OAuth allowlist and Postgres
-            Row Level Security. Unapproved accounts cannot read or mutate any workforce records.
+            Row Level Security. Unapproved accounts cannot read or mutate any department records.
           </p>
         </div>
 

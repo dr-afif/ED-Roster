@@ -56,7 +56,7 @@ describe('AuthBoundary & Gates', () => {
       </SupabaseProvider>,
     );
 
-    expect(screen.getByText(/Verifying Workforce Identity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Verifying Staff Identity/i)).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
@@ -83,7 +83,7 @@ describe('AuthBoundary & Gates', () => {
       </SupabaseProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: /RESQ Workforce/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /ED Roster/i })).toBeInTheDocument();
     expect(screen.getByText(/Approved Identity Access Only/i)).toBeInTheDocument();
 
     const signInBtn = screen.getByRole('button', { name: /Sign in with Google/i });

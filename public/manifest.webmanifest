@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "RESQ Workforce & Roster",
-  "short_name": "RESQ ED",
-  "description": "Emergency Department workforce roster, shift requests, professional records, and document operations.",
+  "name": "ED Roster & Requests",
+  "short_name": "ED Roster",
+  "description": "Emergency Department roster, shift requests, professional records, and document operations.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
