@@ -16,7 +16,6 @@ import {
   Menu,
   Scale,
   Settings,
-  Sparkles,
   User,
   UserCircle2,
   Users,
@@ -29,6 +28,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   getUserRoleSubtitle,
   isAdminPtpoUser,
+  isEpUser,
   useAuthBoundary,
   type AuthenticatedUserContext,
 } from '@/platform/auth';
@@ -55,9 +55,10 @@ const ADMIN_NAV_ITEMS: readonly NavItem[] = [
 ];
 
 // Mobile bottom bar strictly capped at <= 5 items:
-// Home, Roster, Requests (Hero Orb), Records, plus More sheet trigger.
-function buildMobilePrimaryItems(rosterPath: string): readonly NavItem[] {
-  return [
+// MO/Owner: Home, Roster, Requests (Hero Orb), Records, plus More sheet trigger.
+// EP/Admin-PTPO: Home, Roster, Records, My Profile, plus More sheet trigger.
+function buildMobilePrimaryItems(rosterPath: string, isNonMoStaff: boolean): readonly NavItem[] {
+  const base: NavItem[] = [
     { label: 'Home', emoji: '🏠', to: '/', icon: Home },
     {
       label: 'Roster',
@@ -66,6 +67,18 @@ function buildMobilePrimaryItems(rosterPath: string): readonly NavItem[] {
       icon: CalendarDays,
       matchPrefix: '/rosters/',
     },
+  ];
+
+  if (isNonMoStaff) {
+    return [
+      ...base,
+      { label: 'Records', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
+      { label: 'My Profile', emoji: '👤', to: '/profile/me', icon: UserCircle2 },
+    ];
+  }
+
+  return [
+    ...base,
     { label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck },
     { label: 'Records', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
   ];
@@ -185,6 +198,8 @@ export function AppShell() {
   const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
   const isOwner = user?.role === 'owner';
   const isPtpoAdmin = isAdminPtpoUser(user);
+  const isEp = isEpUser(user);
+  const isNonMoStaff = isPtpoAdmin || isEp;
   const roleSubtitle = getUserRoleSubtitle(user);
   const isTestingAsMo = Boolean(isViewingAsOtherUser);
 
@@ -201,9 +216,7 @@ export function AppShell() {
     user?.rosterName?.trim() || user?.displayName?.trim() || (isOwner ? 'Dr. Afif' : 'Staff');
 
   const defaultRosterPath = getSessionOrUpcomingRosterPath();
-  const mobilePrimaryItems = buildMobilePrimaryItems(defaultRosterPath).filter(
-    (item) => !(isPtpoAdmin && item.to === '/requests'),
-  );
+  const mobilePrimaryItems = buildMobilePrimaryItems(defaultRosterPath, isNonMoStaff);
 
   const staffNavItems: readonly NavItem[] = [
     { label: 'Home', emoji: '🏠', to: '/', icon: Home },
@@ -214,7 +227,7 @@ export function AppShell() {
       icon: CalendarDays,
       matchPrefix: '/rosters/',
     },
-    ...(!isPtpoAdmin
+    ...(!isNonMoStaff
       ? [{ label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck }]
       : []),
     { label: 'Records & PH', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
@@ -229,7 +242,6 @@ export function AppShell() {
   ];
 
   const mobileMoreStaffItems: readonly NavItem[] = [
-    { label: 'Public Holidays & GHKA', emoji: '✨', to: '/records?pane=ph', icon: Sparkles },
     { label: 'Documents', emoji: '📁', to: '/documents', icon: FolderKanban },
     {
       label:

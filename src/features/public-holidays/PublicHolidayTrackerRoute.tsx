@@ -16,7 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { isAdminPtpoUser, useAuthBoundary } from '@/platform/auth';
+import { isAdminPtpoUser, isEpUser, useAuthBoundary } from '@/platform/auth';
 import { getShiftToneClasses, Modal, SkeletonPhTrackerView, useToast } from '@/shared/ui';
 import { generateGhkaMemoDocx } from './ghkaMemoExport';
 import type { PhCredit } from './types';
@@ -71,13 +71,18 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
   const { user } = useAuthBoundary();
   const showToast = useToast();
   const isOwner = user?.role === 'owner';
-  const canManageGhkaMemos = isOwner || isAdminPtpoUser(user);
+  const isPtpoAdmin = isAdminPtpoUser(user);
+  const isEp = isEpUser(user);
+  const canViewDepartmentPh = isOwner || isPtpoAdmin || isEp;
+  const canManageGhkaMemos = isOwner || isPtpoAdmin;
   const myStaffId = user?.staffId;
 
   const [activeYear, setActiveYear] = useState<string>(() => String(new Date().getFullYear()));
   const [activeView, setActiveView] = useState<'department' | 'personal'>(() =>
-    canManageGhkaMemos ? 'department' : 'personal',
+    canViewDepartmentPh ? 'department' : 'personal',
   );
+  const effectiveView: 'department' | 'personal' =
+    isPtpoAdmin || isEp ? 'department' : canViewDepartmentPh ? activeView : 'personal';
 
   // Admin toggles
   const [isHolidayManagerOpen, setIsHolidayManagerOpen] = useState(false);
@@ -358,13 +363,13 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
             <h1 className="text-2xl font-extrabold flex items-center gap-2 text-[#18181B]">
               <Sparkles className="w-6 h-6 text-[#0F766E]" />
               <span>
-                {canManageGhkaMemos && activeView === 'department'
+                {canViewDepartmentPh && effectiveView === 'department'
                   ? 'Public Holiday Tracker'
                   : 'My Public Holiday Tracker'}
               </span>
             </h1>
             <p className="text-xs text-[#78716C] mt-1 font-medium">
-              {canManageGhkaMemos && activeView === 'department'
+              {canViewDepartmentPh && effectiveView === 'department'
                 ? 'Track Public Holiday duties and GHKA replacements across the department.'
                 : 'Earned replacement leave (GHKA) calculated from finalized duty rosters.'}
             </p>
@@ -375,13 +380,13 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
       {/* Compact Warm Editorial Pill Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[20px] border border-[#E7E5E4] bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(28,25,23,0.03)]">
         <div className="flex flex-wrap items-center gap-2">
-          {canManageGhkaMemos && (
+          {isOwner && (
             <div className="inline-flex items-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] p-0.5">
               <button
                 type="button"
                 onClick={() => setActiveView('department')}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-extrabold transition cursor-pointer ${
-                  activeView === 'department'
+                  effectiveView === 'department'
                     ? 'bg-[#0F766E] text-white shadow-2xs'
                     : 'text-[#57534E] hover:text-[#18181B]'
                 }`}
@@ -393,7 +398,7 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                 type="button"
                 onClick={() => setActiveView('personal')}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-extrabold transition cursor-pointer ${
-                  activeView === 'personal'
+                  effectiveView === 'personal'
                     ? 'bg-[#0F766E] text-white shadow-2xs'
                     : 'text-[#57534E] hover:text-[#18181B]'
                 }`}
@@ -417,7 +422,7 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!canManageGhkaMemos || activeView === 'personal' ? (
+          {!canViewDepartmentPh || effectiveView === 'personal' ? (
             <button
               type="button"
               onClick={handleOpenExportModal}
@@ -443,18 +448,20 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                   <span>Holidays ({yearHolidaysCount})</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setIsMemoEditMode((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-extrabold transition cursor-pointer ${
-                  isMemoEditMode
-                    ? 'border-[#0F766E] bg-[#0F766E] text-white'
-                    : 'border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-[#EFECE6]'
-                }`}
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>{isMemoEditMode ? '✓ Memo Mode' : 'Memo Mode'}</span>
-              </button>
+              {canManageGhkaMemos && (
+                <button
+                  type="button"
+                  onClick={() => setIsMemoEditMode((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-extrabold transition cursor-pointer ${
+                    isMemoEditMode
+                      ? 'border-[#0F766E] bg-[#0F766E] text-white'
+                      : 'border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-[#EFECE6]'
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isMemoEditMode ? '✓ Memo Mode' : 'Memo Mode'}</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -463,7 +470,7 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
       {/* ========================================================================= */}
       {/* VIEW 1: PERSONAL DOCTOR VIEW                                              */}
       {/* ========================================================================= */}
-      {(!canManageGhkaMemos || activeView === 'personal') && (
+      {(!canViewDepartmentPh || effectiveView === 'personal') && (
         <div className="space-y-4">
           {/* Owner / PTPO Inspecting Doctor Pill Selector */}
           {canManageGhkaMemos && (
@@ -784,9 +791,9 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
       )}
 
       {/* ========================================================================= */}
-      {/* VIEW 2: DEPARTMENT OVERVIEW & ANNUAL MATRIX (OWNER / PTPO)                */}
+      {/* VIEW 2: DEPARTMENT OVERVIEW & ANNUAL MATRIX (OWNER / PTPO / EP)           */}
       {/* ========================================================================= */}
-      {canManageGhkaMemos && activeView === 'department' && (
+      {canViewDepartmentPh && effectiveView === 'department' && (
         <div className="space-y-4">
           {/* Department Overview Cards with Concise Status Pills */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -35,20 +35,26 @@ export function isAdminPtpoUser(
   return group.includes('PTPO') || code.startsWith('PTPO');
 }
 
-export function getUserRoleSubtitle(user: AuthenticatedUserContext | null | undefined): string {
-  if (!user) return 'Medical Officer';
-  if (user.role === 'owner') return 'Super Admin · Admin MO';
-  if (isAdminPtpoUser(user)) return 'Admin (PTPO)';
+export function isEpUser(
+  user: Pick<AuthenticatedUserContext, 'staffGroup' | 'staffCode'> | null | undefined,
+): boolean {
+  if (!user) return false;
   const group = (user.staffGroup ?? '').toUpperCase();
   const code = (user.staffCode ?? '').toUpperCase();
-  if (
+  return (
     group.startsWith('EP |') ||
     group.startsWith('EP') ||
     group.includes('PHYSICIAN') ||
     code.startsWith('EP-')
-  ) {
-    return 'Emergency Physician';
-  }
+  );
+}
+
+export function getUserRoleSubtitle(user: AuthenticatedUserContext | null | undefined): string {
+  if (!user) return 'Medical Officer';
+  if (user.role === 'owner') return 'Super Admin · Admin MO';
+  if (isAdminPtpoUser(user)) return 'Admin (PTPO)';
+  if (isEpUser(user)) return 'Emergency Physician';
+  const group = (user.staffGroup ?? '').toUpperCase();
   if (group.includes('ADMIN-MO')) {
     return 'Admin MO';
   }

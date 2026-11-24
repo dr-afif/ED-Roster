@@ -1,6 +1,7 @@
 export {
   getUserRoleSubtitle,
   isAdminPtpoUser,
+  isEpUser,
   TEST_NORMAL_MO_USER,
   useAuth,
   useAuthBoundary,
