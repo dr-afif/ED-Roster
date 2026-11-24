@@ -34,7 +34,7 @@ export function ProfessionalRecordsRoute() {
   const userStaffId = user?.staffId;
 
   // Live PH & GHKA unclaimed credits for tab badge & My Tally card
-  const { matched } = usePublicHolidayTracker('2027');
+  const { matched } = usePublicHolidayTracker(String(new Date().getFullYear()));
   const unclaimedGhkaCount = useMemo(() => {
     if (!userStaffId) return 0;
     return matched.filter((m) => m.staffId === userStaffId && m.status !== 'USED').length;

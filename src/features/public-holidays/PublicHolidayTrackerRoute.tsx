@@ -74,7 +74,7 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
   const canManageGhkaMemos = isOwner || isAdminPtpoUser(user);
   const myStaffId = user?.staffId;
 
-  const [activeYear, setActiveYear] = useState<string>('2027');
+  const [activeYear, setActiveYear] = useState<string>(() => String(new Date().getFullYear()));
   const [activeView, setActiveView] = useState<'department' | 'personal'>(() =>
     canManageGhkaMemos ? 'department' : 'personal',
   );

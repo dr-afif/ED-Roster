@@ -76,16 +76,33 @@ export function usePublicHolidayTracker(yearFilter?: string) {
     staleTime: 1000 * 60 * 5,
   });
 
-  // 3. Fetch Planned Assignments across all published rosters
+  // 3. Fetch Planned Assignments across all published rosters (paginated past 1000-row cap)
   const assignmentsQuery = useQuery({
     queryKey: ['rosters', 'ph-tracker-assignments'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('roster_planned_assignments')
-        .select('staff_id, duty_date, shift_code, period_id');
+      const pageSize = 1000;
+      const allRows: Array<{
+        staff_id: number;
+        duty_date: string;
+        shift_code: string;
+        period_id: number;
+      }> = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('roster_planned_assignments')
+          .select('staff_id, duty_date, shift_code, period_id')
+          .order('duty_date', { ascending: true })
+          .order('staff_id', { ascending: true })
+          .range(from, from + pageSize - 1);
 
-      if (error) throw error;
-      return data || [];
+        if (error) throw error;
+        const batch = data || [];
+        allRows.push(...batch);
+        if (batch.length < pageSize) break;
+        from += pageSize;
+      }
+      return allRows;
     },
     staleTime: 1000 * 60 * 2,
   });
