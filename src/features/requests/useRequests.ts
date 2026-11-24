@@ -198,8 +198,8 @@ export function useSubmitRequestMutation() {
         p_staff_id: payload.staffId,
         p_request_date: payload.date,
         p_requested_shift_code: payload.request.trim().toUpperCase(),
-        p_notes: payload.comment?.trim() || null,
-        p_edit_request_id: payload.id ? Number(payload.id) : null,
+        p_notes: payload.comment?.trim() || undefined,
+        p_edit_request_id: payload.id ? Number(payload.id) : undefined,
       });
 
       if (error) {
