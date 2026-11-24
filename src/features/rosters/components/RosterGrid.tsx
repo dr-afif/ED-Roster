@@ -171,10 +171,16 @@ export function RosterGrid({
                     const shiftCode = assignment?.shiftCode;
                     const parsed = stripShiftModifiers(shiftCode);
                     const reqEntry = requestMap.get(`${staff.id}:${date}`);
+                    const isPendingRequest = Boolean(!parsed.cleanShift && reqEntry?.request);
+                    const displayShiftCode =
+                      shiftCode || (isPendingRequest ? reqEntry?.request : undefined);
+                    const displayParsed = stripShiftModifiers(displayShiftCode);
                     const isHonoredRequest = Boolean(
                       reqEntry && parsed.cleanShift && parsed.cleanShift === reqEntry.request,
                     );
-                    const isOverride = Boolean(reqEntry && parsed.cleanShift !== reqEntry.request);
+                    const isOverride = Boolean(
+                      reqEntry && parsed.cleanShift && parsed.cleanShift !== reqEntry.request,
+                    );
                     const hasMoNote = Boolean(reqEntry?.note && reqEntry.note.trim());
                     const hasAdminNote = Boolean(assignment?.note && assignment.note.trim());
                     const isAmended = Boolean(amendedCellKeys?.has(`${staff.id}:${date}`));
@@ -200,7 +206,9 @@ export function RosterGrid({
                     tipParts.push(
                       shiftCode
                         ? `${rosterName} on ${date}: ${shiftCode}`
-                        : `${rosterName} on ${date}: No assignment`,
+                        : isPendingRequest
+                          ? `${rosterName} on ${date}: Requested ${reqEntry?.request} (Not yet assigned)`
+                          : `${rosterName} on ${date}: No assignment`,
                     );
                     if (isHonoredRequest) {
                       tipParts.push(`Request Honored: ${reqEntry?.request}`);
@@ -223,7 +231,9 @@ export function RosterGrid({
                           ? 'outline outline-[1.5px] outline-[#D97706]'
                           : parsed.isExtended
                             ? 'outline outline-[1.5px] outline-[#0F766E]'
-                            : '';
+                            : isPendingRequest
+                              ? 'outline outline-[1px] outline-dashed outline-[#0F766E]/55 opacity-85'
+                              : '';
 
                     return (
                       <td
@@ -252,7 +262,7 @@ export function RosterGrid({
                           title={tipParts.join('\n')}
                           style={{ height: cellH }}
                           className={`relative flex items-center justify-center rounded-[6px] tracking-tight transition-transform overflow-hidden font-extrabold text-[10.5px] sm:text-[11px] lg:text-[10.5px] ${getShiftToneClasses(
-                            shiftCode,
+                            displayShiftCode,
                             isHonoredRequest,
                           )} ${modOutlineClass} ${
                             isCellDisabled
@@ -293,13 +303,13 @@ export function RosterGrid({
                               Δ
                             </span>
                           ) : null}
-                          <span>{parsed.cleanShift || '·'}</span>
-                          {parsed.isStandby ? (
+                          <span>{displayParsed.cleanShift || '·'}</span>
+                          {displayParsed.isStandby ? (
                             <span className="ml-0.5 rounded-[3px] bg-[#D97706] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
                               S
                             </span>
                           ) : null}
-                          {parsed.isExtended ? (
+                          {displayParsed.isExtended ? (
                             <span className="ml-0.5 rounded-[3px] bg-[#0F766E] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
                               EX
                             </span>
