@@ -57,6 +57,12 @@ export const appChildRoutes: RouteObject[] = [
     }),
   },
   {
+    path: 'about',
+    lazy: async () => ({
+      Component: (await import('./AppInfoRoute')).AppInfoRoute,
+    }),
+  },
+  {
     path: 'admin/staff',
     lazy: async () => ({
       Component: (await import('@/features/directory')).StaffDirectoryAdminRoute,

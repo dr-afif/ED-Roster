@@ -11,6 +11,7 @@ import {
   FileText,
   FolderKanban,
   Home,
+  Info,
   LogOut,
   Menu,
   Scale,
@@ -107,6 +108,7 @@ function getMobileHeaderTitle(pathname: string): string {
   }
   if (pathname.startsWith('/documents')) return 'Drive Documents';
   if (pathname.startsWith('/updates')) return 'Department Updates';
+  if (pathname.startsWith('/about')) return 'App Info';
   if (pathname.startsWith('/profile')) return 'My Profile';
   if (pathname.startsWith('/admin/staff')) return 'Staff & Accounts';
   if (pathname.startsWith('/admin/rules')) return 'Rules & Policies';
@@ -223,6 +225,7 @@ export function AppShell() {
       icon: Bell,
     },
     { label: 'My Profile', emoji: '👤', to: '/profile/me', icon: UserCircle2 },
+    { label: 'App Info', emoji: 'ℹ️', to: '/about', icon: Info },
   ];
 
   const mobileMoreStaffItems: readonly NavItem[] = [
@@ -238,6 +241,7 @@ export function AppShell() {
       icon: Bell,
     },
     { label: 'My Profile', emoji: '👤', to: '/profile/me', icon: UserCircle2 },
+    { label: 'App Info', emoji: 'ℹ️', to: '/about', icon: Info },
   ];
 
   const toggleSidebar = () => {
