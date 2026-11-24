@@ -119,15 +119,10 @@ export function RosterPeriodRoute() {
   const canExportRoster = isOwner || isPtpoAdmin;
 
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
-  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>(() =>
-    isPtpoAdmin || isEp ? 'calendar' : 'table',
-  );
-
-  useEffect(() => {
-    if (isPtpoAdmin || isEp) {
-      setViewFormat('calendar');
-    }
-  }, [isPtpoAdmin, isEp]);
+  const [viewFormatOverride, setViewFormatOverride] = useState<'calendar' | 'table' | null>(null);
+  const viewFormat: 'calendar' | 'table' =
+    viewFormatOverride ?? (isPtpoAdmin || isEp ? 'calendar' : 'table');
+  const setViewFormat = setViewFormatOverride;
   const [isTableEditEnabled, setIsTableEditEnabled] = useState(false);
   const [rosterEditMode, setRosterEditMode] = useState<'normal' | 'fast' | 'standby' | 'extended'>(
     'normal',
