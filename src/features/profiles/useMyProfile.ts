@@ -77,7 +77,6 @@ export type UpdateProfilePayload = {
   full_name: string;
   phone?: string;
   registration_number?: string;
-  staff_code?: string;
 };
 
 export function useUpdateMyProfileMutation() {
@@ -104,13 +103,6 @@ export function useUpdateMyProfileMutation() {
 
       if (error) {
         throw new Error(error.message);
-      }
-
-      if (payload.staff_code !== undefined && payload.staff_code.trim()) {
-        await supabase
-          .from('staff_directory')
-          .update({ staff_code: payload.staff_code.trim() })
-          .eq('id', staffId);
       }
 
       return data;

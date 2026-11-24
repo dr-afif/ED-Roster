@@ -91,7 +91,7 @@ describe('MyProfileRoute', () => {
     expect(mmcInput).toHaveValue('MMC 88888');
 
     const staffNumberInput = screen.getByLabelText(/staff number/i);
-    expect(staffNumberInput).toHaveValue('MO-ADMIN');
+    expect(staffNumberInput).toHaveValue('');
   });
 
   it('submits updated profile contact details', async () => {
@@ -101,7 +101,7 @@ describe('MyProfileRoute', () => {
     fireEvent.change(phoneInput, { target: { value: '+60199999999' } });
 
     const staffNumberInput = screen.getByLabelText(/staff number/i);
-    fireEvent.change(staffNumberInput, { target: { value: 'MO-1234' } });
+    fireEvent.change(staffNumberInput, { target: { value: 'A05412' } });
 
     const saveButton = screen.getByRole('button', { name: /save profile details/i });
     fireEvent.click(saveButton);
@@ -111,9 +111,10 @@ describe('MyProfileRoute', () => {
         full_name: 'Dr Muhammad Afif',
         phone: '+60199999999',
         registration_number: 'MMC 88888',
-        staff_code: 'MO-1234',
       });
     });
+
+    expect(window.localStorage.getItem('resq.profile.v1.staffNumber.1')).toBe('A05412');
   });
 
   it('preserves trailing | TG tag in registration_number when saving profile changes', async () => {
@@ -134,7 +135,6 @@ describe('MyProfileRoute', () => {
           full_name: 'Dr Muhammad Afif',
           phone: '+60123456789',
           registration_number: 'MMC 99887 | TG',
-          staff_code: 'MO-ADMIN',
         });
       });
     } finally {

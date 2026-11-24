@@ -104,10 +104,9 @@ function ProfileEditForm({
   );
   const [staffNumber, setStaffNumber] = useState(() => {
     try {
-      const cached = window.localStorage.getItem(`resq.profile.v1.staffNumber.${profile.staff_id}`);
-      return cached ?? profile.directory.staff_code ?? '';
+      return window.localStorage.getItem(`resq.profile.v1.staffNumber.${profile.staff_id}`) ?? '';
     } catch {
-      return profile.directory.staff_code ?? '';
+      return '';
     }
   });
   const [icNumber, setIcNumber] = useState('940512-10-5421');
@@ -152,7 +151,6 @@ function ProfileEditForm({
         full_name: fullName,
         phone,
         registration_number: combinedRegistration,
-        staff_code: staffNumber.trim() || undefined,
       });
       setSuccessMessage('Your profile contact details have been updated.');
       showToast('Profile details saved ✓');
@@ -263,7 +261,7 @@ function ProfileEditForm({
               type="text"
               value={staffNumber}
               onChange={(e) => setStaffNumber(e.target.value)}
-              placeholder="e.g. A05412 or MO-01"
+              placeholder="e.g. A05412 (Hospital Staff ID)"
               className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
             />
           </div>
