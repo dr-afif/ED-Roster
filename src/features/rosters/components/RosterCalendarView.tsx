@@ -20,6 +20,7 @@ interface RosterCalendarViewProps {
   isEditable: boolean;
   periodLabel?: string;
   isPublished?: boolean;
+  statusLabel?: string;
   currentUserName?: string;
   currentUserId?: number | null;
   onOpenPdfExport?: () => void;
@@ -79,6 +80,7 @@ export function RosterCalendarView({
   isEditable,
   periodLabel = 'January 2027',
   isPublished = false,
+  statusLabel,
   currentUserName,
   currentUserId,
   onOpenPdfExport,
@@ -421,8 +423,8 @@ export function RosterCalendarView({
 
       {/* Unified App-Themed Printable Monthly Duty Roster Sheet (Mobile + Desktop) */}
       <div className="mx-auto max-w-[760px] lg:max-w-[1290px] rounded-[20px] sm:rounded-[22px] border border-[#EFECE6] bg-white p-2.5 sm:p-5 lg:p-7 shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]">
-        {/* Printable Masthead */}
-        <div className="mb-3 flex items-center justify-between gap-2.5 border-b border-[#EFECE6] pb-3 lg:pb-4">
+        {/* Printable Masthead (Sticky below Month Picker + Switcher bar) */}
+        <div className="sticky top-[157px] lg:top-[102px] z-10 -mx-2.5 px-2.5 sm:-mx-5 sm:px-5 lg:-mx-7 lg:px-7 pt-1 pb-3 lg:pb-4 mb-3 flex items-center justify-between gap-2.5 border-b border-[#EFECE6] bg-white">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 lg:h-10 w-1 shrink-0 rounded-full bg-gradient-to-b from-[#0F766E] to-[#E06D53]" />
             <div className="min-w-0">
@@ -434,19 +436,39 @@ export function RosterCalendarView({
               </div>
             </div>
           </div>
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] lg:text-xs font-extrabold ${
-              isPublished ? 'tone-leave' : 'tone-am'
-            }`}
-          >
-            {isPublished ? '✓ Published' : 'Draft'}
-          </span>
+          {(() => {
+            const rawLabel = statusLabel ?? (isPublished ? 'Published' : 'Draft');
+            const isLegacy = /legacy/i.test(rawLabel);
+            const isClosed = /closed/i.test(rawLabel);
+            const isPub = /published/i.test(rawLabel) || (!statusLabel && isPublished);
+            const badgeText = isLegacy
+              ? 'Legacy'
+              : isClosed
+                ? 'Closed'
+                : isPub
+                  ? '✓ Published'
+                  : rawLabel === 'Planning'
+                    ? 'Draft'
+                    : rawLabel;
+            const badgeClass = isPub
+              ? 'tone-leave'
+              : isLegacy || isClosed
+                ? 'bg-[#F5F5F4] text-[#57534E] border border-[#E7E5E4]'
+                : 'tone-am';
+            return (
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] lg:text-xs font-extrabold ${badgeClass}`}
+              >
+                {badgeText}
+              </span>
+            );
+          })()}
         </div>
 
         {/* Whole-Month Printable Timetable */}
-        <div className="overflow-hidden rounded-[14px] border border-[#E7E5E4]">
+        <div className="overflow-clip rounded-[14px] border border-[#E7E5E4]">
           <table className="w-full table-fixed border-collapse text-center text-[8px] sm:text-[10.5px] lg:text-[13px]">
-            <thead>
+            <thead className="sticky top-[210px] sm:top-[218px] lg:top-[168px] z-10">
               <tr className="bg-[#18181B] text-[#FAF8F5] select-none">
                 <th
                   rowSpan={2}

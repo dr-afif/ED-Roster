@@ -79,7 +79,7 @@ export function RosterGrid({
     <div className="space-y-2">
       {/* Prototype Matrix Card */}
       <div
-        className={`overflow-x-auto lg:overflow-hidden rounded-[20px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)] ${
+        className={`overflow-x-auto lg:overflow-x-clip rounded-[20px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)] ${
           needsVScroll ? 'max-h-[530px] lg:max-h-none overflow-y-auto lg:overflow-y-visible' : ''
         }`}
       >
@@ -88,7 +88,7 @@ export function RosterGrid({
             <tr className="border-b border-[#E7E5E4] bg-[#FAF8F5] text-[9.5px] font-extrabold text-[#57534E]">
               <th
                 scope="col"
-                className="sticky top-0 left-0 z-20 w-[108px] min-w-[96px] bg-[#FAF8F5] px-2.5 py-2 text-left font-extrabold text-[#57534E] border-r border-[#E7E5E4]"
+                className="sticky top-0 lg:top-[102px] left-0 z-20 w-[108px] min-w-[96px] bg-[#FAF8F5] px-2.5 py-2 text-left font-extrabold text-[#57534E] border-r border-[#E7E5E4]"
               >
                 Staff Member
               </th>
@@ -109,7 +109,7 @@ export function RosterGrid({
                     title={
                       holiday ? `${date}: ${holiday.name}` : isWeekend ? `${date}: Weekend` : date
                     }
-                    className={`sticky top-0 z-10 min-w-[38px] lg:min-w-0 py-1.5 px-0.5 text-center font-extrabold ${
+                    className={`sticky top-0 lg:top-[102px] z-10 min-w-[38px] lg:min-w-0 py-1.5 px-0.5 text-center font-extrabold ${
                       holiday
                         ? 'bg-[#FFE4E6] text-[#BE123C]'
                         : isWeekend

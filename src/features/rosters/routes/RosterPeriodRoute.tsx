@@ -8,7 +8,7 @@ import {
   Unlock,
 } from 'lucide-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { isAdminPtpoUser, useAuth } from '@/platform/auth';
+import { isAdminPtpoUser, isEpUser, useAuth } from '@/platform/auth';
 import {
   FIRST_NATIVE_ROSTER_PERIOD,
   formatRosterPeriodLabel,
@@ -114,10 +114,20 @@ export function RosterPeriodRoute() {
   const showToast = useToast();
   const isMobileViewport = useIsMobileViewport(1023);
   const isOwner = user?.role === 'owner';
-  const canExportRoster = isOwner || isAdminPtpoUser(user);
+  const isPtpoAdmin = isAdminPtpoUser(user);
+  const isEp = isEpUser(user);
+  const canExportRoster = isOwner || isPtpoAdmin;
 
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
-  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
+  const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>(() =>
+    isPtpoAdmin || isEp ? 'calendar' : 'table',
+  );
+
+  useEffect(() => {
+    if (isPtpoAdmin || isEp) {
+      setViewFormat('calendar');
+    }
+  }, [isPtpoAdmin, isEp]);
   const [isTableEditEnabled, setIsTableEditEnabled] = useState(false);
   const [rosterEditMode, setRosterEditMode] = useState<'normal' | 'fast' | 'standby' | 'extended'>(
     'normal',
@@ -1051,72 +1061,75 @@ export function RosterPeriodRoute() {
 
       {viewMode !== 'changes' ? (
         <>
-          {/* Centered Month Navigator Bar (Clickable Wheel Picker) */}
-          <div className="flex items-center justify-center gap-5 rounded-[16px] border border-[#E7E5E4] bg-white px-4 py-1.5 shadow-2xs">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              aria-label="Previous Month"
-              title="Previous Month"
-              className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
+          {/* Sticky Month Picker + View Switcher Bar */}
+          <div className="sticky top-[55px] lg:top-0 z-20 -mx-1 px-1 py-1.5 bg-[#FAF8F5]/95 backdrop-blur-xs space-y-2">
+            {/* Centered Month Navigator Bar (Clickable Wheel Picker) */}
+            <div className="flex items-center justify-center gap-5 rounded-[16px] border border-[#E7E5E4] bg-white px-4 py-1.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                aria-label="Previous Month"
+                title="Previous Month"
+                className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setIsMonthWheelOpen(true)}
-              title="Click to pick month"
-              className="cursor-pointer rounded-xl px-3 py-0.5 text-center transition hover:bg-[#FAF8F5]"
-            >
-              <div className="text-[13.5px] font-extrabold text-[#18181B]">
-                {periodLabel} <span className="text-[10px] text-[#0F766E]">▾</span>
-              </div>
-              <div className="text-[9.5px] font-semibold text-[#78716C]">
-                {periodDates.length} Days · {periodStatusLabel}
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsMonthWheelOpen(true)}
+                title="Click to pick month"
+                className="cursor-pointer rounded-xl px-3 py-0.5 text-center transition hover:bg-[#FAF8F5]"
+              >
+                <div className="text-[13.5px] font-extrabold text-[#18181B]">
+                  {periodLabel} <span className="text-[10px] text-[#0F766E]">▾</span>
+                </div>
+                <div className="text-[9.5px] font-semibold text-[#78716C]">
+                  {periodDates.length} Days · {periodStatusLabel}
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              aria-label="Next Month"
-              title="Next Month"
-              className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                aria-label="Next Month"
+                title="Next Month"
+                className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
 
-          {/* Full-Width 2-Tab Sliding Switch: Table View | Month */}
-          <div className="relative grid grid-cols-2 rounded-full bg-[#EAE4DA] p-[3px] select-none">
-            <div
-              className={`absolute top-[3px] bottom-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-[#18181B] shadow-[0_3px_10px_rgba(0,0,0,0.16)] transition-transform duration-200 ${
-                viewFormat === 'calendar' ? 'translate-x-full' : 'translate-x-0'
-              }`}
-            />
-            <button
-              type="button"
-              id="tab-btn-table"
-              data-testid="tab-btn-table"
-              onClick={() => setViewFormat('table')}
-              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
-                viewFormat === 'table' ? 'text-white' : 'text-[#57534E]'
-              }`}
-            >
-              Table View
-            </button>
-            <button
-              type="button"
-              id="tab-btn-calendar"
-              data-testid="tab-btn-calendar"
-              onClick={() => setViewFormat('calendar')}
-              className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
-                viewFormat === 'calendar' ? 'text-white' : 'text-[#57534E]'
-              }`}
-            >
-              Month<span className="sr-only"> (Calendar View)</span>
-            </button>
+            {/* Full-Width 2-Tab Sliding Switch: Table View | Month */}
+            <div className="relative grid grid-cols-2 rounded-full bg-[#EAE4DA] p-[3px] select-none">
+              <div
+                className={`absolute top-[3px] bottom-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-[#18181B] shadow-[0_3px_10px_rgba(0,0,0,0.16)] transition-transform duration-200 ${
+                  viewFormat === 'calendar' ? 'translate-x-full' : 'translate-x-0'
+                }`}
+              />
+              <button
+                type="button"
+                id="tab-btn-table"
+                data-testid="tab-btn-table"
+                onClick={() => setViewFormat('table')}
+                className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                  viewFormat === 'table' ? 'text-white' : 'text-[#57534E]'
+                }`}
+              >
+                Table View
+              </button>
+              <button
+                type="button"
+                id="tab-btn-calendar"
+                data-testid="tab-btn-calendar"
+                onClick={() => setViewFormat('calendar')}
+                className={`relative z-10 py-2 text-xs font-extrabold transition-colors cursor-pointer ${
+                  viewFormat === 'calendar' ? 'text-white' : 'text-[#57534E]'
+                }`}
+              >
+                Month<span className="sr-only"> (Calendar View)</span>
+              </button>
+            </div>
           </div>
 
           {/* Owner-Only Read-Only Protection & Quick Shift Palette Bar (Table View) */}
@@ -1450,6 +1463,7 @@ export function RosterPeriodRoute() {
           isEditable={isOwner}
           periodLabel={periodLabel}
           isPublished={isEnforced || isClosed}
+          statusLabel={periodStatusLabel}
           currentUserName={user?.rosterName || user?.displayName}
           currentUserId={user?.staffId}
           onOpenPdfExport={() => setIsPdfExportModalOpen(true)}
@@ -1458,6 +1472,17 @@ export function RosterPeriodRoute() {
         />
       ) : (
         <>
+          {/* Mobile Full View / Rotate Pill */}
+          <div className="flex justify-center pb-0.5 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setIsRotatedOverlayOpen(true)}
+              className="rounded-full border border-[#E7E5E4] bg-white px-4 py-1.5 text-[11.5px] font-bold text-[#57534E] shadow-2xs hover:border-stone-400 hover:text-[#18181B] cursor-pointer"
+            >
+              🔄 Full View / Rotate
+            </button>
+          </div>
+
           <RosterGrid
             periodDates={periodDates}
             staffList={enrichedDisplay.staffList}
@@ -1477,17 +1502,6 @@ export function RosterPeriodRoute() {
             onSelectCell={handleCellSelect}
             onBlockedEditTap={() => showToast('Tap "Edit Roster" to edit')}
           />
-
-          {/* Mobile Full View / Rotate Pill */}
-          <div className="flex justify-center pt-0.5 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setIsRotatedOverlayOpen(true)}
-              className="rounded-full border border-[#E7E5E4] bg-white px-4 py-1.5 text-[11.5px] font-bold text-[#57534E] shadow-2xs hover:border-stone-400 hover:text-[#18181B] cursor-pointer"
-            >
-              🔄 Full View / Rotate
-            </button>
-          </div>
 
           {/* Owner-Only Tallies, Rules Engine & Snapshot Archive */}
           {isOwner ? (
