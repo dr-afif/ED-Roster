@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getShiftToneClasses } from '@/shared/ui';
 import {
   ADMIN_ALL_SHIFT_TYPES,
-  DEFAULT_LIMIT_GROUPS,
+  DAILY_LIMIT,
   DEFAULT_MONTHLY_LIMIT,
   DEFAULT_MONTHLY_WEEKEND_LIMIT,
   DEFAULT_SHIFT_TYPES,
+  ON1_DAILY_LIMIT,
   buildLimitGroupById,
   buildLimitGroupIdByShiftType,
   buildUsageByDateAndGroup,
@@ -18,10 +19,18 @@ import {
 } from '../domain/quota';
 import { useRequestShiftDefinitionsQuery } from '../useRequests';
 
+export interface RequestQuotaConfig {
+  monthlyLimit?: number;
+  weekendLimit?: number;
+  dailyOffLimit?: number;
+  on1DailyLimit?: number;
+}
+
 export interface NewRequestFormProps {
   selectedName: string;
   selectedStaffId: number;
   isOwner?: boolean;
+  quotaConfig?: RequestQuotaConfig;
   initialValues?: {
     id?: number | string;
     date?: string;
@@ -54,12 +63,17 @@ export function NewRequestForm({
   selectedName,
   selectedStaffId,
   isOwner = false,
+  quotaConfig,
   initialValues,
   requests = [],
   teamMembers = [],
   onSubmit,
   isSubmitting = false,
 }: NewRequestFormProps) {
+  const monthlyLimit = quotaConfig?.monthlyLimit ?? DEFAULT_MONTHLY_LIMIT;
+  const weekendLimit = quotaConfig?.weekendLimit ?? DEFAULT_MONTHLY_WEEKEND_LIMIT;
+  const dailyOffLimit = quotaConfig?.dailyOffLimit ?? DAILY_LIMIT;
+  const on1DailyLimit = quotaConfig?.on1DailyLimit ?? ON1_DAILY_LIMIT;
   const { data: dbShiftDefs = [] } = useRequestShiftDefinitionsQuery();
   const [isStaffPickerOpen, setIsStaffPickerOpen] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
@@ -90,7 +104,14 @@ export function NewRequestForm({
     return ADMIN_ALL_SHIFT_TYPES;
   }, [isOwner, dbShiftDefs]);
 
-  const limitGroupById = useMemo(() => buildLimitGroupById(DEFAULT_LIMIT_GROUPS), []);
+  const limitGroupById = useMemo(
+    () =>
+      buildLimitGroupById([
+        { ID: 'OFF', GroupName: 'OFF / Leave', DefaultLimit: dailyOffLimit },
+        { ID: 'ON1', GroupName: 'ON1 Night Duty', DefaultLimit: on1DailyLimit },
+      ]),
+    [dailyOffLimit, on1DailyLimit],
+  );
   const limitGroupIdByShiftType = useMemo(
     () => buildLimitGroupIdByShiftType(availableShiftTypes),
     [availableShiftTypes],
@@ -173,9 +194,9 @@ export function NewRequestForm({
         dateString: date,
         initialRequestId: initialValues?.id,
       });
-      if (monthlyCount >= DEFAULT_MONTHLY_LIMIT) {
+      if (monthlyCount >= monthlyLimit) {
         setValidationError(
-          `Monthly request limit reached for ${targetMemberName} (${DEFAULT_MONTHLY_LIMIT} requests allowed per month).`,
+          `Monthly request limit reached for ${targetMemberName} (${monthlyLimit} requests allowed per month).`,
         );
         return;
       }
@@ -192,9 +213,9 @@ export function NewRequestForm({
           limitGroupIdByShiftType,
           initialRequestId: initialValues?.id,
         });
-        if (weekendCount >= DEFAULT_MONTHLY_WEEKEND_LIMIT) {
+        if (weekendCount >= weekendLimit) {
           setValidationError(
-            `Monthly weekend leave limit reached for ${targetMemberName} (${DEFAULT_MONTHLY_WEEKEND_LIMIT} weekend leave requests allowed per month).`,
+            `Monthly weekend leave limit reached for ${targetMemberName} (${weekendLimit} weekend leave requests allowed per month).`,
           );
           return;
         }
@@ -231,12 +252,12 @@ export function NewRequestForm({
       dateString: date,
       initialRequestId: initialValues?.id,
     });
-    const isOverLimit = monthlyCount >= DEFAULT_MONTHLY_LIMIT;
+    const isOverLimit = monthlyCount >= monthlyLimit;
 
     let colorClasses = 'text-[#065F46] bg-[#D1FAE5]/60 border-[#A7F3D0]';
     if (isOverLimit) {
       colorClasses = 'text-[#991B1B] bg-[#FEF2F2] border-[#FECACA] font-bold';
-    } else if (monthlyCount >= DEFAULT_MONTHLY_LIMIT - 2) {
+    } else if (monthlyCount >= monthlyLimit - 2) {
       colorClasses = 'text-[#92400E] bg-[#FFFBEB] border-[#FDE68A]';
     }
 
@@ -358,7 +379,7 @@ export function NewRequestForm({
           >
             <span>Monthly total for {monthlyCard.displayMonth}:</span>
             <span className="font-extrabold">
-              {monthlyCard.monthlyCount} / {DEFAULT_MONTHLY_LIMIT} used
+              {monthlyCard.monthlyCount} / {monthlyLimit} used
             </span>
           </div>
         ) : null}

@@ -80,7 +80,7 @@ function getSeededDayInfo(dayNum: number) {
     if (sIdx === 0) myShift = code;
     if (code === 'AM' || code === 'OH') amPool.push(short);
     else if (code === 'PM') pmPool.push(short);
-    else if (code === 'ON1' || code === 'ON2' || code === 'PN') ndPool.push(short);
+    else if (code === 'ON1' || code === 'ON2') ndPool.push(short);
   });
 
   const epOh = dayNum % 3 === 0 ? 'Razak' : 'Hanim';
@@ -228,8 +228,7 @@ export function DashboardRoute() {
         code === 'ON2' ||
         code === 'ON' ||
         code === 'ND' ||
-        code === 'NIGHT' ||
-        code === 'PN'
+        code === 'NIGHT'
       ) {
         onNames.push(name);
       }

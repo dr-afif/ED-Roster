@@ -3,10 +3,13 @@ import { AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
 import { MonthYearWheelModal, useAppUiState } from '@/shared/ui';
+import { useRuleVersionQuery } from '@/features/rosters/data/rosterQueries';
 import { useAuth } from '../../platform/auth';
 import {
+  DAILY_LIMIT,
   DEFAULT_MONTHLY_LIMIT,
   DEFAULT_MONTHLY_WEEKEND_LIMIT,
+  ON1_DAILY_LIMIT,
   getMonthKey,
   getMonthlyStatsForUser,
   toIsoDate,
@@ -45,6 +48,25 @@ export function StaffRequestsRoute() {
   const { data: requests = [], isLoading: isLoadingRequests } = useAllRequestsQuery();
   const { data: teamMembers = [], isLoading: isLoadingMembers } = useTeamMembersQuery();
   const { data: publicHolidays = [] } = usePublicHolidaysQuery();
+  const { data: ruleVersion } = useRuleVersionQuery();
+
+  const rawRuleConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
+  const requestMonthlyLimit = Number(rawRuleConfig.request_monthly_limit ?? DEFAULT_MONTHLY_LIMIT);
+  const requestWeekendLimit = Number(
+    rawRuleConfig.request_weekend_limit ?? DEFAULT_MONTHLY_WEEKEND_LIMIT,
+  );
+  const requestDailyOffLimit = Number(rawRuleConfig.request_daily_off_limit ?? DAILY_LIMIT);
+  const requestOn1DailyLimit = Number(rawRuleConfig.request_on1_daily_limit ?? ON1_DAILY_LIMIT);
+
+  const quotaConfig = useMemo(
+    () => ({
+      monthlyLimit: requestMonthlyLimit,
+      weekendLimit: requestWeekendLimit,
+      dailyOffLimit: requestDailyOffLimit,
+      on1DailyLimit: requestOn1DailyLimit,
+    }),
+    [requestMonthlyLimit, requestWeekendLimit, requestDailyOffLimit, requestOn1DailyLimit],
+  );
 
   const submitMutation = useSubmitRequestMutation();
   const deleteMutation = useDeleteRequestMutation();
@@ -67,8 +89,20 @@ export function StaffRequestsRoute() {
       selectedName,
       selectedStaffId,
       calendarMonth: selectedMonth,
+      settings: {
+        monthly_request_limit: requestMonthlyLimit,
+        monthly_weekend_limit: requestWeekendLimit,
+        weekend_limit_group_id: 'OFF',
+      },
     });
-  }, [requests, selectedName, selectedStaffId, selectedMonth]);
+  }, [
+    requests,
+    selectedName,
+    selectedStaffId,
+    selectedMonth,
+    requestMonthlyLimit,
+    requestWeekendLimit,
+  ]);
 
   const selectedMonthKey = getMonthKey(selectedMonth);
 
@@ -388,6 +422,7 @@ export function StaffRequestsRoute() {
           selectedName={selectedName}
           selectedStaffId={selectedStaffId}
           selectedMonth={selectedMonth}
+          monthlyLimit={requestMonthlyLimit}
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
           onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
@@ -420,6 +455,7 @@ export function StaffRequestsRoute() {
           selectedName={selectedName}
           selectedStaffId={selectedStaffId}
           isOwner={isOwner}
+          quotaConfig={quotaConfig}
           editingRequest={editingRequest}
           teamMembers={teamMembers}
           onClose={handlePanelClose}

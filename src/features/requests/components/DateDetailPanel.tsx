@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { getShiftToneClasses } from '@/shared/ui';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
-import { NewRequestForm } from './NewRequestForm';
+import { NewRequestForm, type RequestQuotaConfig } from './NewRequestForm';
 
 function formatDisplayDate(date: Date) {
   return date.toLocaleDateString(undefined, {
@@ -21,6 +21,7 @@ export interface DateDetailPanelProps {
   selectedName: string;
   selectedStaffId: number;
   isOwner?: boolean;
+  quotaConfig?: RequestQuotaConfig;
   editingRequest?: RequestRecord | null;
   teamMembers?: Array<{
     id: number;
@@ -49,6 +50,7 @@ export function DateDetailPanel({
   selectedName,
   selectedStaffId,
   isOwner = false,
+  quotaConfig,
   editingRequest,
   teamMembers = [],
   onClose,
@@ -218,6 +220,7 @@ export function DateDetailPanel({
               selectedName={selectedName}
               selectedStaffId={selectedStaffId}
               isOwner={isOwner}
+              quotaConfig={quotaConfig}
               initialValues={formInitialValues}
               requests={requests}
               teamMembers={teamMembers}

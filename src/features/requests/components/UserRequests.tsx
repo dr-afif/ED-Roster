@@ -18,6 +18,7 @@ export interface UserRequestsProps {
   selectedName: string;
   selectedStaffId?: number;
   selectedMonth?: Date;
+  monthlyLimit?: number;
   onPrevMonth?: () => void;
   onNextMonth?: () => void;
   onOpenMonthPicker?: () => void;
@@ -31,6 +32,7 @@ export function UserRequests({
   selectedName,
   selectedStaffId,
   selectedMonth,
+  monthlyLimit = DEFAULT_MONTHLY_LIMIT,
   onPrevMonth,
   onNextMonth,
   onOpenMonthPicker,
@@ -140,7 +142,7 @@ export function UserRequests({
             {monthLabel} <span className="text-[11px] text-[#0F766E]">▾</span>
           </div>
           <p className="text-[10.5px] font-semibold text-[#78716C]">
-            {filteredRequests.length} of {DEFAULT_MONTHLY_LIMIT} requests used
+            {filteredRequests.length} of {monthlyLimit} requests used
           </p>
         </button>
 
