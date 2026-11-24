@@ -11,8 +11,15 @@ export function stripShiftModifiers(rawCode?: string): {
   }
   const upper = String(rawCode).trim().toUpperCase();
   const isStandby = upper.includes('(S)') || upper.endsWith('-S');
-  const isExtended = upper.includes('(X)') || upper.endsWith('-X');
-  const cleanShift = upper.replace(/\(S\)|-S|\(X\)|-X/g, '').trim();
+  const strippedStandby = upper.replace(/\(S\)|-S/g, '').trim();
+  const isExtended =
+    strippedStandby.includes('(X)') ||
+    strippedStandby.endsWith('-X') ||
+    strippedStandby === 'AMX' ||
+    strippedStandby === 'PMX';
+  let cleanShift = strippedStandby.replace(/\(X\)|-X/g, '').trim();
+  if (cleanShift === 'AMX') cleanShift = 'AM';
+  else if (cleanShift === 'PMX') cleanShift = 'PM';
   return { cleanShift, isStandby, isExtended };
 }
 

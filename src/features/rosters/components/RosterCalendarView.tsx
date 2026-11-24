@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
+import { stripShiftModifiers } from '@/shared/ui';
 import type { EpAssignmentRow } from '../data/rosterQueries';
 import {
   getMoWorkMode,
@@ -175,10 +176,7 @@ export function RosterCalendarView({
       const name = staff ? staff.rosterName || staff.displayName : `Dr ${a.staffId}`;
       const code = staff ? staff.staffCode : '';
 
-      const shift = (a.shiftCode || '')
-        .toUpperCase()
-        .replace(/\(S\)|-S|\(X\)|-X/g, '')
-        .trim();
+      const { cleanShift: shift } = stripShiftModifiers(a.shiftCode);
       if (shift === 'AM' || (workMode === 'oh_clinical' && shift === 'OH')) {
         dayData.am.push({ id: a.staffId, name, code });
       } else if (shift === 'PM') {

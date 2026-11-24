@@ -16,7 +16,13 @@ import {
   formatRosterPeriodLabel,
   getMalaysiaYearMonth,
 } from '@/shared/dates';
-import { getShiftToneClasses, SegmentedArcGauge, Skeleton, useAppUiState } from '@/shared/ui';
+import {
+  getShiftToneClasses,
+  SegmentedArcGauge,
+  Skeleton,
+  stripShiftModifiers,
+  useAppUiState,
+} from '@/shared/ui';
 
 const PROTOTYPE_STAFF_NAMES = [
   'Dr. Afif',
@@ -209,10 +215,7 @@ export function DashboardRoute() {
     const pmNames: string[] = [];
     const onNames: string[] = [];
     for (const a of dayItems) {
-      const code = (a.shiftCode || '')
-        .toUpperCase()
-        .replace(/\(S\)|-S|\(X\)|-X/g, '')
-        .trim();
+      const { cleanShift: code } = stripShiftModifiers(a.shiftCode);
       const staffMember = teamMembers.find((s) => s.id === a.staffId);
       const sg = (staffMember?.staff_group ?? '').toLowerCase();
       if (sg.includes('non-clinical')) continue;
