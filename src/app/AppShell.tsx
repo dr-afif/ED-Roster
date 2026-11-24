@@ -116,7 +116,6 @@ export function AppShell() {
   const {
     user,
     signOut,
-    testPersona,
     canSwitchTestPersona,
     toggleTestMoPersona,
     previewUser,
@@ -178,9 +177,7 @@ export function AppShell() {
   const [moreOpenForPath, setMoreOpenForPath] = useState<string | null>(null);
   const isMoreOpen = moreOpenForPath === location.pathname;
   const isOwner = user?.role === 'owner';
-  const isTestingAsMo = Boolean(
-    isViewingAsOtherUser || testPersona === 'mo' || (!isOwner && Boolean(canSwitchTestPersona)),
-  );
+  const isTestingAsMo = Boolean(isViewingAsOtherUser);
 
   const mainRef = useRef<HTMLElement | null>(null);
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null);

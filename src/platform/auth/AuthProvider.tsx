@@ -206,7 +206,15 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
             if (storedReturnTo) {
               window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
               const sanitized = sanitizeReturnToPath(storedReturnTo);
-              if (sanitized && sanitized !== '/' && window.location.hash !== `#${sanitized}`) {
+              const baseNoSlash = metadata.basePath.replace(/\/+$/, '');
+              const isBasePath =
+                sanitized === metadata.basePath || (baseNoSlash && sanitized === baseNoSlash);
+              if (
+                sanitized &&
+                sanitized !== '/' &&
+                !isBasePath &&
+                window.location.hash !== `#${sanitized}`
+              ) {
                 window.location.hash = sanitized;
               }
             }
@@ -296,9 +304,7 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
       try {
         const candidatePath =
           returnToPath ??
-          (window.location.hash.startsWith('#')
-            ? window.location.hash.slice(1)
-            : window.location.pathname);
+          (window.location.hash.startsWith('#/') ? window.location.hash.slice(1) : '/');
         const sanitized = sanitizeReturnToPath(candidatePath);
 
         try {

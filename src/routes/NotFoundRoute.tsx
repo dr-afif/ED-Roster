@@ -10,8 +10,8 @@ export function NotFoundRoute() {
         <h1 className="text-lg font-semibold text-text-primary">Page Not Found</h1>
       </div>
       <p className="text-sm text-text-secondary">
-        The requested route does not exist in the RESQ application route map. Check the address or
-        return to the operations overview.
+        The requested route does not exist in the application route map. Check the address or return
+        to the operations overview.
       </p>
       <Link
         to="/"
