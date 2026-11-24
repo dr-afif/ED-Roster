@@ -592,9 +592,9 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                         Holiday
                       </th>
                       <th className="py-2 px-3 text-[9.5px] font-extrabold text-[#18181B] uppercase tracking-wider border-b border-[#E7E5E4] text-center min-w-[130px]">
-                        {getDoctorShortLabel(
-                          currentDoctorProfile?.name || user?.rosterName || user?.displayName,
-                        )}
+                        {currentDoctorProfile?.rosterName ||
+                          user?.rosterName ||
+                          getDoctorShortLabel(currentDoctorProfile?.name || user?.displayName)}
                       </th>
                     </tr>
                   </thead>
@@ -1077,7 +1077,7 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                         <tr key={doc.id} className="hover:bg-[#FAF8F5]/80 transition">
                           <td className="py-2.5 px-4">
                             <div className="font-extrabold text-[#18181B]">
-                              {getDoctorShortLabel(doc.name)}
+                              {doc.rosterName || getDoctorShortLabel(doc.name)}
                             </div>
                             <div className="text-[10px] font-semibold text-[#78716C]">
                               {doc.staffCode || 'MO'}
@@ -1189,7 +1189,9 @@ export function PublicHolidayTrackerRoute({ embedded = false }: PublicHolidayTra
                           className="py-2 px-1 text-[9.5px] font-extrabold text-[#18181B] uppercase tracking-wider border-b border-[#E7E5E4] text-center min-w-[76px] w-[76px]"
                           title={doc.name}
                         >
-                          <span className="block truncate">{getDoctorShortLabel(doc.name)}</span>
+                          <span className="block truncate">
+                            {doc.rosterName || getDoctorShortLabel(doc.name)}
+                          </span>
                         </th>
                       ))}
                     </tr>
