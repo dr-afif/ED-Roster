@@ -27,11 +27,10 @@ import { Suspense, useEffect, useId, useRef, useState, type MouseEvent } from 'r
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuthBoundary, type AuthenticatedUserContext } from '@/platform/auth';
 import { supabase, useSupabaseMetadata } from '@/platform/supabase';
-import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
+import { getSessionOrUpcomingRosterPath } from '@/shared/dates';
 import { SkeletonPageFallback, useAppUiState, usePwaInstall, useToast } from '@/shared/ui';
 
 const SIDEBAR_STORAGE_KEY = 'resq.ui.v1.sidebarCollapsed';
-const DEFAULT_ROSTER_PATH = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
 
 type NavItem = {
   readonly label: string;
@@ -51,18 +50,20 @@ const ADMIN_NAV_ITEMS: readonly NavItem[] = [
 
 // Mobile bottom bar strictly capped at <= 5 items:
 // Home, Roster, Requests (Hero Orb), Records, plus More sheet trigger.
-const MOBILE_PRIMARY_ITEMS: readonly NavItem[] = [
-  { label: 'Home', emoji: '🏠', to: '/', icon: Home },
-  {
-    label: 'Roster',
-    emoji: '📅',
-    to: DEFAULT_ROSTER_PATH,
-    icon: CalendarDays,
-    matchPrefix: '/rosters/',
-  },
-  { label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck },
-  { label: 'Records', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
-];
+function buildMobilePrimaryItems(rosterPath: string): readonly NavItem[] {
+  return [
+    { label: 'Home', emoji: '🏠', to: '/', icon: Home },
+    {
+      label: 'Roster',
+      emoji: '📅',
+      to: rosterPath,
+      icon: CalendarDays,
+      matchPrefix: '/rosters/',
+    },
+    { label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck },
+    { label: 'Records', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
+  ];
+}
 
 function readInitialSidebarCollapsed(): boolean {
   try {
@@ -193,12 +194,15 @@ export function AppShell() {
   const profilePillLabel =
     user?.rosterName?.trim() || user?.displayName?.trim() || (isOwner ? 'Dr. Afif' : 'Staff');
 
+  const defaultRosterPath = getSessionOrUpcomingRosterPath();
+  const mobilePrimaryItems = buildMobilePrimaryItems(defaultRosterPath);
+
   const staffNavItems: readonly NavItem[] = [
     { label: 'Home', emoji: '🏠', to: '/', icon: Home },
     {
       label: 'Roster',
       emoji: '📅',
-      to: DEFAULT_ROSTER_PATH,
+      to: defaultRosterPath,
       icon: CalendarDays,
       matchPrefix: '/rosters/',
     },
@@ -630,7 +634,7 @@ export function AppShell() {
         className="fixed bottom-0 left-0 right-0 z-40 rounded-t-[24px] bg-[#18181B] px-2.5 pt-0 pb-[calc(14px+env(safe-area-inset-bottom))] text-white shadow-[0_-10px_30px_rgba(0,0,0,0.28)] lg:hidden"
       >
         <div className="grid w-full grid-cols-5 items-end justify-items-center">
-          {MOBILE_PRIMARY_ITEMS.map((item) => {
+          {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const active = isNavItemActive(location.pathname, item);
             const isCenterOrb = item.to === '/requests';

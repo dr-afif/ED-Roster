@@ -4,6 +4,10 @@ export {
   FIRST_NATIVE_ROSTER_PERIOD,
   formatRosterPeriodLabel,
   getMalaysiaYearMonth,
+  getSessionOrUpcomingRosterPath,
+  getUpcomingMalaysiaRosterPeriod,
   isValidRosterYearMonth,
+  readSessionRosterPeriod,
+  writeSessionRosterPeriod,
   type RosterYearMonth,
 } from './malaysiaDate';

@@ -12,7 +12,9 @@ import { useAuth } from '@/platform/auth';
 import {
   FIRST_NATIVE_ROSTER_PERIOD,
   formatRosterPeriodLabel,
+  getMalaysiaYearMonth,
   isValidRosterYearMonth,
+  writeSessionRosterPeriod,
 } from '@/shared/dates';
 import {
   getShiftToneClasses,
@@ -216,6 +218,7 @@ export function RosterPeriodRoute() {
   const publishMutation = usePublishRosterMutation(periodId);
 
   const handleMonthChange = (newYyyy: string, newMm: string) => {
+    writeSessionRosterPeriod(newYyyy, newMm);
     navigate(`/rosters/${newYyyy}/${newMm}`);
   };
 
@@ -1616,18 +1619,23 @@ export function RosterPeriodRoute() {
       ) : null}
 
       {/* Month / Year Wheel Picker Modal */}
-      <MonthYearWheelModal
-        isOpen={isMonthWheelOpen}
-        onClose={() => setIsMonthWheelOpen(false)}
-        title="Select Roster Month"
-        subtitle="Current/previous = Published · Upcoming = Draft"
-        selectedYear={parseInt(yyyy, 10)}
-        selectedMonth={parseInt(mm, 10)}
-        shortcutLabel="Current"
-        shortcutYear={2027}
-        shortcutMonth={1}
-        onSelect={(yr, mo) => handleMonthChange(String(yr), String(mo).padStart(2, '0'))}
-      />
+      {(() => {
+        const currentMalaysiaPeriod = getMalaysiaYearMonth(new Date());
+        return (
+          <MonthYearWheelModal
+            isOpen={isMonthWheelOpen}
+            onClose={() => setIsMonthWheelOpen(false)}
+            title="Select Roster Month"
+            subtitle="Current/previous = Published · Upcoming = Draft"
+            selectedYear={parseInt(yyyy, 10)}
+            selectedMonth={parseInt(mm, 10)}
+            shortcutLabel="Current"
+            shortcutYear={Number(currentMalaysiaPeriod.year)}
+            shortcutMonth={Number(currentMalaysiaPeriod.month)}
+            onSelect={(yr, mo) => handleMonthChange(String(yr), String(mo).padStart(2, '0'))}
+          />
+        );
+      })()}
 
       {/* Fast Edit Quick Shift Palette Modal (Enter key in Fast Edit Mode) */}
       {(() => {

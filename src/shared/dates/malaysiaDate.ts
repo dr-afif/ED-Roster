@@ -38,3 +38,43 @@ export function getMalaysiaYearMonth(referenceInstant: Date): RosterYearMonth {
   const month = parts.find((part) => part.type === 'month')?.value ?? '01';
   return { year, month };
 }
+
+export function getUpcomingMalaysiaRosterPeriod(
+  referenceInstant: Date = new Date(),
+): RosterYearMonth {
+  const { year, month } = getMalaysiaYearMonth(referenceInstant);
+  const y = Number(year);
+  const m = Number(month);
+  if (m === 12) {
+    return { year: String(y + 1), month: '01' };
+  }
+  return { year: String(y), month: String(m + 1).padStart(2, '0') };
+}
+
+const SESSION_ROSTER_PERIOD_STORAGE_KEY = 'resq.ui.v1.sessionRosterPeriod';
+
+export function readSessionRosterPeriod(): RosterYearMonth | null {
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_ROSTER_PERIOD_STORAGE_KEY);
+    if (!raw) return null;
+    const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(raw.trim());
+    if (!match?.[1] || !match[2]) return null;
+    return isValidRosterYearMonth(match[1], match[2]) ? { year: match[1], month: match[2] } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeSessionRosterPeriod(year: string, month: string): void {
+  if (!isValidRosterYearMonth(year, month)) return;
+  try {
+    window.sessionStorage.setItem(SESSION_ROSTER_PERIOD_STORAGE_KEY, `${year}-${month}`);
+  } catch {
+    // Ignore storage restrictions
+  }
+}
+
+export function getSessionOrUpcomingRosterPath(referenceInstant: Date = new Date()): string {
+  const chosen = readSessionRosterPeriod() ?? getUpcomingMalaysiaRosterPeriod(referenceInstant);
+  return `/rosters/${chosen.year}/${chosen.month}`;
+}
