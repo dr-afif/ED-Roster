@@ -23,7 +23,37 @@ export type AuthenticatedUserContext = {
   readonly staffCode: string | null;
   readonly displayName: string;
   readonly rosterName: string | null;
+  readonly staffGroup?: string | null;
 };
+
+export function isAdminPtpoUser(
+  user: Pick<AuthenticatedUserContext, 'staffGroup' | 'staffCode'> | null | undefined,
+): boolean {
+  if (!user) return false;
+  const group = (user.staffGroup ?? '').toUpperCase();
+  const code = (user.staffCode ?? '').toUpperCase();
+  return group.includes('PTPO') || code.startsWith('PTPO');
+}
+
+export function getUserRoleSubtitle(user: AuthenticatedUserContext | null | undefined): string {
+  if (!user) return 'Medical Officer';
+  if (user.role === 'owner') return 'Super Admin · Admin MO';
+  if (isAdminPtpoUser(user)) return 'Admin (PTPO)';
+  const group = (user.staffGroup ?? '').toUpperCase();
+  const code = (user.staffCode ?? '').toUpperCase();
+  if (
+    group.startsWith('EP |') ||
+    group.startsWith('EP') ||
+    group.includes('PHYSICIAN') ||
+    code.startsWith('EP-')
+  ) {
+    return 'Emergency Physician';
+  }
+  if (group.includes('ADMIN-MO')) {
+    return 'Admin MO';
+  }
+  return 'Medical Officer';
+}
 
 export type TestPersonaMode = 'owner' | 'mo';
 

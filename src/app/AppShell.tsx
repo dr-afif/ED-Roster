@@ -25,7 +25,12 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Suspense, useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAuthBoundary, type AuthenticatedUserContext } from '@/platform/auth';
+import {
+  getUserRoleSubtitle,
+  isAdminPtpoUser,
+  useAuthBoundary,
+  type AuthenticatedUserContext,
+} from '@/platform/auth';
 import { supabase, useSupabaseMetadata } from '@/platform/supabase';
 import { getSessionOrUpcomingRosterPath } from '@/shared/dates';
 import { SkeletonPageFallback, useAppUiState, usePwaInstall, useToast } from '@/shared/ui';
@@ -157,6 +162,7 @@ export function AppShell() {
       staffCode: row.staff_code ?? null,
       displayName: row.display_name || row.roster_name || 'Staff',
       rosterName: row.roster_name ?? row.display_name ?? null,
+      staffGroup: row.staff_group ?? null,
     };
     setPreviewUser?.(nextUser);
     showToast(`Viewing as ${nextUser.rosterName || nextUser.displayName}`);
@@ -176,6 +182,8 @@ export function AppShell() {
   );
   const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
   const isOwner = user?.role === 'owner';
+  const isPtpoAdmin = isAdminPtpoUser(user);
+  const roleSubtitle = getUserRoleSubtitle(user);
   const isTestingAsMo = Boolean(isViewingAsOtherUser);
 
   const mainRef = useRef<HTMLElement | null>(null);
@@ -191,7 +199,9 @@ export function AppShell() {
     user?.rosterName?.trim() || user?.displayName?.trim() || (isOwner ? 'Dr. Afif' : 'Staff');
 
   const defaultRosterPath = getSessionOrUpcomingRosterPath();
-  const mobilePrimaryItems = buildMobilePrimaryItems(defaultRosterPath);
+  const mobilePrimaryItems = buildMobilePrimaryItems(defaultRosterPath).filter(
+    (item) => !(isPtpoAdmin && item.to === '/requests'),
+  );
 
   const staffNavItems: readonly NavItem[] = [
     { label: 'Home', emoji: '🏠', to: '/', icon: Home },
@@ -202,7 +212,9 @@ export function AppShell() {
       icon: CalendarDays,
       matchPrefix: '/rosters/',
     },
-    { label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck },
+    ...(!isPtpoAdmin
+      ? [{ label: 'Requests', emoji: '📋', to: '/requests', icon: ClipboardCheck }]
+      : []),
     { label: 'Records & PH', emoji: '🏅', to: '/records', icon: Award, matchPrefix: '/holidays' },
     {
       label: unreadUpdatesCount > 0 ? `Updates (${unreadUpdatesCount})` : 'Updates',
@@ -501,9 +513,7 @@ export function AppShell() {
             {!isSidebarCollapsed && user ? (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-extrabold text-white">{user.displayName}</p>
-                <p className="truncate text-[10px] font-medium text-[#A8A29E]">
-                  {user.role === 'owner' ? 'Super Admin · Admin MO' : 'Medical Officer'}
-                </p>
+                <p className="truncate text-[10px] font-medium text-[#A8A29E]">{roleSubtitle}</p>
               </div>
             ) : null}
             <div className="flex items-center gap-1 shrink-0">
@@ -814,7 +824,7 @@ export function AppShell() {
                         {user.displayName}
                       </p>
                       <p className="truncate text-[10.5px] text-[#A1A1AA]">
-                        {user.role === 'owner' ? 'Super Admin · Admin MO' : 'Medical Officer'}
+                        {roleSubtitle}
                         {user.staffCode ? ` · ${user.staffCode}` : ''}
                       </p>
                     </div>

@@ -187,6 +187,15 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
           }
 
           const resolvedRole = record.role === 'owner' ? 'owner' : 'staff';
+          let staffGroup: string | null = null;
+          if (record.staff_id != null) {
+            const { data: staffRow } = await supabase
+              .from('staff_directory')
+              .select('staff_group')
+              .eq('id', record.staff_id)
+              .maybeSingle();
+            staffGroup = (staffRow as { staff_group?: string | null } | null)?.staff_group ?? null;
+          }
           const resolvedUser: AuthenticatedUserContext = {
             authUserId: authUser.id,
             email: authUser.email ?? null,
@@ -195,6 +204,7 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
             staffCode: record.staff_code,
             displayName: record.display_name ?? 'Approved Workforce User',
             rosterName: record.roster_name,
+            staffGroup,
           };
           writeCachedAuthUser(resolvedUser);
           setUser(resolvedUser);
