@@ -182,7 +182,13 @@ export function RosterGrid({
                       reqEntry && parsed.cleanShift && parsed.cleanShift !== reqEntry.request,
                     );
                     const hasMoNote = Boolean(reqEntry?.note && reqEntry.note.trim());
-                    const hasAdminNote = Boolean(assignment?.note && assignment.note.trim());
+                    const trimmedAdminNote = assignment?.note?.trim() ?? '';
+                    const hasStandbyNote = /\bstandby\s*\(s\)/i.test(trimmedAdminNote);
+                    const isStandby = parsed.isStandby || hasStandbyNote;
+                    const isDisplayStandby = displayParsed.isStandby || hasStandbyNote;
+                    const hasAdminNote = Boolean(
+                      trimmedAdminNote && !/^standby\s*\(s\)$/i.test(trimmedAdminNote),
+                    );
                     const isAmended = Boolean(amendedCellKeys?.has(`${staff.id}:${date}`));
                     const isDirty = Boolean(dirtyCellKeys?.has(`${staff.id}:${date}`));
                     const isSelected =
@@ -219,15 +225,16 @@ export function RosterGrid({
                       );
                     }
                     if (hasMoNote) tipParts.push(`MO Note: ${reqEntry?.note}`);
+                    if (isStandby) tipParts.push('Standby (S)');
                     if (hasAdminNote) tipParts.push(`Admin Note: ${assignment?.note}`);
                     if (isAmended) tipParts.push('Post-publication amendment');
                     if (isDirty) tipParts.push('Unsaved edit');
 
                     const modOutlineClass = isDirty
                       ? 'outline outline-[1.5px] outline-dashed outline-[#E06D53]'
-                      : parsed.isStandby && parsed.isExtended
+                      : isStandby && parsed.isExtended
                         ? 'outline outline-[1.5px] outline-dashed outline-[#0F766E]'
-                        : parsed.isStandby
+                        : isStandby
                           ? 'outline outline-[1.5px] outline-[#D97706]'
                           : parsed.isExtended
                             ? 'outline outline-[1.5px] outline-[#0F766E]'
@@ -304,7 +311,7 @@ export function RosterGrid({
                             </span>
                           ) : null}
                           <span>{displayParsed.cleanShift || '·'}</span>
-                          {displayParsed.isStandby ? (
+                          {isDisplayStandby ? (
                             <span className="ml-0.5 rounded-[3px] bg-[#D97706] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
                               S
                             </span>
