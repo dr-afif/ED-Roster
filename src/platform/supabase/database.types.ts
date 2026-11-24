@@ -1585,6 +1585,7 @@ export type Database = {
           phone: string | null;
           registration_number: string | null;
           staff_id: number;
+          staff_number: string | null;
           updated_at: string;
           updated_by: string | null;
           verification_status: string;
@@ -1600,6 +1601,7 @@ export type Database = {
           phone?: string | null;
           registration_number?: string | null;
           staff_id: number;
+          staff_number?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           verification_status?: string;
@@ -1615,6 +1617,7 @@ export type Database = {
           phone?: string | null;
           registration_number?: string | null;
           staff_id?: number;
+          staff_number?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           verification_status?: string;

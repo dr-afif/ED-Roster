@@ -8,6 +8,7 @@ export type MyProfileData = {
   email: string | null;
   phone: string | null;
   registration_number: string | null;
+  staff_number: string | null;
   verification_status: string;
   verified_at: string | null;
   directory: {
@@ -58,6 +59,7 @@ export function useMyProfileQuery() {
         email: profile.email,
         phone: profile.phone,
         registration_number: profile.registration_number,
+        staff_number: profile.staff_number ?? null,
         verification_status: profile.verification_status,
         verified_at: profile.verified_at,
         directory: {
@@ -77,6 +79,7 @@ export type UpdateProfilePayload = {
   full_name: string;
   phone?: string;
   registration_number?: string;
+  staff_number?: string;
 };
 
 export function useUpdateMyProfileMutation() {
@@ -96,6 +99,7 @@ export function useUpdateMyProfileMutation() {
           full_name: payload.full_name.trim(),
           phone: payload.phone?.trim() || null,
           registration_number: payload.registration_number?.trim() || null,
+          staff_number: payload.staff_number?.trim() || null,
         })
         .eq('staff_id', staffId)
         .select()

@@ -103,6 +103,9 @@ function ProfileEditForm({
     initialDisplayName || profile.directory.roster_name,
   );
   const [staffNumber, setStaffNumber] = useState(() => {
+    if (profile.staff_number) {
+      return profile.staff_number;
+    }
     try {
       return window.localStorage.getItem(`resq.profile.v1.staffNumber.${profile.staff_id}`) ?? '';
     } catch {
@@ -151,6 +154,7 @@ function ProfileEditForm({
         full_name: fullName,
         phone,
         registration_number: combinedRegistration,
+        staff_number: staffNumber,
       });
       setSuccessMessage('Your profile contact details have been updated.');
       showToast('Profile details saved ✓');
