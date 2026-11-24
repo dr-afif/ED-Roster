@@ -8,7 +8,7 @@ import {
   Unlock,
 } from 'lucide-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/platform/auth';
+import { isAdminPtpoUser, useAuth } from '@/platform/auth';
 import {
   FIRST_NATIVE_ROSTER_PERIOD,
   formatRosterPeriodLabel,
@@ -114,6 +114,7 @@ export function RosterPeriodRoute() {
   const showToast = useToast();
   const isMobileViewport = useIsMobileViewport(1023);
   const isOwner = user?.role === 'owner';
+  const canExportRoster = isOwner || isAdminPtpoUser(user);
 
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
   const [viewFormat, setViewFormat] = useState<'calendar' | 'table'>('table');
@@ -977,7 +978,7 @@ export function RosterPeriodRoute() {
             </button>
           ) : null}
 
-          {isOwner ? (
+          {canExportRoster ? (
             <button
               type="button"
               onClick={() => setIsPdfExportModalOpen(true)}

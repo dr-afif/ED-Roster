@@ -574,7 +574,7 @@ export function AppShell() {
             </button>
           ) : null}
 
-          {isOwner && isOnRosterRoute ? (
+          {(isOwner || isPtpoAdmin) && isOnRosterRoute ? (
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('resq:open-roster-pdf'))}
