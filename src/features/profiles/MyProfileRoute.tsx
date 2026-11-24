@@ -504,15 +504,37 @@ export function MyProfileRoute() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <span
-              className={`rounded-full border px-3 py-1 text-[11px] font-extrabold ${
-                isOwner
+            {(() => {
+              const group = (profile.directory.staff_group ?? '').toUpperCase();
+              const code = (profile.directory.staff_code ?? '').toUpperCase();
+              const isPtpo = group.includes('PTPO') || code.startsWith('PTPO');
+              const isEp =
+                group.startsWith('EP |') ||
+                group.startsWith('EP') ||
+                group.includes('PHYSICIAN') ||
+                code.startsWith('EP-');
+              const isAdminMo = group.includes('ADMIN-MO');
+              const badgeLabel = isOwner
+                ? 'Owner'
+                : isPtpo
+                  ? 'Admin (PTPO)'
+                  : isEp
+                    ? 'EP'
+                    : isAdminMo
+                      ? 'Admin MO'
+                      : 'MO';
+              const badgeTone =
+                isOwner || isPtpo
                   ? 'border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]'
-                  : 'border-[#C7D8AF] bg-[#E5EED8] text-[#365314]'
-              }`}
-            >
-              {isOwner ? 'Owner' : 'MO'}
-            </span>
+                  : 'border-[#C7D8AF] bg-[#E5EED8] text-[#365314]';
+              return (
+                <span
+                  className={`rounded-full border px-3 py-1 text-[11px] font-extrabold ${badgeTone}`}
+                >
+                  {badgeLabel}
+                </span>
+              );
+            })()}
           </div>
         </div>
       </div>
