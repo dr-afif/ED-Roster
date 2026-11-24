@@ -254,7 +254,7 @@ export function getMonthlyWeekendRequestCount({
   requests = [],
   targetName,
   dateString,
-  weekendLimitGroupId = 'ALL',
+  weekendLimitGroupId = 'OFF',
   limitGroupIdByShiftType = {},
   initialRequestId,
 }: {
@@ -365,7 +365,7 @@ export function getMonthlyStatsForUser({
   const limitGroupIdByShiftType = buildLimitGroupIdByShiftType(shiftTypes);
   const counts: Record<string, number> = {};
   const weekendCounts: Record<string, number> = {};
-  const weekendLimitGroupId = settings?.weekend_limit_group_id || 'ALL';
+  const weekendLimitGroupId = settings?.weekend_limit_group_id || 'OFF';
 
   userActiveRequests.forEach((request) => {
     if (!request.date) return;

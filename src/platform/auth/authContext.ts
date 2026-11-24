@@ -50,6 +50,9 @@ export type AuthBoundaryState = {
   readonly canSwitchTestPersona?: boolean;
   readonly toggleTestMoPersona?: () => void;
   readonly signInAsTestMo?: () => Promise<void>;
+  readonly previewUser?: AuthenticatedUserContext | null;
+  readonly isViewingAsOtherUser?: boolean;
+  readonly setPreviewUser?: (target: AuthenticatedUserContext | null) => void;
 };
 
 const NOOP_ASYNC = async () => {
@@ -73,6 +76,9 @@ export const DEFAULT_AUTH_STATE: AuthBoundaryState = Object.freeze({
   canSwitchTestPersona: false,
   toggleTestMoPersona: NOOP_SYNC,
   signInAsTestMo: NOOP_ASYNC,
+  previewUser: null,
+  isViewingAsOtherUser: false,
+  setPreviewUser: NOOP_SYNC,
 });
 
 export const AuthContext = createContext<AuthBoundaryState>(DEFAULT_AUTH_STATE);

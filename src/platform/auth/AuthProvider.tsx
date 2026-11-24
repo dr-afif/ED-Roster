@@ -15,7 +15,27 @@ import { useSupabaseClient, useSupabaseMetadata } from '@/platform/supabase';
 
 const RETURN_TO_STORAGE_KEY = 'resq.auth.v1.returnTo';
 const TEST_PERSONA_STORAGE_KEY = 'resq.auth.v1.testPersona';
+const PREVIEW_USER_STORAGE_KEY = 'resq.auth.v1.previewUser';
 const CACHED_AUTH_USER_STORAGE_KEY = 'resq.auth.v1.cachedUser';
+
+function readStoredPreviewUser(): AuthenticatedUserContext | null {
+  try {
+    const raw = window.sessionStorage.getItem(PREVIEW_USER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthenticatedUserContext;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.authUserId === 'string' &&
+      typeof parsed.displayName === 'string'
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Ignore storage restrictions
+  }
+  return null;
+}
 
 function readCachedAuthUser(): AuthenticatedUserContext | null {
   try {
@@ -83,6 +103,30 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
   const [unapprovedEmail, setUnapprovedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [testPersona, setTestPersona] = useState<TestPersonaMode>(readStoredTestPersona);
+  const [previewUser, setPreviewUserState] = useState<AuthenticatedUserContext | null>(
+    readStoredPreviewUser,
+  );
+
+  const setPreviewUser = useCallback((target: AuthenticatedUserContext | null) => {
+    setPreviewUserState(target);
+    try {
+      if (target) {
+        window.sessionStorage.setItem(PREVIEW_USER_STORAGE_KEY, JSON.stringify(target));
+      } else {
+        window.sessionStorage.removeItem(PREVIEW_USER_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage restrictions
+    }
+    if (!target) {
+      setTestPersona('owner');
+      try {
+        window.localStorage.setItem(TEST_PERSONA_STORAGE_KEY, 'owner');
+      } catch {
+        // Ignore storage restrictions
+      }
+    }
+  }, []);
 
   const updateTestPersona = useCallback((nextPersona: TestPersonaMode) => {
     setTestPersona(nextPersona);
@@ -309,12 +353,14 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
     try {
       try {
         window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+        window.sessionStorage.removeItem(PREVIEW_USER_STORAGE_KEY);
         window.localStorage.removeItem(TEST_PERSONA_STORAGE_KEY);
       } catch {
         // Ignore storage restrictions
       }
       writeCachedAuthUser(null);
       setTestPersona('owner');
+      setPreviewUserState(null);
       queryClient.clear();
       await supabase.auth.signOut();
     } finally {
@@ -331,17 +377,22 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
     await runBootstrap(email);
   }, [supabase, runBootstrap]);
 
-  const canSwitchTestPersona =
-    !metadata.isProduction && status === 'authenticated' && user !== null && user.role === 'owner';
+  const canSwitchTestPersona = status === 'authenticated' && user !== null && user.role === 'owner';
+
+  const isViewingAsOtherUser = Boolean(
+    user?.role === 'owner' && (previewUser || (!metadata.isProduction && testPersona === 'mo')),
+  );
 
   const effectiveUser = useMemo<AuthenticatedUserContext | null>(() => {
     if (!user) return null;
-    if (metadata.isProduction) return user;
-    if (user.role === 'owner' && testPersona === 'mo') {
+    if (user.role === 'owner' && previewUser) {
+      return previewUser;
+    }
+    if (!metadata.isProduction && user.role === 'owner' && testPersona === 'mo') {
       return TEST_NORMAL_MO_USER;
     }
     return user;
-  }, [user, metadata.isProduction, testPersona]);
+  }, [user, previewUser, metadata.isProduction, testPersona]);
 
   const stateValue: AuthBoundaryState = useMemo(
     () => ({
@@ -357,6 +408,9 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
       canSwitchTestPersona,
       toggleTestMoPersona,
       signInAsTestMo,
+      previewUser,
+      isViewingAsOtherUser,
+      setPreviewUser,
     }),
     [
       status,
@@ -371,6 +425,9 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
       canSwitchTestPersona,
       toggleTestMoPersona,
       signInAsTestMo,
+      previewUser,
+      isViewingAsOtherUser,
+      setPreviewUser,
     ],
   );
 

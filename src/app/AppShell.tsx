@@ -22,10 +22,11 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Suspense, useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAuthBoundary } from '@/platform/auth';
-import { useSupabaseMetadata } from '@/platform/supabase';
+import { useAuthBoundary, type AuthenticatedUserContext } from '@/platform/auth';
+import { supabase, useSupabaseMetadata } from '@/platform/supabase';
 import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
 import { SkeletonPageFallback, useAppUiState, usePwaInstall, useToast } from '@/shared/ui';
 
@@ -111,11 +112,55 @@ function getMobileHeaderTitle(pathname: string): string {
 
 export function AppShell() {
   const metadata = useSupabaseMetadata();
-  const { user, signOut, testPersona, canSwitchTestPersona, toggleTestMoPersona } =
-    useAuthBoundary();
+  const {
+    user,
+    signOut,
+    testPersona,
+    canSwitchTestPersona,
+    toggleTestMoPersona,
+    previewUser,
+    isViewingAsOtherUser,
+    setPreviewUser,
+  } = useAuthBoundary();
   const { unreadUpdatesCount } = useAppUiState();
   const showToast = useToast();
   const { canInstall, promptInstall } = usePwaInstall();
+
+  const { data: previewStaffOptions = [] } = useQuery({
+    queryKey: ['auth', 'preview-staff-options'],
+    enabled: Boolean(canSwitchTestPersona),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff_directory')
+        .select('id, staff_code, roster_name, display_name, staff_group')
+        .eq('active', true)
+        .order('id', { ascending: true });
+      if (error) return [];
+      return data ?? [];
+    },
+  });
+
+  const handleSelectPreviewStaff = (staffIdStr: string) => {
+    if (!staffIdStr) {
+      setPreviewUser?.(null);
+      showToast('Returned to Super Admin view ✓');
+      return;
+    }
+    const row = previewStaffOptions.find((s) => String(s.id) === staffIdStr);
+    if (!row) return;
+    const nextUser: AuthenticatedUserContext = {
+      authUserId: user?.authUserId ?? `preview-${row.id}`,
+      email: user?.email ?? null,
+      role: 'staff',
+      staffId: row.id,
+      staffCode: row.staff_code ?? null,
+      displayName: row.display_name || row.roster_name || 'Staff',
+      rosterName: row.roster_name ?? row.display_name ?? null,
+    };
+    setPreviewUser?.(nextUser);
+    showToast(`Viewing as ${nextUser.rosterName || nextUser.displayName}`);
+  };
 
   const handleInstallApp = async () => {
     const result = await promptInstall();
@@ -132,7 +177,9 @@ export function AppShell() {
   const [moreOpenForPath, setMoreOpenForPath] = useState<string | null>(null);
   const isMoreOpen = moreOpenForPath === location.pathname;
   const isOwner = user?.role === 'owner';
-  const isTestingAsMo = testPersona === 'mo' || (!isOwner && Boolean(canSwitchTestPersona));
+  const isTestingAsMo = Boolean(
+    isViewingAsOtherUser || testPersona === 'mo' || (!isOwner && Boolean(canSwitchTestPersona)),
+  );
 
   const mainRef = useRef<HTMLElement | null>(null);
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -403,28 +450,48 @@ export function AppShell() {
               {!isSidebarCollapsed ? <span className="truncate">Install App (PWA)</span> : null}
             </button>
           ) : null}
-          {canSwitchTestPersona && toggleTestMoPersona ? (
-            <button
-              type="button"
-              onClick={toggleTestMoPersona}
-              title={
-                isTestingAsMo
-                  ? 'Exit Normal MO test mode and return to Super Admin (Dr. Afif)'
-                  : 'Test app as Normal MO (Dr. Siti · MO-02)'
-              }
-              className={`flex w-full items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2 text-[11px] font-extrabold transition-all cursor-pointer ${
-                isTestingAsMo
-                  ? 'border-[#F59E0B]/40 bg-[#F59E0B]/15 text-[#FCD34D] hover:bg-[#F59E0B]/25'
-                  : 'border-[#14B8A6]/35 bg-[#14B8A6]/12 text-[#5EEAD4] hover:bg-[#14B8A6]/22'
-              }`}
-            >
-              <span aria-hidden="true">{isTestingAsMo ? '👑' : '🩺'}</span>
+          {canSwitchTestPersona ? (
+            <div className="space-y-1.5">
               {!isSidebarCollapsed ? (
-                <span className="truncate">
-                  {isTestingAsMo ? 'Exit MO Test · Back to Admin' : 'Test as Normal MO (Dr. Siti)'}
-                </span>
+                <label className="block space-y-1">
+                  <span className="block text-[9.5px] font-extrabold uppercase tracking-[0.05em] text-[#5EEAD4]">
+                    Test View As User
+                  </span>
+                  <select
+                    aria-label="Test View As User"
+                    value={previewUser?.staffId ? String(previewUser.staffId) : ''}
+                    onChange={(e) => handleSelectPreviewStaff(e.target.value)}
+                    className="w-full rounded-xl border border-[#3F3F46] bg-[#27272A] px-2.5 py-1.5 text-[11px] font-bold text-white focus:border-[#14B8A6] focus:outline-none cursor-pointer"
+                  >
+                    <option value="">👑 Super Admin (Default)</option>
+                    {previewStaffOptions.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.roster_name || s.display_name} ({s.staff_code})
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
-            </button>
+              {isTestingAsMo ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (previewUser) {
+                      setPreviewUser?.(null);
+                    } else {
+                      toggleTestMoPersona?.();
+                    }
+                  }}
+                  title="Exit test user view and return to Super Admin"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/15 px-2.5 py-2 text-[11px] font-extrabold text-[#FCD34D] transition-all hover:bg-[#F59E0B]/25 cursor-pointer"
+                >
+                  <span aria-hidden="true">👑</span>
+                  {!isSidebarCollapsed ? (
+                    <span className="truncate">Exit Preview · Back to Admin</span>
+                  ) : null}
+                </button>
+              ) : null}
+            </div>
           ) : null}
           <div
             className={`flex items-center gap-2 ${
@@ -478,28 +545,22 @@ export function AppShell() {
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {canSwitchTestPersona && toggleTestMoPersona ? (
+          {canSwitchTestPersona && isTestingAsMo ? (
             <button
               type="button"
-              onClick={toggleTestMoPersona}
-              title={
-                isTestingAsMo
-                  ? 'Exit Normal MO test mode and return to Super Admin (Dr. Afif)'
-                  : 'Switch to Normal MO test user (Dr. Siti · MO-02)'
-              }
-              aria-label={
-                isTestingAsMo
-                  ? 'Exit Normal MO test mode and return to Super Admin'
-                  : 'Test app as Normal MO (Dr. Siti)'
-              }
-              className={`inline-flex h-[34px] items-center gap-1 rounded-full border px-2.5 text-[10.5px] font-extrabold shadow-[0_2px_6px_rgba(0,0,0,0.03)] active:scale-[0.95] cursor-pointer ${
-                isTestingAsMo
-                  ? 'border-[#F59E0B] bg-[#FEF3C7] text-[#92400E]'
-                  : 'border-[#99F6E4] bg-[#F0FDFA] text-[#0F766E]'
-              }`}
+              onClick={() => {
+                if (previewUser) {
+                  setPreviewUser?.(null);
+                } else {
+                  toggleTestMoPersona?.();
+                }
+              }}
+              title="Exit test user view and return to Super Admin"
+              aria-label="Exit test user view and return to Super Admin"
+              className="inline-flex h-[34px] items-center gap-1 rounded-full border border-[#F59E0B] bg-[#FEF3C7] px-2.5 text-[10.5px] font-extrabold text-[#92400E] shadow-[0_2px_6px_rgba(0,0,0,0.03)] active:scale-[0.95] cursor-pointer"
             >
-              <span aria-hidden="true">{isTestingAsMo ? '👑' : '🩺'}</span>
-              <span>{isTestingAsMo ? 'Back to Admin' : 'Test MO'}</span>
+              <span aria-hidden="true">👑</span>
+              <span>Back to Admin</span>
             </button>
           ) : null}
 
@@ -535,6 +596,28 @@ export function AppShell() {
         className="flex-1 max-w-full overflow-x-clip px-3.5 py-3 pb-24 focus:outline-none sm:px-6 sm:py-5 lg:px-[26px] lg:py-5 lg:pb-8"
       >
         <div className="mx-auto w-full">
+          {isViewingAsOtherUser && user ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-2 text-xs font-bold text-[#92400E] shadow-2xs">
+              <span>
+                👁️ Viewing as{' '}
+                <strong className="font-extrabold">{user.rosterName || user.displayName}</strong>{' '}
+                {user.staffCode ? `(${user.staffCode})` : ''} — Test Preview Mode
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (previewUser) {
+                    setPreviewUser?.(null);
+                  } else {
+                    toggleTestMoPersona?.();
+                  }
+                }}
+                className="rounded-full bg-[#18181B] px-3 py-1 text-[11px] font-extrabold text-white hover:bg-stone-800 cursor-pointer"
+              >
+                Return to Super Admin
+              </button>
+            </div>
+          ) : null}
           <Suspense fallback={<SkeletonPageFallback />}>
             <Outlet />
           </Suspense>
@@ -754,26 +837,47 @@ export function AppShell() {
                       <span>Install RESQ ED App</span>
                     </button>
                   ) : null}
-                  {canSwitchTestPersona && toggleTestMoPersona ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        toggleTestMoPersona();
-                        setMoreOpenForPath(null);
-                      }}
-                      className={`mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border px-4 py-2.5 text-xs font-extrabold transition-colors cursor-pointer ${
-                        isTestingAsMo
-                          ? 'border-[#F59E0B]/40 bg-[#F59E0B]/15 text-[#FCD34D] hover:bg-[#F59E0B]/25'
-                          : 'border-[#14B8A6]/40 bg-[#14B8A6]/15 text-[#5EEAD4] hover:bg-[#14B8A6]/25'
-                      }`}
-                    >
-                      <span aria-hidden="true">{isTestingAsMo ? '👑' : '🩺'}</span>
-                      <span>
-                        {isTestingAsMo
-                          ? 'Return to Super Admin (Dr. Afif · MO-01)'
-                          : 'Switch to Normal MO (Dr. Siti · MO-02)'}
-                      </span>
-                    </button>
+                  {canSwitchTestPersona ? (
+                    <div className="mb-2 space-y-2">
+                      <label className="block space-y-1">
+                        <span className="block text-[10px] font-extrabold uppercase tracking-[0.05em] text-[#5EEAD4]">
+                          Test View As User
+                        </span>
+                        <select
+                          aria-label="Mobile Test View As User"
+                          value={previewUser?.staffId ? String(previewUser.staffId) : ''}
+                          onChange={(e) => {
+                            handleSelectPreviewStaff(e.target.value);
+                            setMoreOpenForPath(null);
+                          }}
+                          className="w-full rounded-[14px] border border-[#3F3F46] bg-[#27272A] px-3 py-2 text-xs font-bold text-white focus:border-[#14B8A6] focus:outline-none cursor-pointer"
+                        >
+                          <option value="">👑 Super Admin (Default)</option>
+                          {previewStaffOptions.map((s) => (
+                            <option key={s.id} value={String(s.id)}>
+                              {s.roster_name || s.display_name} ({s.staff_code})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {isTestingAsMo ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (previewUser) {
+                              setPreviewUser?.(null);
+                            } else {
+                              toggleTestMoPersona?.();
+                            }
+                            setMoreOpenForPath(null);
+                          }}
+                          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-[#F59E0B]/40 bg-[#F59E0B]/15 px-4 py-2.5 text-xs font-extrabold text-[#FCD34D] hover:bg-[#F59E0B]/25 transition-colors cursor-pointer"
+                        >
+                          <span aria-hidden="true">👑</span>
+                          <span>Return to Super Admin</span>
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                   <button
                     type="button"

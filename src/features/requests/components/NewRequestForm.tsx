@@ -182,18 +182,19 @@ export function NewRequestForm({
 
       const d = new Date(date);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      if (isWeekend) {
+      const isLeaveGroupRequest = limitGroupIdByShiftType[upperReq] === 'OFF';
+      if (isWeekend && isLeaveGroupRequest) {
         const weekendCount = getMonthlyWeekendRequestCount({
           requests,
           targetName: targetMemberName,
           dateString: date,
-          weekendLimitGroupId: 'ALL',
+          weekendLimitGroupId: 'OFF',
           limitGroupIdByShiftType,
           initialRequestId: initialValues?.id,
         });
         if (weekendCount >= DEFAULT_MONTHLY_WEEKEND_LIMIT) {
           setValidationError(
-            `Monthly weekend request limit reached for ${targetMemberName} (${DEFAULT_MONTHLY_WEEKEND_LIMIT} weekend requests allowed per month).`,
+            `Monthly weekend leave limit reached for ${targetMemberName} (${DEFAULT_MONTHLY_WEEKEND_LIMIT} weekend leave requests allowed per month).`,
           );
           return;
         }
