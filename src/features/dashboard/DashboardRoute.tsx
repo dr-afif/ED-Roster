@@ -10,7 +10,12 @@ import {
   useRosterPeriodQuery,
 } from '@/features/rosters/data/rosterQueries';
 import { getDatesInRange } from '@/features/rosters/domain/rulesEngine';
-import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
+import {
+  APP_LOCALE,
+  APP_TIMEZONE,
+  formatRosterPeriodLabel,
+  getMalaysiaYearMonth,
+} from '@/shared/dates';
 import { getShiftToneClasses, SegmentedArcGauge, Skeleton, useAppUiState } from '@/shared/ui';
 
 const PROTOTYPE_STAFF_NAMES = [
@@ -83,12 +88,27 @@ export function DashboardRoute() {
   const isOwner = user?.role === 'owner';
   const { updates, unreadUpdatesCount, deptSettings, requestWindowSummary } = useAppUiState();
   const [mobileHomeMode, setMobileHomeMode] = useState<'duty' | 'admin'>('duty');
-  const targetRosterHref = `/rosters/${FIRST_NATIVE_ROSTER_PERIOD.year}/${FIRST_NATIVE_ROSTER_PERIOD.month}`;
+  const currentPeriod = useMemo(() => getMalaysiaYearMonth(new Date()), []);
+  const periodLabel = useMemo(
+    () => formatRosterPeriodLabel(currentPeriod.year, currentPeriod.month),
+    [currentPeriod.year, currentPeriod.month],
+  );
+  const shortPeriodLabel = useMemo(() => {
+    const utcMidMonth = new Date(
+      Date.UTC(Number(currentPeriod.year), Number(currentPeriod.month) - 1, 15, 4, 0, 0),
+    );
+    return new Intl.DateTimeFormat(APP_LOCALE, {
+      month: 'short',
+      year: 'numeric',
+      timeZone: APP_TIMEZONE,
+    }).format(utcMidMonth);
+  }, [currentPeriod.year, currentPeriod.month]);
+  const targetRosterHref = `/rosters/${currentPeriod.year}/${currentPeriod.month}`;
 
   // Live operational data queries
   const { data: periodRow, isLoading: isPeriodLoading } = useRosterPeriodQuery(
-    FIRST_NATIVE_ROSTER_PERIOD.year,
-    FIRST_NATIVE_ROSTER_PERIOD.month,
+    currentPeriod.year,
+    currentPeriod.month,
   );
   const { data: teamMembers = [], isLoading: isMembersLoading } = useTeamMembersQuery();
   const { data: requests = [] } = useAllRequestsQuery();
@@ -99,25 +119,29 @@ export function DashboardRoute() {
     periodRow?.id,
   );
   const { data: epAssignments = [] } = useRosterEpAssignmentsQuery(periodRow?.id);
-  const { summaries: phSummaries } = usePublicHolidayTracker(FIRST_NATIVE_ROSTER_PERIOD.year);
+  const { summaries: phSummaries } = usePublicHolidayTracker(currentPeriod.year);
 
   const periodDates = useMemo(() => {
     if (periodRow?.period_start && periodRow?.period_end) {
       return getDatesInRange(periodRow.period_start, periodRow.period_end);
     }
-    const yr = Number(FIRST_NATIVE_ROSTER_PERIOD.year);
-    const mo = Number(FIRST_NATIVE_ROSTER_PERIOD.month);
+    const yr = Number(currentPeriod.year);
+    const mo = Number(currentPeriod.month);
     const daysInMonth = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
     return Array.from({ length: daysInMonth }, (_, i) => {
       const d = String(i + 1).padStart(2, '0');
-      return `${FIRST_NATIVE_ROSTER_PERIOD.year}-${FIRST_NATIVE_ROSTER_PERIOD.month}-${d}`;
+      return `${currentPeriod.year}-${currentPeriod.month}-${d}`;
     });
-  }, [periodRow]);
+  }, [periodRow, currentPeriod.year, currentPeriod.month]);
 
   const todayIndex = useMemo(() => {
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: APP_TIMEZONE,
+    }).format(new Date());
     const idx = periodDates.indexOf(todayIso);
-    // Anchor to prototype Day 13 (index 12) when viewing outside Jan 2027
     return idx >= 0 ? idx : Math.min(12, Math.max(0, periodDates.length - 1));
   }, [periodDates]);
 
@@ -150,8 +174,7 @@ export function DashboardRoute() {
 
   const safeDayIndex = Math.max(0, Math.min(periodDates.length - 1, selectedDayIndex));
   const activeDateStr =
-    periodDates[safeDayIndex] ??
-    `${FIRST_NATIVE_ROSTER_PERIOD.year}-${FIRST_NATIVE_ROSTER_PERIOD.month}-01`;
+    periodDates[safeDayIndex] ?? `${currentPeriod.year}-${currentPeriod.month}-01`;
   const activeDayNum = parseInt(activeDateStr.slice(8, 10), 10) || 1;
   const userStaffId = user?.staffId;
   const userTargetName = (user?.rosterName || user?.displayName || '').trim().toLowerCase();
@@ -243,8 +266,12 @@ export function DashboardRoute() {
     }
     for (const dateStr of periodDates) {
       if (!map.has(dateStr)) {
-        const dNum = parseInt(dateStr.slice(8, 10), 10) || 1;
-        map.set(dateStr, getSeededDayInfo(dNum).myShift);
+        if (import.meta.env.VITE_APP_ENV === 'production') {
+          map.set(dateStr, 'OFF');
+        } else {
+          const dNum = parseInt(dateStr.slice(8, 10), 10) || 1;
+          map.set(dateStr, getSeededDayInfo(dNum).myShift);
+        }
       }
     }
     return map;
@@ -569,7 +596,7 @@ export function DashboardRoute() {
         {/* Month Sheet Section */}
         <div className="section-title flex items-center justify-between px-0.5 pt-0.5">
           <span className="text-[10.5px] lg:text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#A8A29E]">
-            January 2027 · Month Sheet
+            {periodLabel} · Month Sheet
           </span>
           <Link
             to={targetRosterHref}
@@ -680,7 +707,7 @@ export function DashboardRoute() {
         <SegmentedArcGauge
           value={progressPercent}
           title={`${progressPercent}%`}
-          subtitle={`Jan 2027 · ${isPublished ? 'Published' : 'Planning Mode'}`}
+          subtitle={`${shortPeriodLabel} · ${isPublished ? 'Published' : 'Planning Mode'}`}
           palette="rainbow"
           size="md"
           className="mx-auto w-full"
@@ -721,7 +748,7 @@ export function DashboardRoute() {
           Shift Coverage
         </span>
         <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#A8A29E]">
-          Jan 2027
+          {shortPeriodLabel}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5">
@@ -791,7 +818,7 @@ export function DashboardRoute() {
       <SegmentedArcGauge
         value={progressPercent}
         title={`${progressPercent}%`}
-        subtitle={`Jan 2027 · ${isPublished ? 'Published' : 'Planning'}`}
+        subtitle={`${shortPeriodLabel} · ${isPublished ? 'Published' : 'Planning'}`}
         palette="rainbow"
         size="md"
         className="mx-auto w-full"
@@ -846,7 +873,7 @@ export function DashboardRoute() {
             Enter Timetable
           </Link>
           <Link to={targetRosterHref} className="sr-only">
-            Open Jan 2027 Roster Shell
+            Open {shortPeriodLabel} Roster Shell
           </Link>
         </div>
       </div>

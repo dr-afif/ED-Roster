@@ -15,37 +15,68 @@ export function useAllRequestsQuery() {
   return useQuery({
     queryKey: queryKeys.requests.all,
     queryFn: async (): Promise<RequestRecord[]> => {
-      const { data, error } = await supabase
-        .from('roster_requests')
-        .select(
-          `
-          id,
-          public_id,
-          staff_id,
-          start_date,
-          end_date,
-          requested_shift_code,
-          notes,
-          status,
-          created_at,
-          staff:staff_directory!roster_requests_staff_id_fkey (
-            id,
-            roster_name,
-            display_name,
-            staff_code
-          )
-        `,
-        )
-        .in('status', ['active', 'submitted', 'approved'])
-        .order('start_date', { ascending: true });
+      const pageSize = 1000;
+      const allRows: Array<{
+        id: number;
+        public_id: string | null;
+        staff_id: number;
+        start_date: string;
+        end_date: string;
+        requested_shift_code: string | null;
+        notes: string | null;
+        status: string;
+        created_at: string;
+        staff: {
+          id: number;
+          roster_name: string | null;
+          display_name: string | null;
+          staff_code: string | null;
+        } | null;
+      }> = [];
 
-      if (error) {
-        throw new Error(`Failed to load requests: ${error.message}`);
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('roster_requests')
+          .select(
+            `
+            id,
+            public_id,
+            staff_id,
+            start_date,
+            end_date,
+            requested_shift_code,
+            notes,
+            status,
+            created_at,
+            staff:staff_directory!roster_requests_staff_id_fkey (
+              id,
+              roster_name,
+              display_name,
+              staff_code
+            )
+          `,
+          )
+          .in('status', ['active', 'submitted', 'approved'])
+          .order('start_date', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          throw new Error(`Failed to load requests: ${error.message}`);
+        }
+
+        const batch = data ?? [];
+        allRows.push(...batch);
+        if (batch.length < pageSize) {
+          break;
+        }
+        from += pageSize;
       }
 
-      return (data ?? []).map((row) => ({
+      return allRows.map((row) => ({
         id: row.id,
-        public_id: row.public_id,
+        public_id: row.public_id ?? undefined,
         staff_id: row.staff_id,
         name: row.staff?.roster_name || row.staff?.display_name || row.staff?.staff_code || 'Staff',
         date: row.start_date,

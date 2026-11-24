@@ -79,14 +79,10 @@ describe('AppShell & Placeholder Routes', () => {
     expect(document.getElementById('main-content')).toHaveFocus();
     expect(router.state.location.pathname).toBe('/');
 
-    // Navigate to January 2027 Roster.
-    await user.click(screen.getByRole('link', { name: /Open Jan 2027 Roster Shell/i }));
+    // Navigate to current month Roster.
+    await user.click(screen.getByRole('link', { name: /Open .* Roster Shell/i }));
     expect(
-      await screen.findByRole(
-        'heading',
-        { level: 1, name: /January 2027 Roster/i },
-        { timeout: 15000 },
-      ),
+      await screen.findByRole('heading', { level: 1, name: /Roster/i }, { timeout: 15000 }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Table View/i })).toBeInTheDocument();
 
