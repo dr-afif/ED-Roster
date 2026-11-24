@@ -174,8 +174,7 @@ export function AppShell() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(
     readInitialSidebarCollapsed,
   );
-  const [moreOpenForPath, setMoreOpenForPath] = useState<string | null>(null);
-  const isMoreOpen = moreOpenForPath === location.pathname;
+  const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
   const isOwner = user?.role === 'owner';
   const isTestingAsMo = Boolean(isViewingAsOtherUser);
 
@@ -258,7 +257,7 @@ export function AppShell() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        setMoreOpenForPath(null);
+        setIsMoreOpen(false);
         moreTriggerRef.current?.focus();
         return;
       }
@@ -694,9 +693,7 @@ export function AppShell() {
             aria-label="More"
             aria-expanded={isMoreOpen}
             aria-controls="mobile-more-sheet"
-            onClick={() =>
-              setMoreOpenForPath((prev) => (prev === location.pathname ? null : location.pathname))
-            }
+            onClick={() => setIsMoreOpen((prev) => !prev)}
             className={`dock-btn relative flex h-[58px] w-[62px] flex-col items-center justify-end gap-1 pb-[5px] transition-colors duration-200 active:scale-[0.94] cursor-pointer ${
               isMoreOpen || isMoreRouteActive
                 ? 'active text-white'
@@ -715,7 +712,7 @@ export function AppShell() {
       {/* Accessible Obsidian Mobile More Sheet */}
       {isMoreOpen ? (
         <div
-          onClick={() => setMoreOpenForPath(null)}
+          onClick={() => setIsMoreOpen(false)}
           className="fixed inset-0 z-50 flex items-end bg-[#18181B]/55 backdrop-blur-[3px] lg:hidden"
         >
           <div
@@ -740,7 +737,7 @@ export function AppShell() {
                 ref={moreCloseButtonRef}
                 type="button"
                 aria-label="Close more navigation menu"
-                onClick={() => setMoreOpenForPath(null)}
+                onClick={() => setIsMoreOpen(false)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-stone-400 hover:bg-[#27272A] hover:text-white transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -760,6 +757,7 @@ export function AppShell() {
                       <NavLink
                         key={item.to}
                         to={item.to}
+                        onClick={() => setIsMoreOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         className={`flex items-center justify-between rounded-[16px] px-3.5 py-3 text-[13px] font-bold transition-all active:scale-[0.98] ${
                           active
@@ -789,6 +787,7 @@ export function AppShell() {
                         <NavLink
                           key={item.to}
                           to={item.to}
+                          onClick={() => setIsMoreOpen(false)}
                           aria-current={active ? 'page' : undefined}
                           className={`flex items-center justify-between rounded-[16px] px-3.5 py-3 text-[13px] font-bold transition-all active:scale-[0.98] ${
                             active
@@ -829,13 +828,13 @@ export function AppShell() {
                     <button
                       type="button"
                       onClick={() => {
-                        setMoreOpenForPath(null);
+                        setIsMoreOpen(false);
                         void handleInstallApp();
                       }}
                       className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-[#3F3F46] bg-[#27272A] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#3F3F46] transition-colors cursor-pointer"
                     >
                       <Download className="h-4 w-4 shrink-0 text-[#5EEAD4]" aria-hidden="true" />
-                      <span>Install RESQ ED App</span>
+                      <span>Install ED Roster App</span>
                     </button>
                   ) : null}
                   {canSwitchTestPersona ? (
@@ -849,7 +848,7 @@ export function AppShell() {
                           value={previewUser?.staffId ? String(previewUser.staffId) : ''}
                           onChange={(e) => {
                             handleSelectPreviewStaff(e.target.value);
-                            setMoreOpenForPath(null);
+                            setIsMoreOpen(false);
                           }}
                           className="w-full rounded-[14px] border border-[#3F3F46] bg-[#27272A] px-3 py-2 text-xs font-bold text-white focus:border-[#14B8A6] focus:outline-none cursor-pointer"
                         >
@@ -870,7 +869,7 @@ export function AppShell() {
                             } else {
                               toggleTestMoPersona?.();
                             }
-                            setMoreOpenForPath(null);
+                            setIsMoreOpen(false);
                           }}
                           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-[#F59E0B]/40 bg-[#F59E0B]/15 px-4 py-2.5 text-xs font-extrabold text-[#FCD34D] hover:bg-[#F59E0B]/25 transition-colors cursor-pointer"
                         >
@@ -883,7 +882,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() => {
-                      setMoreOpenForPath(null);
+                      setIsMoreOpen(false);
                       void signOut();
                     }}
                     className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs font-extrabold text-rose-300 hover:bg-red-500/20 transition-colors cursor-pointer"
