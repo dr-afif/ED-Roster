@@ -1,7 +1,7 @@
 import { Code2, Database, Globe, Info, ShieldCheck, UserCheck } from 'lucide-react';
 import { useSupabaseMetadata } from '@/platform/supabase';
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '2.0.0';
 
 export function AppInfoRoute() {
   const metadata = useSupabaseMetadata();
