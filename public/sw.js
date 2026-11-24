@@ -1,5 +1,5 @@
 /* RESQ Workforce & Roster Service Worker */
-const CACHE_VERSION = 'resq-ed-pwa-v3';
+const CACHE_VERSION = 'resq-ed-pwa-v4';
 const IS_DEV_TUNNEL =
   self.location.hostname === 'localhost' ||
   self.location.hostname === '127.0.0.1' ||
@@ -96,8 +96,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   const isCacheableStatic =
-    url.pathname.includes('/assets/') ||
-    /\.(?:png|svg|ico|webmanifest|woff2?)$/i.test(url.pathname);
+    url.pathname.includes('/assets/') || /\.(?:png|svg|ico|woff2?)$/i.test(url.pathname);
 
   if (isCacheableStatic) {
     event.respondWith(
