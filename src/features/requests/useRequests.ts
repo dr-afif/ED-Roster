@@ -25,6 +25,7 @@ export function useAllRequestsQuery() {
         requested_shift_code: string | null;
         notes: string | null;
         status: string;
+        submitted_at: string;
         created_at: string;
         staff: {
           id: number;
@@ -48,6 +49,7 @@ export function useAllRequestsQuery() {
             requested_shift_code,
             notes,
             status,
+            submitted_at,
             created_at,
             staff:staff_directory!roster_requests_staff_id_fkey (
               id,
@@ -59,6 +61,7 @@ export function useAllRequestsQuery() {
           )
           .in('status', ['active', 'submitted', 'approved'])
           .order('start_date', { ascending: true })
+          .order('submitted_at', { ascending: true })
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
 
@@ -83,6 +86,7 @@ export function useAllRequestsQuery() {
         request: (row.requested_shift_code || 'OFF').toUpperCase(),
         comment: row.notes,
         status: row.status,
+        submitted_at: row.submitted_at,
         created_at: row.created_at,
       }));
     },
@@ -190,60 +194,16 @@ export function useSubmitRequestMutation() {
 
   return useMutation({
     mutationFn: async (payload: SubmitRequestPayload) => {
-      const { data: requestTypes, error: rtError } = await supabase
-        .from('request_types')
-        .select('id, code')
-        .eq('active', true);
-
-      if (rtError) {
-        throw new Error(`Failed to resolve request type: ${rtError.message}`);
-      }
-
-      const cleanCode = payload.request.trim().toLowerCase();
-      const matched = (requestTypes ?? []).find((rt) => rt.code.toLowerCase() === cleanCode);
-      const requestTypeId = matched?.id || requestTypes?.[0]?.id;
-
-      if (!requestTypeId) {
-        throw new Error('No valid request type configured in system.');
-      }
-
-      if (payload.id) {
-        const { data, error } = await supabase
-          .from('roster_requests')
-          .update({
-            start_date: payload.date,
-            end_date: payload.date,
-            requested_shift_code: payload.request.trim().toUpperCase(),
-            request_type_id: requestTypeId,
-            notes: payload.comment?.trim() || null,
-            status: 'active',
-          })
-          .eq('id', Number(payload.id))
-          .select()
-          .single();
-
-        if (error) {
-          throw new Error(`Failed to update request: ${error.message}`);
-        }
-        return data;
-      }
-
-      const { data, error } = await supabase
-        .from('roster_requests')
-        .insert({
-          staff_id: payload.staffId,
-          start_date: payload.date,
-          end_date: payload.date,
-          requested_shift_code: payload.request.trim().toUpperCase(),
-          request_type_id: requestTypeId,
-          notes: payload.comment?.trim() || null,
-          status: 'active',
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('submit_roster_request', {
+        p_staff_id: payload.staffId,
+        p_request_date: payload.date,
+        p_requested_shift_code: payload.request.trim().toUpperCase(),
+        p_notes: payload.comment?.trim() || null,
+        p_edit_request_id: payload.id ? Number(payload.id) : null,
+      });
 
       if (error) {
-        throw new Error(`Failed to create request: ${error.message}`);
+        throw new Error(`Failed to save request: ${error.message}`);
       }
       return data;
     },
@@ -258,10 +218,16 @@ export function useDeleteRequestMutation() {
 
   return useMutation({
     mutationFn: async (requestId: number | string) => {
-      const { error } = await supabase.from('roster_requests').delete().eq('id', Number(requestId));
+      const { error } = await supabase
+        .from('roster_requests')
+        .update({
+          status: 'withdrawn',
+          decision_reason: 'Withdrawn by user',
+        })
+        .eq('id', Number(requestId));
 
       if (error) {
-        throw new Error(`Failed to delete request: ${error.message}`);
+        throw new Error(`Failed to withdraw request: ${error.message}`);
       }
       return true;
     },

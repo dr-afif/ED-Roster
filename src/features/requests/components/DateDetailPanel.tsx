@@ -14,6 +14,19 @@ function formatDisplayDate(date: Date) {
   });
 }
 
+function formatRequestTimestamp(value?: string): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export interface DateDetailPanelProps {
   date: Date;
   holidayName?: string;
@@ -163,6 +176,7 @@ export function DateDetailPanel({
                     selectedStaffId && r.staff_id && String(r.staff_id) === String(selectedStaffId),
                   );
                   const canManage = isOwner || isOwn;
+                  const createdLabel = formatRequestTimestamp(r.submitted_at || r.created_at);
 
                   return (
                     <li
@@ -182,6 +196,11 @@ export function DateDetailPanel({
                         <span className="date-panel__request-name">{r.name}</span>
                         {r.comment ? (
                           <span className="date-panel__request-comment">{r.comment}</span>
+                        ) : null}
+                        {createdLabel ? (
+                          <span className="w-full text-[10px] font-medium text-[#78716C]">
+                            Date created: {createdLabel}
+                          </span>
                         ) : null}
                       </div>
 

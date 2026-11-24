@@ -390,6 +390,91 @@ export type Database = {
           },
         ];
       };
+      ph_memo_submissions: {
+        Row: {
+          created_at: string;
+          holiday_date: string | null;
+          id: number;
+          is_submitted: boolean;
+          memo_month: string;
+          replacement_date: string;
+          staff_id: number;
+          submitted_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          holiday_date?: string | null;
+          id?: never;
+          is_submitted?: boolean;
+          memo_month: string;
+          replacement_date: string;
+          staff_id: number;
+          submitted_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          holiday_date?: string | null;
+          id?: never;
+          is_submitted?: boolean;
+          memo_month?: string;
+          replacement_date?: string;
+          staff_id?: number;
+          submitted_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ph_memo_submissions_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      ph_opening_balances: {
+        Row: {
+          created_at: string;
+          id: number;
+          note: string | null;
+          opening_balance: number;
+          staff_id: number;
+          updated_at: string;
+          updated_by: string | null;
+          year: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: never;
+          note?: string | null;
+          opening_balance?: number;
+          staff_id: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          year: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: never;
+          note?: string | null;
+          opening_balance?: number;
+          staff_id?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          year?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ph_opening_balances_staff_id_fkey';
+            columns: ['staff_id'];
+            isOneToOne: false;
+            referencedRelation: 'staff_directory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       professional_records: {
         Row: {
           created_at: string;
@@ -461,91 +546,6 @@ export type Database = {
           },
           {
             foreignKeyName: 'professional_records_staff_id_fkey';
-            columns: ['staff_id'];
-            isOneToOne: false;
-            referencedRelation: 'staff_directory';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      ph_opening_balances: {
-        Row: {
-          id: number;
-          staff_id: number;
-          year: number;
-          opening_balance: number;
-          note: string | null;
-          created_at: string;
-          updated_at: string;
-          updated_by: string | null;
-        };
-        Insert: {
-          id?: never;
-          staff_id: number;
-          year: number;
-          opening_balance?: number;
-          note?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Update: {
-          id?: never;
-          staff_id?: number;
-          year?: number;
-          opening_balance?: number;
-          note?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'ph_opening_balances_staff_id_fkey';
-            columns: ['staff_id'];
-            isOneToOne: false;
-            referencedRelation: 'staff_directory';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      ph_memo_submissions: {
-        Row: {
-          id: number;
-          staff_id: number;
-          holiday_date: string | null;
-          replacement_date: string;
-          memo_month: string;
-          is_submitted: boolean;
-          submitted_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: never;
-          staff_id: number;
-          holiday_date?: string | null;
-          replacement_date: string;
-          memo_month?: string;
-          is_submitted?: boolean;
-          submitted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: never;
-          staff_id?: number;
-          holiday_date?: string | null;
-          replacement_date?: string;
-          memo_month?: string;
-          is_submitted?: boolean;
-          submitted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'ph_memo_submissions_staff_id_fkey';
             columns: ['staff_id'];
             isOneToOne: false;
             referencedRelation: 'staff_directory';
@@ -1641,8 +1641,8 @@ export type Database = {
           end_date: string | null;
           end_reason: string | null;
           id: number;
-          start_date: string;
           staff_id: number;
+          start_date: string;
           updated_at: string;
         };
         Insert: {
@@ -1651,8 +1651,8 @@ export type Database = {
           end_date?: string | null;
           end_reason?: string | null;
           id?: never;
-          start_date: string;
           staff_id: number;
+          start_date: string;
           updated_at?: string;
         };
         Update: {
@@ -1661,8 +1661,8 @@ export type Database = {
           end_date?: string | null;
           end_reason?: string | null;
           id?: never;
-          start_date?: string;
           staff_id?: number;
+          start_date?: string;
           updated_at?: string;
         };
         Relationships: [
@@ -1780,7 +1780,7 @@ export type Database = {
       admin_upsert_ph_opening_balance: {
         Args: {
           p_balance: number;
-          p_note?: string | null;
+          p_note?: string;
           p_staff_id: number;
           p_year: number;
         };
@@ -1794,42 +1794,11 @@ export type Database = {
           updated_by: string | null;
           year: number;
         };
-      };
-      admin_upsert_public_holiday: {
-        Args: {
-          p_holiday_date: string;
-          p_is_state_specific?: boolean;
-          p_jurisdiction?: string;
-          p_name: string;
-        };
-        Returns: {
-          created_at: string;
-          created_by: string | null;
-          holiday_date: string;
-          id: number;
-          is_state_specific: boolean;
-          jurisdiction: string;
-          name: string;
-        };
-      };
-      toggle_ph_memo_status: {
-        Args: {
-          p_holiday_date?: string | null;
-          p_is_submitted?: boolean;
-          p_memo_month?: string;
-          p_replacement_date: string;
-          p_staff_id: number;
-        };
-        Returns: {
-          created_at: string;
-          holiday_date: string | null;
-          id: number;
-          is_submitted: boolean;
-          memo_month: string;
-          replacement_date: string;
-          staff_id: number;
-          submitted_at: string | null;
-          updated_at: string;
+        SetofOptions: {
+          from: '*';
+          to: 'ph_opening_balances';
+          isOneToOne: true;
+          isSetofReturn: false;
         };
       };
       bootstrap_my_session: {
@@ -1967,6 +1936,70 @@ export type Database = {
           p_reason: string;
         };
         Returns: number;
+      };
+      submit_roster_request: {
+        Args: {
+          p_edit_request_id?: number;
+          p_notes?: string;
+          p_request_date: string;
+          p_requested_shift_code: string;
+          p_staff_id: number;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_reason: string | null;
+          end_date: string;
+          id: number;
+          legacy_source_id: string | null;
+          notes: string | null;
+          period_start_date: string | null;
+          public_id: string;
+          reason_category: string;
+          request_type_id: number;
+          requested_shift_code: string | null;
+          source_system: string;
+          staff_id: number;
+          start_date: string;
+          status: string;
+          submitted_at: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'roster_requests';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      toggle_ph_memo_status: {
+        Args: {
+          p_holiday_date?: string;
+          p_is_submitted?: boolean;
+          p_memo_month?: string;
+          p_replacement_date: string;
+          p_staff_id: number;
+        };
+        Returns: {
+          created_at: string;
+          holiday_date: string | null;
+          id: number;
+          is_submitted: boolean;
+          memo_month: string;
+          replacement_date: string;
+          staff_id: number;
+          submitted_at: string | null;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'ph_memo_submissions';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       update_reconciliation_disposition: {
         Args: { p_disposition: string; p_notes?: string; p_result_id: number };

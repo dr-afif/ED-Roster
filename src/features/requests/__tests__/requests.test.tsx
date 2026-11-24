@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StaffRequestsRoute, AdminRequestsRoute } from '../RequestsRoutes';
+import { NewRequestForm } from '../components/NewRequestForm';
 import { AuthContext, type AuthBoundaryState } from '@/platform/auth/authContext';
 import {
   buildUsageByDateAndGroup,
@@ -349,5 +350,124 @@ describe('Quota and Limit Domain Logic', () => {
     expect(offGroupStatus.limit).toBe(3);
     expect(offGroupStatus.usage).toBe(3);
     expect(offGroupStatus.isAtLimit).toBe(true);
+  });
+});
+
+describe('NewRequestForm Fair Queue & Replacement Confirmation', () => {
+  const baseRequests = [
+    {
+      id: 10,
+      staff_id: 1,
+      name: 'Dr Afif',
+      date: '2026-12-15',
+      request: 'OFF',
+      comment: 'Initial note',
+      status: 'active',
+    },
+  ];
+
+  function renderForm(
+    initialValues?: {
+      id?: number | string;
+      date?: string;
+      request?: string;
+      comment?: string | null;
+      name?: string;
+      staffId?: number;
+    } | null,
+    onSubmit = vi.fn().mockResolvedValue(undefined),
+  ) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    return {
+      onSubmit,
+      ...render(
+        <QueryClientProvider client={queryClient}>
+          <NewRequestForm
+            selectedName="Dr Afif"
+            selectedStaffId={1}
+            initialValues={initialValues}
+            requests={baseRequests}
+            onSubmit={onSubmit}
+          />
+        </QueryClientProvider>,
+      ),
+    };
+  }
+
+  it('prompts for confirmation when creating a new request on a date with an existing request', async () => {
+    const { onSubmit } = renderForm({ date: '2026-12-15' });
+
+    fireEvent.click(screen.getByRole('button', { name: /^AM$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Request/i }));
+
+    expect(await screen.findByText(/Replace Existing Request\?/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm & Replace/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        id: undefined,
+        staffId: 1,
+        date: '2026-12-15',
+        request: 'AM',
+        comment: '',
+      });
+    });
+  });
+
+  it('submits comment-only edits immediately without a confirmation popup', async () => {
+    const { onSubmit } = renderForm({
+      id: 10,
+      staffId: 1,
+      date: '2026-12-15',
+      request: 'OFF',
+      comment: 'Initial note',
+    });
+
+    const textarea = screen.getByPlaceholderText(/Add context for this request/i);
+    fireEvent.change(textarea, { target: { value: 'Updated comment only' } });
+    fireEvent.click(screen.getByRole('button', { name: /Update Request/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        id: 10,
+        staffId: 1,
+        date: '2026-12-15',
+        request: 'OFF',
+        comment: 'Updated comment only',
+      });
+    });
+    expect(screen.queryByText(/Confirm Request Change/i)).not.toBeInTheDocument();
+  });
+
+  it('prompts for confirmation when changing the shift type of an existing request', async () => {
+    const { onSubmit } = renderForm({
+      id: 10,
+      staffId: 1,
+      date: '2026-12-15',
+      request: 'OFF',
+      comment: 'Initial note',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^PM$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Update Request/i }));
+
+    expect(await screen.findByText(/Confirm Request Change/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Change/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        id: 10,
+        staffId: 1,
+        date: '2026-12-15',
+        request: 'PM',
+        comment: 'Initial note',
+      });
+    });
   });
 });

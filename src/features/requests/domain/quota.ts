@@ -32,6 +32,7 @@ export interface RequestRecord {
   request: string; // shift code (e.g., 'OFF', 'AM', 'PM', 'ON', 'AL', etc.)
   comment?: string | null;
   status: string; // 'active' | 'withdrawn' | etc.
+  submitted_at?: string;
   created_at?: string;
   isOptimistic?: boolean;
 }
