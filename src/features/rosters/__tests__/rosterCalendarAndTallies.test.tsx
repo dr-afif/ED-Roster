@@ -282,6 +282,25 @@ describe('RosterTallyTables (Daily Coverage & Member Tallies)', () => {
     expect(pnRow).toHaveTextContent('1');
   });
 
+  it('counts unassigned requests in Shift Distribution Tally without double-counting assigned cells', () => {
+    render(
+      <RosterTallyTables
+        periodDates={['2027-01-01']}
+        staffList={staffList}
+        assignments={[{ staffId: 1, dutyDate: '2027-01-01', shiftCode: 'PM' }]}
+        requests={[
+          { staff_id: 1, date: '2027-01-01', request: 'AM' },
+          { staff_id: 2, date: '2027-01-01', request: 'AM' },
+        ]}
+      />,
+    );
+
+    const amRow = screen.getByText(/AM Shift/i).closest('tr');
+    const pmRow = screen.getByText(/PM Shift/i).closest('tr');
+    expect(amRow).toHaveTextContent('1⚠');
+    expect(pmRow).toHaveTextContent('1⚠');
+  });
+
   it('allows expanding Individual Member Shift Tally to inspect member workload', () => {
     render(
       <RosterTallyTables

@@ -10,6 +10,11 @@ interface RosterTallyTablesProps {
   periodDates: readonly string[];
   staffList: readonly StaffRosterIdentity[];
   assignments: readonly Assignment[];
+  requests?: ReadonlyArray<{
+    staff_id?: number | string;
+    date: string;
+    request: string;
+  }>;
 }
 
 function cleanShiftCode(raw?: string): string {
@@ -19,7 +24,12 @@ function cleanShiftCode(raw?: string): string {
     .trim();
 }
 
-export function RosterTallyTables({ periodDates, staffList, assignments }: RosterTallyTablesProps) {
+export function RosterTallyTables({
+  periodDates,
+  staffList,
+  assignments,
+  requests = [],
+}: RosterTallyTablesProps) {
   const { tallyThresholds, setTallyThresholds, showToast } = useAppUiState();
   const [prevTallyThresholds, setPrevTallyThresholds] =
     useState<SharedTallyThresholds>(tallyThresholds);
@@ -72,7 +82,36 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
 
   const staffById = new Map(staffList.map((s) => [s.id, s]));
 
+  const assignedCellKeys = new Set<string>();
+  const effectiveEntries: Array<{ staffId: number; dutyDate: string; shiftCode: string }> = [];
+
   for (const a of assignments) {
+    if (a.shiftCode) {
+      assignedCellKeys.add(`${a.staffId}:${a.dutyDate}`);
+    }
+    effectiveEntries.push({
+      staffId: a.staffId,
+      dutyDate: a.dutyDate,
+      shiftCode: a.shiftCode,
+    });
+  }
+
+  const seenRequestKeys = new Set<string>();
+  for (const r of requests) {
+    if (r.staff_id == null || !r.date || !r.request) continue;
+    const numericStaffId = Number(r.staff_id);
+    if (!Number.isFinite(numericStaffId)) continue;
+    const key = `${numericStaffId}:${r.date}`;
+    if (assignedCellKeys.has(key) || seenRequestKeys.has(key)) continue;
+    seenRequestKeys.add(key);
+    effectiveEntries.push({
+      staffId: numericStaffId,
+      dutyDate: r.date,
+      shiftCode: r.request,
+    });
+  }
+
+  for (const a of effectiveEntries) {
     const code = cleanShiftCode(a.shiftCode);
     const day = dailyTally.get(a.dutyDate);
     const mem = memberTally.get(a.staffId);

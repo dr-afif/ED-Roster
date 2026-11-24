@@ -1492,6 +1492,7 @@ export function RosterPeriodRoute() {
                 periodDates={periodDates}
                 staffList={enrichedDisplay.staffList}
                 assignments={enrichedDisplay.assignments}
+                requests={enrichedDisplay.requests}
               />
 
               {rulesOutput ? (
