@@ -38,10 +38,10 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
 
   const dailyTally = new Map<
     string,
-    { am: number; pm: number; night: number; leave: number; empty: number }
+    { am: number; pm: number; night: number; pn: number; leave: number; empty: number }
   >();
   for (const date of periodDates) {
-    dailyTally.set(date, { am: 0, pm: 0, night: 0, leave: 0, empty: staffList.length });
+    dailyTally.set(date, { am: 0, pm: 0, night: 0, pn: 0, leave: 0, empty: staffList.length });
   }
 
   const memberTally = new Map<
@@ -50,6 +50,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       am: number;
       pm: number;
       night: number;
+      pn: number;
       off: number;
       goff: number;
       leave: number;
@@ -61,6 +62,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       am: 0,
       pm: 0,
       night: 0,
+      pn: 0,
       off: 0,
       goff: 0,
       leave: 0,
@@ -81,15 +83,11 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       continue;
     }
 
-    const isAm = code === 'AM' || (workMode === 'oh_clinical' && code === 'OH');
-    const isPm = code === 'PM';
+    const isAm = code === 'AM' || code === 'AMX' || (workMode === 'oh_clinical' && code === 'OH');
+    const isPm = code === 'PM' || code === 'PMX';
     const isNight =
-      code === 'ND' ||
-      code === 'NIGHT' ||
-      code === 'ON' ||
-      code === 'ON1' ||
-      code === 'ON2' ||
-      code === 'PN';
+      code === 'ND' || code === 'NIGHT' || code === 'ON' || code === 'ON1' || code === 'ON2';
+    const isPostNight = code === 'PN';
     const isOff = code === 'OFF';
     const isGoff = code === 'GOFF';
     const isLeave =
@@ -113,6 +111,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       if (isAm) day.am += 1;
       else if (isPm) day.pm += 1;
       else if (isNight) day.night += 1;
+      else if (isPostNight) day.pn += 1;
       else if (isOff || isGoff || isLeave) day.leave += 1;
       if (code) day.empty = Math.max(0, day.empty - 1);
     }
@@ -129,6 +128,8 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
       } else if (isNight) {
         mem.night += 1;
         mem.totalWorked += 1;
+      } else if (isPostNight) {
+        mem.pn += 1;
       } else if (isOff) {
         mem.off += 1;
       } else if (isGoff) {
@@ -372,6 +373,28 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                 })}
               </tr>
 
+              {/* Row Post Night */}
+              <tr className="border-b border-[#F4EFE6]">
+                <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#6D28D9] border-r border-[#E7E5E4] whitespace-nowrap">
+                  <span>😴 Post Night (PN)</span>
+                  <span className="sr-only">Post Night</span>
+                </td>
+                {periodDates.map((date) => {
+                  const count = dailyTally.get(date)?.pn ?? 0;
+                  const isSunday = new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
+                  return (
+                    <td
+                      key={date}
+                      className={`py-1.5 px-0.5 text-center font-bold tabular-nums text-[#57534E] ${
+                        isSunday ? 'border-r-2 border-r-[#D6D3D1]' : 'border-r border-r-[#F4EFE6]'
+                      }`}
+                    >
+                      {count}
+                    </td>
+                  );
+                })}
+              </tr>
+
               {/* Row Total Leave */}
               <tr className="border-b border-[#F4EFE6]">
                 <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-center font-extrabold text-[#166534] border-r border-[#E7E5E4] whitespace-nowrap">
@@ -465,6 +488,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                   <th className="px-2 py-2 text-[#B45309]">AM</th>
                   <th className="px-2 py-2 text-[#0F766E]">PM</th>
                   <th className="px-2 py-2 text-[#3730A3]">NIGHT</th>
+                  <th className="px-2 py-2 text-[#6D28D9]">PN</th>
                   <th className="px-2 py-2 text-[#0F766E]">
                     <span className="sr-only">Total</span>Worked
                   </th>
@@ -480,6 +504,7 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                     am: 0,
                     pm: 0,
                     night: 0,
+                    pn: 0,
                     off: 0,
                     goff: 0,
                     leave: 0,
@@ -508,6 +533,9 @@ export function RosterTallyTables({ periodDates, staffList, assignments }: Roste
                         }`}
                       >
                         {stats.night}
+                      </td>
+                      <td className="px-2 py-2 font-bold text-[#6D28D9] tabular-nums">
+                        {stats.pn}
                       </td>
                       <td className="px-2 py-2 font-extrabold bg-[#F0FDFA] text-[#0F766E] tabular-nums">
                         {stats.totalWorked}

@@ -235,7 +235,51 @@ describe('RosterTallyTables (Daily Coverage & Member Tallies)', () => {
     expect(screen.getByText(/AM Shift/i)).toBeInTheDocument();
     expect(screen.getByText(/PM Shift/i)).toBeInTheDocument();
     expect(screen.getByText(/Night Duty/i)).toBeInTheDocument();
+    expect(screen.getByText(/Post Night \(PN\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Total Leave/i)).toBeInTheDocument();
+  });
+
+  it('counts AMX toward AM, PMX toward PM, and separates PN from Night', () => {
+    render(
+      <RosterTallyTables
+        periodDates={['2027-01-01']}
+        staffList={[
+          ...staffList,
+          {
+            id: 3,
+            staffCode: 'MO-03',
+            rosterName: 'Dr Lee',
+            displayName: 'Dr Lee Wei',
+            staffGroup: 'Medical Officer',
+            active: true,
+          },
+          {
+            id: 4,
+            staffCode: 'MO-04',
+            rosterName: 'Dr Tan',
+            displayName: 'Dr Tan Mei',
+            staffGroup: 'Medical Officer',
+            active: true,
+          },
+        ]}
+        assignments={[
+          { staffId: 1, dutyDate: '2027-01-01', shiftCode: 'AMX' },
+          { staffId: 2, dutyDate: '2027-01-01', shiftCode: 'PMX' },
+          { staffId: 3, dutyDate: '2027-01-01', shiftCode: 'ON1' },
+          { staffId: 4, dutyDate: '2027-01-01', shiftCode: 'PN' },
+        ]}
+      />,
+    );
+
+    const amRow = screen.getByText(/AM Shift/i).closest('tr');
+    const pmRow = screen.getByText(/PM Shift/i).closest('tr');
+    const nightRow = screen.getByText(/Night Duty/i).closest('tr');
+    const pnRow = screen.getByText(/Post Night \(PN\)/i).closest('tr');
+
+    expect(amRow).toHaveTextContent('1⚠');
+    expect(pmRow).toHaveTextContent('1⚠');
+    expect(nightRow).toHaveTextContent('1⚠');
+    expect(pnRow).toHaveTextContent('1');
   });
 
   it('allows expanding Individual Member Shift Tally to inspect member workload', () => {
