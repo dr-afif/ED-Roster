@@ -3,16 +3,28 @@ import {
   Bell,
   CheckCircle2,
   IdCard,
+  Lock,
   LogOut,
   Mail,
   MessageSquare,
   Phone,
   ShieldAlert,
+  Unlock,
   User,
 } from 'lucide-react';
 import { useAuth } from '@/platform/auth';
+import type { Json } from '@/platform/supabase/database.types';
+import {
+  useRuleVersionQuery,
+  useUpdateRuleVersionMutation,
+} from '@/features/rosters/data/rosterQueries';
 import { ModuleBackBar, SkeletonProfileView, StatusBadge, useToast } from '@/shared/ui';
-import { useMyProfileQuery, useUpdateMyProfileMutation, type MyProfileData } from './useMyProfile';
+import {
+  useMyProfileQuery,
+  useUpdateMyProfileMutation,
+  type MyProfileData,
+  type UpdateProfilePayload,
+} from './useMyProfile';
 
 const DOB_MONTHS = [
   'Jan',
@@ -87,12 +99,65 @@ function splitRegistrationAndApc(raw?: string | null): {
   };
 }
 
+type ProfileFieldKey =
+  'full_name' | 'display_name' | 'staff_number' | 'registration_number' | 'ic_number' | 'phone';
+
+function FieldLockControl({
+  field,
+  isOwner,
+  isLocked,
+  disabled,
+  onToggle,
+}: {
+  field: ProfileFieldKey;
+  isOwner: boolean;
+  isLocked: boolean;
+  disabled?: boolean;
+  onToggle: (field: ProfileFieldKey) => void;
+}) {
+  if (isOwner) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onToggle(field)}
+        title={isLocked ? 'Unlock this field for staff' : 'Lock this field for staff'}
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9.5px] font-extrabold transition cursor-pointer disabled:opacity-50 ${
+          isLocked
+            ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+            : 'border-[#E7E5E4] bg-[#FAF8F5] text-[#57534E] hover:bg-[#EFECE6]'
+        }`}
+      >
+        {isLocked ? <Lock className="h-2.5 w-2.5" /> : <Unlock className="h-2.5 w-2.5" />}
+        {isLocked ? 'Locked' : 'Unlocked'}
+      </button>
+    );
+  }
+  if (isLocked) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-800">
+        <Lock className="h-2.5 w-2.5" />
+        Locked by admin
+      </span>
+    );
+  }
+  return null;
+}
+
 function ProfileEditForm({
   profile,
   initialDisplayName,
+  isOwner,
+  lockedFields,
+  isSavingLocks,
+  onToggleLock,
 }: {
   profile: MyProfileData;
   initialDisplayName: string;
+  isOwner: boolean;
+  lockedFields: Set<ProfileFieldKey>;
+  isSavingLocks: boolean;
+  onToggleLock: (field: ProfileFieldKey) => void;
 }) {
   const updateMutation = useUpdateMyProfileMutation();
   const showToast = useToast();
@@ -112,19 +177,21 @@ function ProfileEditForm({
       return '';
     }
   });
-  const [icNumber, setIcNumber] = useState('940512-10-5421');
+  const [icNumber, setIcNumber] = useState(profile.ic_number || '');
   const [phone, setPhone] = useState(profile.phone || '');
   const [registrationNumber, setRegistrationNumber] = useState(parsedCreds.mmc);
   const [apcNumber, setApcNumber] = useState(parsedCreds.apc);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const isFieldDisabled = (field: ProfileFieldKey) => !isOwner && lockedFields.has(field);
+
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
     setSuccessMessage(null);
     setErrorMessage(null);
 
-    if (!fullName.trim()) {
+    if (!isFieldDisabled('full_name') && !fullName.trim()) {
       setErrorMessage('Full name is required.');
       return;
     }
@@ -141,6 +208,26 @@ function ProfileEditForm({
     }
     const combinedRegistration = segments.join(' | ');
 
+    const payload: UpdateProfilePayload = {};
+    if (!isFieldDisabled('full_name')) {
+      payload.full_name = fullName;
+    }
+    if (!isFieldDisabled('display_name') && displayName.trim() !== initialDisplayName.trim()) {
+      payload.display_name = displayName.trim();
+    }
+    if (!isFieldDisabled('phone')) {
+      payload.phone = phone;
+    }
+    if (!isFieldDisabled('registration_number')) {
+      payload.registration_number = combinedRegistration;
+    }
+    if (!isFieldDisabled('staff_number')) {
+      payload.staff_number = staffNumber;
+    }
+    if (!isFieldDisabled('ic_number')) {
+      payload.ic_number = icNumber;
+    }
+
     try {
       try {
         window.localStorage.setItem(
@@ -150,12 +237,7 @@ function ProfileEditForm({
       } catch {
         // Ignore storage restrictions safely
       }
-      await updateMutation.mutateAsync({
-        full_name: fullName,
-        phone,
-        registration_number: combinedRegistration,
-        staff_number: staffNumber,
-      });
+      await updateMutation.mutateAsync(payload);
       setSuccessMessage('Your profile contact details have been updated.');
       showToast('Profile details saved ✓');
     } catch (err) {
@@ -194,12 +276,21 @@ function ProfileEditForm({
 
       <form onSubmit={handleSaveProfile} className="mt-4 space-y-3.5">
         <div>
-          <label
-            htmlFor="profile-fullname"
-            className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
-          >
-            Full Registered Name <span className="text-rose-500">*</span>
-          </label>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label
+              htmlFor="profile-fullname"
+              className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#57534E]"
+            >
+              Full Registered Name <span className="text-rose-500">*</span>
+            </label>
+            <FieldLockControl
+              field="full_name"
+              isOwner={isOwner}
+              isLocked={lockedFields.has('full_name')}
+              disabled={isSavingLocks}
+              onToggle={onToggleLock}
+            />
+          </div>
           <p className="text-[10.5px] italic text-[#78716C] mb-1.5">
             For use in official roster and GHKA memo
           </p>
@@ -209,9 +300,10 @@ function ProfileEditForm({
               id="profile-fullname"
               type="text"
               required
+              disabled={isFieldDisabled('full_name')}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
             />
           </div>
         </div>
@@ -219,18 +311,28 @@ function ProfileEditForm({
         {/* Display Name | Roster Name (2 columns even on mobile) */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label
-              htmlFor="profile-displayname"
-              className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
-            >
-              Display Name
-            </label>
+            <div className="flex items-center justify-between gap-1.5 mb-1">
+              <label
+                htmlFor="profile-displayname"
+                className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E]"
+              >
+                Display Name
+              </label>
+              <FieldLockControl
+                field="display_name"
+                isOwner={isOwner}
+                isLocked={lockedFields.has('display_name')}
+                disabled={isSavingLocks}
+                onToggle={onToggleLock}
+              />
+            </div>
             <input
               id="profile-displayname"
               type="text"
+              disabled={isFieldDisabled('display_name')}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 px-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 px-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
             />
           </div>
           <div>
@@ -252,64 +354,90 @@ function ProfileEditForm({
 
         {/* Staff Number */}
         <div>
-          <label
-            htmlFor="profile-staffnumber"
-            className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
-          >
-            Staff Number
-          </label>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label
+              htmlFor="profile-staffnumber"
+              className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E]"
+            >
+              Staff Number
+            </label>
+            <FieldLockControl
+              field="staff_number"
+              isOwner={isOwner}
+              isLocked={lockedFields.has('staff_number')}
+              disabled={isSavingLocks}
+              onToggle={onToggleLock}
+            />
+          </div>
           <div className="relative">
             <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
             <input
               id="profile-staffnumber"
               type="text"
+              disabled={isFieldDisabled('staff_number')}
               value={staffNumber}
               onChange={(e) => setStaffNumber(e.target.value)}
               placeholder="e.g. A05412 (Hospital Staff ID)"
-              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
             />
           </div>
         </div>
 
         {/* MMC # | APC # (2 columns even on mobile) */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              htmlFor="profile-mmc"
-              className="block text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#57534E] mb-1"
-            >
-              Malaysian Medical Council (MMC) Registration Number
-            </label>
-            <div className="relative">
-              <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
-              <input
-                id="profile-mmc"
-                type="text"
-                value={registrationNumber}
-                onChange={(e) => setRegistrationNumber(e.target.value)}
-                placeholder="MMC 12345"
-                className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-2.5 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
-              />
-            </div>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.04em] text-[#78716C]">
+              Professional Registration
+            </span>
+            <FieldLockControl
+              field="registration_number"
+              isOwner={isOwner}
+              isLocked={lockedFields.has('registration_number')}
+              disabled={isSavingLocks}
+              onToggle={onToggleLock}
+            />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="profile-mmc"
+                className="block text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#57534E] mb-1"
+              >
+                Malaysian Medical Council (MMC) Registration Number
+              </label>
+              <div className="relative">
+                <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
+                <input
+                  id="profile-mmc"
+                  type="text"
+                  disabled={isFieldDisabled('registration_number')}
+                  value={registrationNumber}
+                  onChange={(e) => setRegistrationNumber(e.target.value)}
+                  placeholder="MMC 12345"
+                  className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-2.5 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
+                />
+              </div>
+            </div>
 
-          <div>
-            <label
-              htmlFor="profile-apc"
-              className="block text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#57534E] mb-1"
-            >
-              Annual Practicing Certificate (APC) Number
-            </label>
-            <div className="relative">
-              <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
-              <input
-                id="profile-apc"
-                type="text"
-                value={apcNumber}
-                onChange={(e) => setApcNumber(e.target.value)}
-                placeholder="APC 2027-44102"
-                className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-2.5 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
-              />
+            <div>
+              <label
+                htmlFor="profile-apc"
+                className="block text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#57534E] mb-1"
+              >
+                Annual Practicing Certificate (APC) Number
+              </label>
+              <div className="relative">
+                <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
+                <input
+                  id="profile-apc"
+                  type="text"
+                  disabled={isFieldDisabled('registration_number')}
+                  value={apcNumber}
+                  onChange={(e) => setApcNumber(e.target.value)}
+                  placeholder="APC 2027-44102"
+                  className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-9 pr-2.5 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -317,20 +445,30 @@ function ProfileEditForm({
         {/* I.C. | Birthday (Auto) (2 columns even on mobile) */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label
-              htmlFor="profile-ic"
-              className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
-            >
-              I.C. Number
-            </label>
+            <div className="flex items-center justify-between gap-1.5 mb-1">
+              <label
+                htmlFor="profile-ic"
+                className="block text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#57534E]"
+              >
+                I.C. Number
+              </label>
+              <FieldLockControl
+                field="ic_number"
+                isOwner={isOwner}
+                isLocked={lockedFields.has('ic_number')}
+                disabled={isSavingLocks}
+                onToggle={onToggleLock}
+              />
+            </div>
             <input
               id="profile-ic"
               type="tel"
               inputMode="numeric"
+              disabled={isFieldDisabled('ic_number')}
               value={icNumber}
               onChange={(e) => setIcNumber(formatMyIc(e.target.value))}
               placeholder="940512-10-5421"
-              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 px-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 px-3 text-xs sm:text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
             />
           </div>
           <div>
@@ -351,12 +489,21 @@ function ProfileEditForm({
         </div>
 
         <div>
-          <label
-            htmlFor="profile-phone"
-            className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#57534E] mb-1"
-          >
-            Contact Phone Number
-          </label>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label
+              htmlFor="profile-phone"
+              className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#57534E]"
+            >
+              Contact Phone Number
+            </label>
+            <FieldLockControl
+              field="phone"
+              isOwner={isOwner}
+              isLocked={lockedFields.has('phone')}
+              disabled={isSavingLocks}
+              onToggle={onToggleLock}
+            />
+          </div>
           <p className="text-[10.5px] text-[#78716C] mb-1.5">
             Used for urgent operational contact during roster disruptions (10 or 11 digits).
           </p>
@@ -366,11 +513,12 @@ function ProfileEditForm({
               id="profile-phone"
               type="tel"
               inputMode="numeric"
+              disabled={isFieldDisabled('phone')}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               onBlur={() => setPhone((prev) => formatMalaysiaPhone(prev))}
               placeholder="+6012-3456789"
-              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+              className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#18181B] focus:border-[#0F766E] focus:outline-none disabled:bg-[#FAF8F5] disabled:text-[#78716C]"
             />
           </div>
         </div>
@@ -392,7 +540,42 @@ function ProfileEditForm({
 export function MyProfileRoute() {
   const { user, signOut } = useAuth();
   const { data: profile, isLoading, error } = useMyProfileQuery();
+  const { data: ruleVersion } = useRuleVersionQuery();
+  const updateRuleVersion = useUpdateRuleVersionMutation();
+  const showToast = useToast();
   const [shiftRemindersEnabled, setShiftRemindersEnabled] = useState(true);
+
+  const rawRuleConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
+  const lockedFields = new Set<ProfileFieldKey>(
+    Array.isArray(rawRuleConfig.profile_locked_fields)
+      ? (rawRuleConfig.profile_locked_fields as ProfileFieldKey[])
+      : [],
+  );
+
+  async function handleToggleFieldLock(field: ProfileFieldKey) {
+    if (!ruleVersion) return;
+    const nextSet = new Set(lockedFields);
+    if (nextSet.has(field)) {
+      nextSet.delete(field);
+    } else {
+      nextSet.add(field);
+    }
+    try {
+      await updateRuleVersion.mutateAsync({
+        id: ruleVersion.id,
+        effectiveFrom: ruleVersion.effective_from,
+        effectiveTo: ruleVersion.effective_to,
+        config: {
+          ...rawRuleConfig,
+          profile_locked_fields: Array.from(nextSet),
+        } as Json,
+        changeSummary: `Profile field '${field}' ${nextSet.has(field) ? 'locked' : 'unlocked'} for staff`,
+      });
+      showToast(nextSet.has(field) ? `Locked ${field}` : `Unlocked ${field}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update field lock');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -636,6 +819,10 @@ export function MyProfileRoute() {
             key={profile.staff_id}
             profile={profile}
             initialDisplayName={user?.displayName || profile.directory.roster_name}
+            isOwner={isOwner}
+            lockedFields={lockedFields}
+            isSavingLocks={updateRuleVersion.isPending}
+            onToggleLock={(f) => void handleToggleFieldLock(f)}
           />
         </div>
       </div>

@@ -16,6 +16,7 @@ vi.mock('../useMyProfile', () => ({
       phone: '+60123456789',
       registration_number: mockRegistrationNumber,
       staff_number: 'A05412',
+      ic_number: '940512-10-5421',
       verification_status: 'verified',
       verified_at: '2026-11-03T09:00:00Z',
       directory: {
@@ -113,6 +114,7 @@ describe('MyProfileRoute', () => {
         phone: '+60199999999',
         registration_number: 'MMC 88888',
         staff_number: 'A09999',
+        ic_number: '940512-10-5421',
       });
     });
 

@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { useAuthBoundary } from '@/platform/auth';
 import { usePublicHolidayTracker } from '@/features/public-holidays/usePublicHolidayTracker';
 import { useAllRequestsQuery, useTeamMembersQuery } from '@/features/requests/useRequests';
+import { DEFAULT_MONTHLY_LIMIT, toIsoDate } from '@/features/requests/domain/quota';
 import {
   useDraftAssignmentsQuery,
   usePlannedAssignmentsQuery,
   useRosterEpAssignmentsQuery,
   useRosterPeriodQuery,
+  useRuleVersionQuery,
 } from '@/features/rosters/data/rosterQueries';
 import { getDatesInRange } from '@/features/rosters/domain/rulesEngine';
 import {
@@ -125,7 +127,22 @@ export function DashboardRoute() {
     periodRow?.id,
   );
   const { data: epAssignments = [] } = useRosterEpAssignmentsQuery(periodRow?.id);
+  const { data: ruleVersion } = useRuleVersionQuery();
   const { summaries: phSummaries } = usePublicHolidayTracker(currentPeriod.year);
+
+  const upcomingMonthKey = useMemo(() => {
+    const yr = Number(currentPeriod.year);
+    const mo = Number(currentPeriod.month);
+    const nextDate = new Date(Date.UTC(yr, mo, 1));
+    const nextYr = nextDate.getUTCFullYear();
+    const nextMo = String(nextDate.getUTCMonth() + 1).padStart(2, '0');
+    return `${nextYr}-${nextMo}`;
+  }, [currentPeriod.year, currentPeriod.month]);
+
+  const requestMonthlyLimit = Number(
+    ((ruleVersion?.config as Record<string, unknown>) ?? {}).request_monthly_limit ??
+      DEFAULT_MONTHLY_LIMIT,
+  );
 
   const periodDates = useMemo(() => {
     if (periodRow?.period_start && periodRow?.period_end) {
@@ -294,12 +311,14 @@ export function DashboardRoute() {
     return requests.filter((r) => {
       const status = (r.status || '').toLowerCase();
       if (status !== 'active' && status !== 'submitted' && status !== 'approved') return false;
+      const iso = toIsoDate(r.date);
+      if (!iso || !iso.startsWith(upcomingMonthKey)) return false;
       if (userStaffId && r.staff_id != null && Number(r.staff_id) === Number(userStaffId)) {
         return true;
       }
       return Boolean(userTargetName && r.name && r.name.trim().toLowerCase() === userTargetName);
     }).length;
-  }, [requests, userStaffId, userTargetName]);
+  }, [requests, upcomingMonthKey, userStaffId, userTargetName]);
 
   const myGhkaAvailable = useMemo(() => {
     if (!userStaffId) return 1;
@@ -681,7 +700,9 @@ export function DashboardRoute() {
             </div>
             <div className="mt-0.5 text-[15px] lg:text-[17px] font-extrabold text-[#18181B] tabular-nums">
               {myRequestsCount}
-              <span className="text-[10px] lg:text-[11px] font-bold text-[#78716C]">/10</span>
+              <span className="text-[10px] lg:text-[11px] font-bold text-[#78716C]">
+                /{requestMonthlyLimit}
+              </span>
             </div>
           </Link>
 

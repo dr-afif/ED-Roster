@@ -47,6 +47,8 @@ export type DirectoryStaffMember = {
   staff_profile?: {
     phone: string | null;
     registration_number: string | null;
+    staff_number?: string | null;
+    ic_number?: string | null;
     verification_status: string;
   } | null;
 };
@@ -254,6 +256,8 @@ export type UpdateStaffPayload = {
   staff_group: string;
   phone?: string;
   registration_number?: string;
+  staff_number?: string;
+  ic_number?: string;
   email?: string;
   role?: 'owner' | 'staff';
   active?: boolean;
@@ -281,6 +285,8 @@ export function useUpdateStaffMemberMutation() {
         p_staff_group: payload.staff_group,
         p_phone: payload.phone || undefined,
         p_registration_number: payload.registration_number || undefined,
+        p_staff_number: payload.staff_number || undefined,
+        p_ic_number: payload.ic_number || undefined,
         p_email: payload.email || undefined,
         p_role: payload.role || undefined,
         p_active: hasOpenPeriod,

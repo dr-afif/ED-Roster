@@ -312,6 +312,8 @@ export function StaffDirectoryAdminRoute() {
     hadTelegramTag: false,
     email: '',
     phone: '',
+    staff_number: '',
+    ic_number: '',
     active: true,
     servicePeriods: [] as StaffServicePeriod[],
   });
@@ -470,6 +472,8 @@ export function StaffDirectoryAdminRoute() {
       hadTelegramTag: Boolean(member.staff_profile?.registration_number?.includes('| TG')),
       email: member.allowed_user?.email ?? '',
       phone: member.staff_profile?.phone ?? '',
+      staff_number: member.staff_profile?.staff_number ?? '',
+      ic_number: member.staff_profile?.ic_number ?? '',
       active: isMemberActive(member),
       servicePeriods: initialPeriods,
     });
@@ -609,6 +613,8 @@ export function StaffDirectoryAdminRoute() {
         staff_group: encodeStaffGroup(editForm.role, editForm.workMode),
         phone: editForm.phone.trim() || undefined,
         registration_number: regCombined || undefined,
+        staff_number: editForm.staff_number.trim() || undefined,
+        ic_number: editForm.ic_number.trim() || undefined,
         email: editForm.email.trim() || undefined,
         role: dbRole,
         active: editForm.servicePeriods.some((p) => !p.end_date),
@@ -1843,6 +1849,41 @@ export function StaffDirectoryAdminRoute() {
                   type="email"
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white px-3 py-2 text-[13px] text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  htmlFor="edit-staff-number"
+                  className="block text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#57534E] mb-1"
+                >
+                  Staff Number
+                </label>
+                <input
+                  id="edit-staff-number"
+                  type="text"
+                  value={editForm.staff_number}
+                  onChange={(e) => setEditForm({ ...editForm, staff_number: e.target.value })}
+                  placeholder="e.g. A05412"
+                  className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white px-3 py-2 text-[13px] text-[#18181B] focus:border-[#0F766E] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-ic-number"
+                  className="block text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#57534E] mb-1"
+                >
+                  I.C. Number
+                </label>
+                <input
+                  id="edit-ic-number"
+                  type="text"
+                  value={editForm.ic_number}
+                  onChange={(e) => setEditForm({ ...editForm, ic_number: e.target.value })}
+                  placeholder="e.g. 940512-10-5421"
                   className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white px-3 py-2 text-[13px] text-[#18181B] focus:border-[#0F766E] focus:outline-none"
                 />
               </div>

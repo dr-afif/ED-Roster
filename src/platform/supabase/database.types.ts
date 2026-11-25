@@ -1582,6 +1582,7 @@ export type Database = {
           created_by: string | null;
           email: string | null;
           full_name: string;
+          ic_number: string | null;
           phone: string | null;
           registration_number: string | null;
           staff_id: number;
@@ -1598,6 +1599,7 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           full_name: string;
+          ic_number?: string | null;
           phone?: string | null;
           registration_number?: string | null;
           staff_id: number;
@@ -1614,6 +1616,7 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           full_name?: string;
+          ic_number?: string | null;
           phone?: string | null;
           registration_number?: string | null;
           staff_id?: number;
@@ -1767,6 +1770,7 @@ export type Database = {
           p_active?: boolean;
           p_display_name: string;
           p_email?: string;
+          p_ic_number?: string;
           p_phone?: string;
           p_registration_number?: string;
           p_role?: string;
@@ -1774,7 +1778,12 @@ export type Database = {
           p_staff_code: string;
           p_staff_group: string;
           p_staff_id: number;
+          p_staff_number?: string;
         };
+        Returns: boolean;
+      };
+      update_my_display_name: {
+        Args: { p_display_name: string };
         Returns: boolean;
       };
       admin_upsert_ph_opening_balance: {

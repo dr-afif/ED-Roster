@@ -9,6 +9,7 @@ export type MyProfileData = {
   phone: string | null;
   registration_number: string | null;
   staff_number: string | null;
+  ic_number: string | null;
   verification_status: string;
   verified_at: string | null;
   directory: {
@@ -60,6 +61,7 @@ export function useMyProfileQuery() {
         phone: profile.phone,
         registration_number: profile.registration_number,
         staff_number: profile.staff_number ?? null,
+        ic_number: profile.ic_number ?? null,
         verification_status: profile.verification_status,
         verified_at: profile.verified_at,
         directory: {
@@ -76,10 +78,12 @@ export function useMyProfileQuery() {
 }
 
 export type UpdateProfilePayload = {
-  full_name: string;
+  full_name?: string;
+  display_name?: string;
   phone?: string;
   registration_number?: string;
   staff_number?: string;
+  ic_number?: string;
 };
 
 export function useUpdateMyProfileMutation() {
@@ -93,26 +97,59 @@ export function useUpdateMyProfileMutation() {
         throw new Error('No active staff identity found in current session.');
       }
 
-      const { data, error } = await supabase
-        .from('staff_profiles')
-        .update({
-          full_name: payload.full_name.trim(),
-          phone: payload.phone?.trim() || null,
-          registration_number: payload.registration_number?.trim() || null,
-          staff_number: payload.staff_number?.trim() || null,
-        })
-        .eq('staff_id', staffId)
-        .select()
-        .single();
+      const patch: {
+        full_name?: string;
+        phone?: string | null;
+        registration_number?: string | null;
+        staff_number?: string | null;
+        ic_number?: string | null;
+      } = {};
 
-      if (error) {
-        throw new Error(error.message);
+      if (payload.full_name !== undefined) {
+        patch.full_name = payload.full_name.trim();
+      }
+      if (payload.phone !== undefined) {
+        patch.phone = payload.phone.trim() || null;
+      }
+      if (payload.registration_number !== undefined) {
+        patch.registration_number = payload.registration_number.trim() || null;
+      }
+      if (payload.staff_number !== undefined) {
+        patch.staff_number = payload.staff_number.trim() || null;
+      }
+      if (payload.ic_number !== undefined) {
+        patch.ic_number = payload.ic_number.trim() || null;
       }
 
-      return data;
+      let updatedRow = null;
+      if (Object.keys(patch).length > 0) {
+        const { data, error } = await supabase
+          .from('staff_profiles')
+          .update(patch)
+          .eq('staff_id', staffId)
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+        updatedRow = data;
+      }
+
+      if (payload.display_name !== undefined && payload.display_name.trim()) {
+        const { error: displayError } = await supabase.rpc('update_my_display_name', {
+          p_display_name: payload.display_name.trim(),
+        });
+        if (displayError) {
+          throw new Error(displayError.message);
+        }
+      }
+
+      return updatedRow;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my_profile'] });
+      queryClient.invalidateQueries({ queryKey: ['staff_directory'] });
     },
   });
 }
