@@ -30,6 +30,8 @@ export interface MonthYearWheelModalProps {
   shortcutLabel?: string;
   shortcutYear?: number;
   shortcutMonth?: number; // 1-12
+  maxYear?: number;
+  maxMonth?: number; // 1-12
   onSelect: (year: number, month: number) => void;
 }
 
@@ -43,6 +45,8 @@ export function MonthYearWheelModal({
   shortcutLabel = 'Upcoming',
   shortcutYear = 2027,
   shortcutMonth = 2,
+  maxYear,
+  maxMonth,
   onSelect,
 }: MonthYearWheelModalProps) {
   const [wheelMonthIdx, setWheelMonthIdx] = useState(Math.max(0, Math.min(11, selectedMonth - 1)));
@@ -106,9 +110,19 @@ export function MonthYearWheelModal({
     }
   };
 
+  const chosenYear = WHEEL_YEARS[wheelYearIdx] ?? 2027;
+  const chosenMonth = wheelMonthIdx + 1;
+  const isChosenAfterMax =
+    maxYear !== undefined &&
+    maxMonth !== undefined &&
+    (chosenYear > maxYear || (chosenYear === maxYear && chosenMonth > maxMonth));
+
   const handleConfirm = () => {
-    const chosenYear = WHEEL_YEARS[wheelYearIdx] ?? 2027;
-    const chosenMonth = wheelMonthIdx + 1;
+    if (isChosenAfterMax && maxYear !== undefined && maxMonth !== undefined) {
+      onSelect(maxYear, maxMonth);
+      onClose();
+      return;
+    }
     onSelect(chosenYear, chosenMonth);
     onClose();
   };
@@ -172,15 +186,22 @@ export function MonthYearWheelModal({
           >
             {WHEEL_MONTHS.map((mName, idx) => {
               const active = idx === wheelMonthIdx;
+              const isFutureMonth =
+                maxYear !== undefined &&
+                maxMonth !== undefined &&
+                (chosenYear > maxYear || (chosenYear === maxYear && idx + 1 > maxMonth));
               return (
                 <button
                   key={mName}
                   type="button"
+                  disabled={isFutureMonth}
                   onClick={() => spinTo('month', idx)}
-                  className={`flex h-[38px] w-full items-center justify-center snap-center transition-all duration-150 cursor-pointer ${
-                    active
-                      ? 'text-[15.5px] font-extrabold text-[#0F766E] scale-[1.04]'
-                      : 'text-[13px] font-semibold text-[#78716C] opacity-55 scale-[0.96]'
+                  className={`flex h-[38px] w-full items-center justify-center snap-center transition-all duration-150 ${
+                    isFutureMonth
+                      ? 'text-[12px] font-medium text-[#A8A29E] opacity-30 cursor-not-allowed'
+                      : active
+                        ? 'text-[15.5px] font-extrabold text-[#0F766E] scale-[1.04] cursor-pointer'
+                        : 'text-[13px] font-semibold text-[#78716C] opacity-55 scale-[0.96] cursor-pointer'
                   }`}
                 >
                   {mName}

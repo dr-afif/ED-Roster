@@ -116,7 +116,33 @@ export function RosterPeriodRoute() {
   const isOwner = user?.role === 'owner';
   const isPtpoAdmin = isAdminPtpoUser(user);
   const isEp = isEpUser(user);
+  const isRestrictedToCurrentAndPast = !isOwner && (isPtpoAdmin || isEp);
   const canExportRoster = isOwner || isPtpoAdmin;
+  const currentMalaysiaPeriod = getMalaysiaYearMonth(new Date());
+  const isFuturePeriod =
+    Number(yyyy) > Number(currentMalaysiaPeriod.year) ||
+    (Number(yyyy) === Number(currentMalaysiaPeriod.year) &&
+      Number(mm) > Number(currentMalaysiaPeriod.month));
+  const isAtMaxAllowedMonth =
+    isRestrictedToCurrentAndPast &&
+    (Number(yyyy) > Number(currentMalaysiaPeriod.year) ||
+      (Number(yyyy) === Number(currentMalaysiaPeriod.year) &&
+        Number(mm) >= Number(currentMalaysiaPeriod.month)));
+
+  useEffect(() => {
+    if (isRestrictedToCurrentAndPast && isFuturePeriod) {
+      writeSessionRosterPeriod(currentMalaysiaPeriod.year, currentMalaysiaPeriod.month);
+      navigate(`/rosters/${currentMalaysiaPeriod.year}/${currentMalaysiaPeriod.month}`, {
+        replace: true,
+      });
+    }
+  }, [
+    isRestrictedToCurrentAndPast,
+    isFuturePeriod,
+    currentMalaysiaPeriod.year,
+    currentMalaysiaPeriod.month,
+    navigate,
+  ]);
 
   const [viewMode, setViewMode] = useState<RosterOperationalViewMode>('current');
   const [viewFormatOverride, setViewFormatOverride] = useState<'calendar' | 'table' | null>(null);
@@ -237,6 +263,9 @@ export function RosterPeriodRoute() {
   };
 
   const handleNextMonth = () => {
+    if (isAtMaxAllowedMonth) {
+      return;
+    }
     const curDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
     curDate.setMonth(curDate.getMonth() + 1);
     const nextY = String(curDate.getFullYear());
@@ -1086,10 +1115,13 @@ export function RosterPeriodRoute() {
 
               <button
                 type="button"
+                disabled={isAtMaxAllowedMonth}
                 onClick={handleNextMonth}
                 aria-label="Next Month"
-                title="Next Month"
-                className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92]"
+                title={
+                  isAtMaxAllowedMonth ? 'Upcoming draft months are not available' : 'Next Month'
+                }
+                className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7E5E4] bg-[#FAF8F5] text-[#18181B] hover:bg-stone-100 transition cursor-pointer active:scale-[0.92] disabled:opacity-35 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -1630,18 +1662,25 @@ export function RosterPeriodRoute() {
 
       {/* Month / Year Wheel Picker Modal */}
       {(() => {
-        const currentMalaysiaPeriod = getMalaysiaYearMonth(new Date());
         return (
           <MonthYearWheelModal
             isOpen={isMonthWheelOpen}
             onClose={() => setIsMonthWheelOpen(false)}
             title="Select Roster Month"
-            subtitle="Current/previous = Published · Upcoming = Draft"
+            subtitle={
+              isRestrictedToCurrentAndPast
+                ? 'Current & previous months only'
+                : 'Current/previous = Published · Upcoming = Draft'
+            }
             selectedYear={parseInt(yyyy, 10)}
             selectedMonth={parseInt(mm, 10)}
             shortcutLabel="Current"
             shortcutYear={Number(currentMalaysiaPeriod.year)}
             shortcutMonth={Number(currentMalaysiaPeriod.month)}
+            maxYear={isRestrictedToCurrentAndPast ? Number(currentMalaysiaPeriod.year) : undefined}
+            maxMonth={
+              isRestrictedToCurrentAndPast ? Number(currentMalaysiaPeriod.month) : undefined
+            }
             onSelect={(yr, mo) => handleMonthChange(String(yr), String(mo).padStart(2, '0'))}
           />
         );
