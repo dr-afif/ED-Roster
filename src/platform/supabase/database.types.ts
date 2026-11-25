@@ -1358,6 +1358,51 @@ export type Database = {
           },
         ];
       };
+      roster_telegram_deliveries: {
+        Row: {
+          amendment_event_ids: number[] | null;
+          error_message: string | null;
+          id: number;
+          message_text: string;
+          notification_type: string;
+          period_id: number;
+          sent_at: string;
+          sent_by: string | null;
+          staff_id: number;
+          status: string;
+          telegram_chat_id: string | null;
+          telegram_message_id: string | null;
+        };
+        Insert: {
+          amendment_event_ids?: number[] | null;
+          error_message?: string | null;
+          id?: never;
+          message_text: string;
+          notification_type: string;
+          period_id: number;
+          sent_at?: string;
+          sent_by?: string | null;
+          staff_id: number;
+          status: string;
+          telegram_chat_id?: string | null;
+          telegram_message_id?: string | null;
+        };
+        Update: {
+          amendment_event_ids?: number[] | null;
+          error_message?: string | null;
+          id?: never;
+          message_text?: string;
+          notification_type?: string;
+          period_id?: number;
+          sent_at?: string;
+          sent_by?: string | null;
+          staff_id?: number;
+          status?: string;
+          telegram_chat_id?: string | null;
+          telegram_message_id?: string | null;
+        };
+        Relationships: [];
+      };
       rule_sets: {
         Row: {
           created_at: string;
@@ -1952,6 +1997,15 @@ export type Database = {
         Returns: Json;
       };
       get_migration_batches: { Args: never; Returns: Json };
+      get_staff_telegram_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          staff_id: number;
+          telegram_alerts_enabled: boolean;
+          telegram_linked: boolean;
+          telegram_username: string | null;
+        }[];
+      };
       publish_roster_period: {
         Args: { p_notes?: string; p_period_id: number };
         Returns: string;

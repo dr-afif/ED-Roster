@@ -1,30 +1,49 @@
 import { useState } from 'react';
-import { AlertCircle, ArrowRight, Clock, History, RotateCcw, ShieldCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Clock,
+  History,
+  RotateCcw,
+  Send,
+  ShieldCheck,
+} from 'lucide-react';
 import { Button, Modal, SkeletonCardList, StatusBadge, SurfaceCard } from '@/shared/ui';
 import { useReverseAmendmentMutation } from '../data/rosterQueries';
 import { formatAmendmentCategoryLabel } from '../domain/amendments';
-import type { AmendmentEvent, StaffRosterIdentity } from '../domain/types';
+import type { AmendmentEvent, Assignment, StaffRosterIdentity } from '../domain/types';
+import { TelegramNotifyModal } from './TelegramNotifyModal';
 
 type AmendmentHistoryListProps = {
   periodId: number;
+  periodLabel?: string;
   isOwner: boolean;
   staffList: StaffRosterIdentity[];
   events: AmendmentEvent[];
+  plannedAssignments?: Assignment[];
+  currentAssignments?: Assignment[];
   isLoading?: boolean;
   onOpenAmend?: () => void;
 };
 
 export function AmendmentHistoryList({
   periodId,
+  periodLabel = 'Roster',
   isOwner,
   staffList,
   events,
+  plannedAssignments = [],
+  currentAssignments = [],
   isLoading,
   onOpenAmend,
 }: AmendmentHistoryListProps) {
   const [reversingEvent, setReversingEvent] = useState<AmendmentEvent | null>(null);
   const [reversalReason, setReversalReason] = useState<string>('');
   const [reversalError, setReversalError] = useState<string | null>(null);
+  const [telegramNotifyState, setTelegramNotifyState] = useState<{
+    isOpen: boolean;
+    focusEventId: number | null;
+  }>({ isOpen: false, focusEventId: null });
 
   const reverseMutation = useReverseAmendmentMutation(periodId);
 
@@ -90,6 +109,16 @@ export function AmendmentHistoryList({
           <span className="text-xs text-text-muted font-mono hidden sm:inline">
             Append-only audit ledger
           </span>
+          {isOwner && events.some((e) => e.status === 'active') ? (
+            <button
+              type="button"
+              onClick={() => setTelegramNotifyState({ isOpen: true, focusEventId: null })}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#99F6E4] bg-[#F0FDFA] px-3 py-1.5 text-xs font-extrabold text-[#0F766E] cursor-pointer hover:bg-[#CCFBF1]"
+            >
+              <Send className="h-3 w-3" />
+              <span>Notify via Telegram</span>
+            </button>
+          ) : null}
           {isOwner && onOpenAmend ? (
             <button
               type="button"
@@ -206,13 +235,23 @@ export function AmendmentHistoryList({
                     </table>
                   </div>
 
-                  {/* Reversal Action for Owner */}
+                  {/* Notify & Reversal Actions for Owner */}
                   {isOwner && !isReversed && !isReversalEvent && (
-                    <div className="flex justify-end pt-2">
+                    <div className="flex items-center justify-end gap-4 pt-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTelegramNotifyState({ isOpen: true, focusEventId: event.id })
+                        }
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0F766E] hover:underline cursor-pointer"
+                      >
+                        <Send className="h-3 w-3" />
+                        Notify Staff
+                      </button>
                       <button
                         type="button"
                         onClick={() => setReversingEvent(event)}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-danger hover:underline hover:text-danger/90"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-danger hover:underline hover:text-danger/90 cursor-pointer"
                       >
                         <RotateCcw className="h-3 w-3" />
                         Reverse this amendment
@@ -285,6 +324,22 @@ export function AmendmentHistoryList({
           </div>
         </Modal>
       )}
+
+      {telegramNotifyState.isOpen ? (
+        <TelegramNotifyModal
+          key={`amend-tg-${telegramNotifyState.focusEventId ?? 'batch'}`}
+          isOpen={telegramNotifyState.isOpen}
+          onClose={() => setTelegramNotifyState({ isOpen: false, focusEventId: null })}
+          mode="amendment_update"
+          periodId={periodId}
+          periodLabel={periodLabel}
+          staffList={staffList}
+          amendmentEvents={events}
+          focusEventId={telegramNotifyState.focusEventId}
+          plannedAssignments={plannedAssignments}
+          currentAssignments={currentAssignments}
+        />
+      ) : null}
     </div>
   );
 }

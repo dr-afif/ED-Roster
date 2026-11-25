@@ -1044,3 +1044,99 @@ export function useBatchUpsertEpAssignmentsMutation(periodId: number) {
     },
   });
 }
+
+export type StaffTelegramStatusRow = {
+  staff_id: number;
+  telegram_linked: boolean;
+  telegram_username: string | null;
+  telegram_alerts_enabled: boolean;
+};
+
+export type RosterTelegramDeliveryRow =
+  Database['public']['Tables']['roster_telegram_deliveries']['Row'];
+
+export function useStaffTelegramStatusQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['rosters', 'staff-telegram-status'] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_staff_telegram_status');
+      if (error) throw error;
+      return (data ?? []) as StaffTelegramStatusRow[];
+    },
+    enabled,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useRosterTelegramDeliveriesQuery(periodId?: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ['rosters', 'telegram-deliveries', periodId ?? 0] as const,
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data, error } = await supabase
+        .from('roster_telegram_deliveries')
+        .select('*')
+        .eq('period_id', periodId)
+        .order('sent_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as RosterTelegramDeliveryRow[];
+    },
+    enabled: Boolean(periodId) && enabled,
+    staleTime: 1000 * 15,
+  });
+}
+
+export type SendStaffTelegramPayload = {
+  notificationType: 'published_broadcast' | 'amendment_update';
+  recipients: Array<{
+    staffId: number;
+    messageText: string;
+    amendmentEventIds?: number[];
+  }>;
+};
+
+export type SendStaffTelegramResult = {
+  staffId: number;
+  status: 'sent' | 'failed' | 'skipped';
+  telegramMessageId?: string;
+  error?: string;
+};
+
+export function useSendStaffTelegramMutation(periodId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: SendStaffTelegramPayload) => {
+      const { data, error } = await supabase.functions.invoke<{
+        results: SendStaffTelegramResult[];
+      }>('send-staff-telegram', {
+        body: {
+          periodId,
+          notificationType: payload.notificationType,
+          recipients: payload.recipients,
+        },
+      });
+
+      if (error) {
+        let detailedMsg = error.message || 'Telegram Edge Function failed';
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const errBody = (await ctx.json()) as { error?: string };
+            if (errBody?.error) detailedMsg = errBody.error;
+          }
+        } catch {
+          // Ignore JSON parse failures
+        }
+        throw new Error(detailedMsg);
+      }
+
+      return data?.results ?? [];
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['rosters', 'telegram-deliveries', periodId],
+      });
+    },
+  });
+}

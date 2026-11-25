@@ -35,6 +35,7 @@ import { RosterIssuesPanel } from '../components/RosterIssuesPanel';
 import { RosterSnapshotBar } from '../components/RosterSnapshotBar';
 import { RosterTallyTables } from '../components/RosterTallyTables';
 import { ShiftPickerModal } from '../components/ShiftPickerModal';
+import { TelegramNotifyModal } from '../components/TelegramNotifyModal';
 import {
   type DraftAssignmentRow,
   type PlannedAssignmentRow,
@@ -165,6 +166,7 @@ export function RosterPeriodRoute() {
 
   // Modal control states
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState(false);
+  const [isBroadcastTelegramOpen, setIsBroadcastTelegramOpen] = useState(false);
   const [isAmendModalOpen, setIsAmendModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [amendModalPrefill, setAmendModalPrefill] = useState<{
@@ -1024,6 +1026,18 @@ export function RosterPeriodRoute() {
               <span>Export PDF</span>
             </button>
           ) : null}
+
+          {isOwner && isEnforced && !isLegacyReadOnly ? (
+            <button
+              type="button"
+              onClick={() => setIsBroadcastTelegramOpen(true)}
+              title="Broadcast Roster Published via Telegram"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#99F6E4] bg-[#F0FDFA] px-3.5 py-1.5 text-xs font-extrabold text-[#0F766E] shadow-2xs hover:bg-[#CCFBF1] transition cursor-pointer"
+            >
+              <span>📣</span>
+              <span>Broadcast Telegram</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1471,9 +1485,12 @@ export function RosterPeriodRoute() {
       ) : viewMode === 'changes' ? (
         <AmendmentHistoryList
           periodId={periodId}
+          periodLabel={periodLabel}
           isOwner={isOwner}
           staffList={staffList}
           events={amendmentEvents}
+          plannedAssignments={plannedAssignments}
+          currentAssignments={currentAssignments}
           isLoading={isAmendmentsLoading}
           onOpenAmend={() => {
             setAmendModalPrefill(null);
@@ -1806,6 +1823,17 @@ export function RosterPeriodRoute() {
           plannedCount={plannedAssignments.length}
           amendmentCount={amendmentEvents.length}
           accruedGoffCandidates={accruedGoffCandidates}
+          staffList={moStaffList}
+        />
+      ) : null}
+      {isBroadcastTelegramOpen ? (
+        <TelegramNotifyModal
+          key={`broadcast-${periodId}`}
+          isOpen={isBroadcastTelegramOpen}
+          onClose={() => setIsBroadcastTelegramOpen(false)}
+          mode="published_broadcast"
+          periodId={periodId}
+          periodLabel={periodLabel}
           staffList={moStaffList}
         />
       ) : null}
