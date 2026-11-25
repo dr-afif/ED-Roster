@@ -46,6 +46,7 @@ export type DirectoryStaffMember = {
   } | null;
   staff_profile?: {
     full_name?: string | null;
+    email?: string | null;
     phone: string | null;
     registration_number: string | null;
     staff_number?: string | null;

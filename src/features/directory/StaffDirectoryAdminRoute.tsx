@@ -470,7 +470,7 @@ export function StaffDirectoryAdminRoute() {
       mmc: creds.mmc,
       apc: creds.apc === '—' ? '' : creds.apc,
       hadTelegramTag: Boolean(member.staff_profile?.registration_number?.includes('| TG')),
-      email: member.allowed_user?.email ?? '',
+      email: member.allowed_user?.email ?? member.staff_profile?.email ?? '',
       phone: member.staff_profile?.phone ?? '',
       staff_number: member.staff_profile?.staff_number ?? '',
       ic_number: member.staff_profile?.ic_number ?? '',
@@ -783,7 +783,7 @@ export function StaffDirectoryAdminRoute() {
                       </div>
                     ) : null}
                     <div className="col-span-2 truncate border-t border-[#EFECE6] pt-1 text-[#57534E]">
-                      ✉️ {member.allowed_user?.email ?? '—'}
+                      ✉️ {member.allowed_user?.email ?? member.staff_profile?.email ?? '—'}
                     </div>
                   </div>
 
@@ -1044,7 +1044,7 @@ export function StaffDirectoryAdminRoute() {
                             </span>
                           </div>
                           <div className="text-[10.5px] text-[#78716C]">
-                            {member.allowed_user?.email ?? '—'}
+                            {member.allowed_user?.email ?? member.staff_profile?.email ?? '—'}
                           </div>
                           {(member.staff_profile?.staff_number ||
                             member.staff_profile?.ic_number) && (
