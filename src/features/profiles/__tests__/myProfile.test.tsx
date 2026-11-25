@@ -140,6 +140,7 @@ describe('MyProfileRoute', () => {
           phone: '+60123456789',
           registration_number: 'MMC 99887 | TG',
           staff_number: 'A05412',
+          ic_number: '940512-10-5421',
         });
       });
     } finally {
