@@ -17,6 +17,10 @@ vi.mock('../useMyProfile', () => ({
       registration_number: mockRegistrationNumber,
       staff_number: 'A05412',
       ic_number: '940512-10-5421',
+      telegram_chat_id: null,
+      telegram_username: null,
+      telegram_linked_at: null,
+      telegram_alerts_enabled: true,
       verification_status: 'verified',
       verified_at: '2026-11-03T09:00:00Z',
       directory: {
@@ -35,6 +39,18 @@ vi.mock('../useMyProfile', () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
   }),
+  useCreateTelegramLinkMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({
+      token: 'test-token',
+      url: 'https://t.me/edroster_bot?start=test-token',
+    }),
+    isPending: false,
+  }),
+  useUnlinkTelegramMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(true),
+    isPending: false,
+  }),
+  TELEGRAM_BOT_USERNAME: 'edroster_bot',
 }));
 
 function renderProfile() {

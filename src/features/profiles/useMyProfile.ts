@@ -10,6 +10,10 @@ export type MyProfileData = {
   registration_number: string | null;
   staff_number: string | null;
   ic_number: string | null;
+  telegram_chat_id: string | null;
+  telegram_username: string | null;
+  telegram_linked_at: string | null;
+  telegram_alerts_enabled: boolean;
   verification_status: string;
   verified_at: string | null;
   directory: {
@@ -62,6 +66,10 @@ export function useMyProfileQuery() {
         registration_number: profile.registration_number,
         staff_number: profile.staff_number ?? null,
         ic_number: profile.ic_number ?? null,
+        telegram_chat_id: profile.telegram_chat_id ?? null,
+        telegram_username: profile.telegram_username ?? null,
+        telegram_linked_at: profile.telegram_linked_at ?? null,
+        telegram_alerts_enabled: profile.telegram_alerts_enabled ?? true,
         verification_status: profile.verification_status,
         verified_at: profile.verified_at,
         directory: {
@@ -84,6 +92,7 @@ export type UpdateProfilePayload = {
   registration_number?: string;
   staff_number?: string;
   ic_number?: string;
+  telegram_alerts_enabled?: boolean;
 };
 
 export function useUpdateMyProfileMutation() {
@@ -103,6 +112,7 @@ export function useUpdateMyProfileMutation() {
         registration_number?: string | null;
         staff_number?: string | null;
         ic_number?: string | null;
+        telegram_alerts_enabled?: boolean;
       } = {};
 
       if (payload.full_name !== undefined) {
@@ -119,6 +129,9 @@ export function useUpdateMyProfileMutation() {
       }
       if (payload.ic_number !== undefined) {
         patch.ic_number = payload.ic_number.trim() || null;
+      }
+      if (payload.telegram_alerts_enabled !== undefined) {
+        patch.telegram_alerts_enabled = payload.telegram_alerts_enabled;
       }
 
       let updatedRow = null;
@@ -150,6 +163,39 @@ export function useUpdateMyProfileMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my_profile'] });
       queryClient.invalidateQueries({ queryKey: ['staff_directory'] });
+    },
+  });
+}
+
+export const TELEGRAM_BOT_USERNAME = 'edroster_bot';
+
+export function useCreateTelegramLinkMutation() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data: token, error } = await supabase.rpc('create_my_telegram_link_token');
+      if (error || !token) {
+        throw new Error(error?.message || 'Failed to generate Telegram link token.');
+      }
+      return {
+        token,
+        url: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(token)}`,
+      };
+    },
+  });
+}
+
+export function useUnlinkTelegramMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('unlink_my_telegram');
+      if (error) {
+        throw new Error(error.message);
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my_profile'] });
     },
   });
 }

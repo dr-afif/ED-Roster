@@ -2,12 +2,14 @@ import { useState } from 'react';
 import {
   Bell,
   CheckCircle2,
+  ExternalLink,
   IdCard,
   Lock,
   LogOut,
   Mail,
   MessageSquare,
   Phone,
+  RefreshCw,
   ShieldAlert,
   Unlock,
   User,
@@ -20,7 +22,10 @@ import {
 } from '@/features/rosters/data/rosterQueries';
 import { ModuleBackBar, SkeletonProfileView, StatusBadge, useToast } from '@/shared/ui';
 import {
+  TELEGRAM_BOT_USERNAME,
+  useCreateTelegramLinkMutation,
   useMyProfileQuery,
+  useUnlinkTelegramMutation,
   useUpdateMyProfileMutation,
   type MyProfileData,
   type UpdateProfilePayload,
@@ -539,11 +544,20 @@ function ProfileEditForm({
 
 export function MyProfileRoute() {
   const { user, signOut } = useAuth();
-  const { data: profile, isLoading, error } = useMyProfileQuery();
+  const {
+    data: profile,
+    isLoading,
+    error,
+    refetch: refetchProfile,
+    isFetching: isRefreshingProfile,
+  } = useMyProfileQuery();
   const { data: ruleVersion } = useRuleVersionQuery();
   const updateRuleVersion = useUpdateRuleVersionMutation();
+  const updateProfileMutation = useUpdateMyProfileMutation();
+  const createTelegramLinkMutation = useCreateTelegramLinkMutation();
+  const unlinkTelegramMutation = useUnlinkTelegramMutation();
   const showToast = useToast();
-  const [shiftRemindersEnabled, setShiftRemindersEnabled] = useState(true);
+  const [pendingTelegramUrl, setPendingTelegramUrl] = useState<string | null>(null);
 
   const rawRuleConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
   const lockedFields = new Set<ProfileFieldKey>(
@@ -626,8 +640,8 @@ export function MyProfileRoute() {
   }
 
   const isVerified = profile.verification_status === 'verified';
-  const parsedCreds = splitRegistrationAndApc(profile.registration_number);
-  const telegramLinked = parsedCreds.hasTelegramTag || isVerified;
+  const telegramLinked = Boolean(profile.telegram_chat_id);
+  const telegramAlertsEnabled = profile.telegram_alerts_enabled ?? true;
   const rawName = (profile.full_name || profile.directory.roster_name).replace(/^Dr\.?\s+/i, '');
   const initials =
     rawName
@@ -753,27 +767,131 @@ export function MyProfileRoute() {
                   <div className="min-w-0">
                     <div className="font-extrabold text-[#18181B]">Telegram Duty Alerts</div>
                     <div className="text-[10.5px] font-semibold text-[#78716C]">
-                      Roster publications &amp; amendment pings
+                      {telegramLinked
+                        ? profile.telegram_username
+                          ? `Linked as ${profile.telegram_username}`
+                          : 'Roster publications & amendment pings'
+                        : `Link @${TELEGRAM_BOT_USERNAME} for duty alerts`}
                     </div>
                   </div>
                 </div>
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={shiftRemindersEnabled}
+                  aria-checked={telegramAlertsEnabled}
                   aria-label="Toggle Telegram Duty Alerts"
-                  onClick={() => setShiftRemindersEnabled((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-                    shiftRemindersEnabled ? 'bg-[#0F766E]' : 'bg-[#D6D3D1]'
+                  disabled={updateProfileMutation.isPending}
+                  onClick={() => {
+                    void updateProfileMutation
+                      .mutateAsync({ telegram_alerts_enabled: !telegramAlertsEnabled })
+                      .then(() => {
+                        showToast(
+                          !telegramAlertsEnabled
+                            ? 'Telegram alerts enabled'
+                            : 'Telegram alerts paused',
+                        );
+                      })
+                      .catch((err) => {
+                        showToast(
+                          err instanceof Error ? err.message : 'Failed to update alert preference',
+                        );
+                      });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-60 ${
+                    telegramAlertsEnabled ? 'bg-[#0F766E]' : 'bg-[#D6D3D1]'
                   }`}
                 >
                   <span
                     className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${
-                      shiftRemindersEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                      telegramAlertsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                     }`}
                   />
                 </button>
               </div>
+
+              {telegramLinked ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5]/60 px-3 py-2">
+                  <span className="text-[11px] font-semibold text-[#065F46]">
+                    Connected to @{TELEGRAM_BOT_USERNAME}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={unlinkTelegramMutation.isPending}
+                    onClick={() => {
+                      void unlinkTelegramMutation
+                        .mutateAsync()
+                        .then(() => {
+                          setPendingTelegramUrl(null);
+                          showToast('Telegram unlinked');
+                        })
+                        .catch((err) => {
+                          showToast(err instanceof Error ? err.message : 'Failed to unlink');
+                        });
+                    }}
+                    className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[10px] font-extrabold text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"
+                  >
+                    {unlinkTelegramMutation.isPending ? 'Unlinking...' : 'Unlink'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={createTelegramLinkMutation.isPending}
+                      onClick={() => {
+                        void createTelegramLinkMutation
+                          .mutateAsync()
+                          .then(({ url }) => {
+                            setPendingTelegramUrl(url);
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          })
+                          .catch((err) => {
+                            showToast(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to generate Telegram link',
+                            );
+                          });
+                      }}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0F766E] px-3 py-2 text-[11.5px] font-extrabold text-white shadow-xs hover:bg-[#0D655E] transition cursor-pointer disabled:opacity-60"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>
+                        {createTelegramLinkMutation.isPending
+                          ? 'Generating Link...'
+                          : `Link Telegram (@${TELEGRAM_BOT_USERNAME})`}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isRefreshingProfile}
+                      onClick={() => void refetchProfile()}
+                      title="Refresh Telegram link status"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] text-[#57534E] hover:bg-[#EFECE6] cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${isRefreshingProfile ? 'animate-spin' : ''}`}
+                      />
+                    </button>
+                  </div>
+                  {pendingTelegramUrl ? (
+                    <div className="rounded-xl border border-[#E7E5E4] bg-[#FAF8F5] px-3 py-2 text-[10.5px] text-[#57534E] space-y-1">
+                      <p className="font-semibold">
+                        Tap <strong>Start</strong> in Telegram, then tap Refresh above.
+                      </p>
+                      <a
+                        href={pendingTelegramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-extrabold text-[#0F766E] hover:underline"
+                      >
+                        Open @{TELEGRAM_BOT_USERNAME} directly →
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="rounded-xl border border-[#EFECE6] bg-[#FAF8F5] px-3 py-2">

@@ -1587,6 +1587,12 @@ export type Database = {
           registration_number: string | null;
           staff_id: number;
           staff_number: string | null;
+          telegram_alerts_enabled: boolean;
+          telegram_chat_id: string | null;
+          telegram_link_token: string | null;
+          telegram_link_token_expires_at: string | null;
+          telegram_linked_at: string | null;
+          telegram_username: string | null;
           updated_at: string;
           updated_by: string | null;
           verification_status: string;
@@ -1604,6 +1610,12 @@ export type Database = {
           registration_number?: string | null;
           staff_id: number;
           staff_number?: string | null;
+          telegram_alerts_enabled?: boolean;
+          telegram_chat_id?: string | null;
+          telegram_link_token?: string | null;
+          telegram_link_token_expires_at?: string | null;
+          telegram_linked_at?: string | null;
+          telegram_username?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           verification_status?: string;
@@ -1621,6 +1633,12 @@ export type Database = {
           registration_number?: string | null;
           staff_id?: number;
           staff_number?: string | null;
+          telegram_alerts_enabled?: boolean;
+          telegram_chat_id?: string | null;
+          telegram_link_token?: string | null;
+          telegram_link_token_expires_at?: string | null;
+          telegram_linked_at?: string | null;
+          telegram_username?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           verification_status?: string;
@@ -1780,6 +1798,14 @@ export type Database = {
           p_staff_id: number;
           p_staff_number?: string;
         };
+        Returns: boolean;
+      };
+      create_my_telegram_link_token: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      unlink_my_telegram: {
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
       update_my_display_name: {
