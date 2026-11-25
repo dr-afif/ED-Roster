@@ -45,6 +45,7 @@ export type DirectoryStaffMember = {
     revocation_reason: string | null;
   } | null;
   staff_profile?: {
+    full_name?: string | null;
     phone: string | null;
     registration_number: string | null;
     staff_number?: string | null;

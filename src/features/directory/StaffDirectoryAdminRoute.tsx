@@ -759,6 +759,29 @@ export function StaffDirectoryAdminRoute() {
                         {creds.telegram ? '✓ Linked' : 'Not linked'}
                       </div>
                     </div>
+                    <div>
+                      <div className="text-[9px] font-extrabold uppercase text-[#78716C]">
+                        Staff #
+                      </div>
+                      <div className="font-bold text-[#18181B]">
+                        {member.staff_profile?.staff_number || '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-extrabold uppercase text-[#78716C]">
+                        I.C. #
+                      </div>
+                      <div className="font-bold text-[#18181B]">
+                        {member.staff_profile?.ic_number || '—'}
+                      </div>
+                    </div>
+                    {member.staff_profile?.full_name &&
+                    member.staff_profile.full_name !== member.display_name ? (
+                      <div className="col-span-2 truncate border-t border-[#EFECE6] pt-1 text-[10.5px] text-[#57534E]">
+                        <span className="font-extrabold text-[#78716C]">Registered:</span>{' '}
+                        {member.staff_profile.full_name}
+                      </div>
+                    ) : null}
                     <div className="col-span-2 truncate border-t border-[#EFECE6] pt-1 text-[#57534E]">
                       ✉️ {member.allowed_user?.email ?? '—'}
                     </div>
@@ -1023,6 +1046,13 @@ export function StaffDirectoryAdminRoute() {
                           <div className="text-[10.5px] text-[#78716C]">
                             {member.allowed_user?.email ?? '—'}
                           </div>
+                          {(member.staff_profile?.staff_number ||
+                            member.staff_profile?.ic_number) && (
+                            <div className="mt-0.5 text-[10px] font-semibold text-[#57534E]">
+                              Staff: {member.staff_profile?.staff_number || '—'} &middot; I.C.:{' '}
+                              {member.staff_profile?.ic_number || '—'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
