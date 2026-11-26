@@ -72,6 +72,7 @@ import {
   type RosterOperationalViewMode,
   type RosterPeriod,
   type StaffRosterIdentity,
+  isStaffInServiceDuringPeriod,
   type VersionedRuleConfiguration,
 } from '../domain/types';
 
@@ -327,26 +328,36 @@ export function RosterPeriodRoute() {
     return currentAssignments;
   }, [periodRow, draftAssignments, plannedAssignments, currentAssignments, viewMode]);
 
+  const periodStaffList = useMemo(() => {
+    const periodStart = periodDates[0];
+    const periodEnd = periodDates[periodDates.length - 1];
+    if (!periodStart || !periodEnd) return staffList;
+    const assignedStaffIds = new Set(activeAssignments.map((a) => a.staffId));
+    return staffList.filter(
+      (s) => isStaffInServiceDuringPeriod(s, periodStart, periodEnd) || assignedStaffIds.has(s.id),
+    );
+  }, [staffList, periodDates, activeAssignments]);
+
   const moStaffList = useMemo(
     () =>
       sortStaffByWorkMode(
-        staffList.filter(
+        periodStaffList.filter(
           (s) =>
             !/^(EP|PTPO)-/i.test(s.staffCode) &&
             !/\bADMIN-PTPO\b/i.test(s.staffGroup ?? '') &&
             !(s.staffGroup ?? '').toLowerCase().startsWith('ep |'),
         ),
       ),
-    [staffList],
+    [periodStaffList],
   );
 
   const epStaffList = useMemo(
     () =>
-      staffList.filter(
+      periodStaffList.filter(
         (s) =>
           /^EP-/i.test(s.staffCode) || (s.staffGroup ?? '').toLowerCase().includes('physician'),
       ),
-    [staffList],
+    [periodStaffList],
   );
 
   const calendarStaffList = useMemo(

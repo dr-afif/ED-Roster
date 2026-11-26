@@ -91,6 +91,7 @@ export function evaluateWeeklyOffForStaff(
   nightQualifyingCodes?: readonly string[],
   customSemantics?: readonly ShiftSemanticDefinition[],
   hasAdjacentData = true,
+  hasOutOfServiceDate = false,
 ): WeeklyOffResult {
   let actualOff = 0;
   let hasQualifyingNight = false;
@@ -118,7 +119,9 @@ export function evaluateWeeklyOffForStaff(
   // Policy B: 1 OFF if qualifying night present, otherwise 2 OFFs
   const requiredOff = policy === 'policy_a' ? 1 : hasQualifyingNight ? 1 : 2;
 
-  const isProvisional = week.isBoundaryWeek && (!hasAdjacentData || hasMissingDate);
+  const isProvisional =
+    (week.isBoundaryWeek && (!hasAdjacentData || hasMissingDate)) ||
+    (hasOutOfServiceDate && actualOff < requiredOff);
 
   let status: WeeklyOffEvaluationStatus;
   if (isProvisional) {

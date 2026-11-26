@@ -1,6 +1,11 @@
 import { getShiftToneClasses, stripShiftModifiers } from '@/shared/ui';
 import type { ShiftDefinitionRow } from '../data/rosterQueries';
-import type { Assignment, PublicHolidayEntry, StaffRosterIdentity } from '../domain/types';
+import {
+  isStaffInServiceOnDate,
+  type Assignment,
+  type PublicHolidayEntry,
+  type StaffRosterIdentity,
+} from '../domain/types';
 
 export interface RosterGridProps {
   periodDates: readonly string[];
@@ -196,11 +201,13 @@ export function RosterGrid({
                       Boolean(selectedRangeKeys?.has(`${staff.id}:${date}`));
 
                     const isWorking = WORKING_SHIFTS.has(parsed.cleanShift);
+                    const isOutOfService = !isStaffInServiceOnDate(staff, date) && !shiftCode;
                     const isCellDisabled =
-                      isEditable &&
-                      isTableEditEnabled &&
-                      ((rosterEditMode === 'standby' && (!parsed.cleanShift || isWorking)) ||
-                        (rosterEditMode === 'extended' && !isWorking));
+                      isOutOfService ||
+                      (isEditable &&
+                        isTableEditEnabled &&
+                        ((rosterEditMode === 'standby' && (!parsed.cleanShift || isWorking)) ||
+                          (rosterEditMode === 'extended' && !isWorking)));
 
                     const tdBg = holiday
                       ? 'bg-[#FFF5F6]'
@@ -210,11 +217,19 @@ export function RosterGrid({
 
                     const tipParts: string[] = [];
                     tipParts.push(
-                      shiftCode
-                        ? `${rosterName} on ${date}: ${shiftCode}`
-                        : isPendingRequest
-                          ? `${rosterName} on ${date}: Requested ${reqEntry?.request} (Not yet assigned)`
-                          : `${rosterName} on ${date}: No assignment`,
+                      isOutOfService
+                        ? `${rosterName} on ${date}: Not in service${
+                            staff.startDate && date < staff.startDate
+                              ? ` (starts ${staff.startDate})`
+                              : staff.endDate && date > staff.endDate
+                                ? ` (ended ${staff.endDate})`
+                                : ''
+                          }`
+                        : shiftCode
+                          ? `${rosterName} on ${date}: ${shiftCode}`
+                          : isPendingRequest
+                            ? `${rosterName} on ${date}: Requested ${reqEntry?.request} (Not yet assigned)`
+                            : `${rosterName} on ${date}: No assignment`,
                     );
                     if (isHonoredRequest) {
                       tipParts.push(`Request Honored: ${reqEntry?.request}`);
@@ -268,12 +283,15 @@ export function RosterGrid({
                         <div
                           title={tipParts.join('\n')}
                           style={{ height: cellH }}
-                          className={`relative flex items-center justify-center rounded-[6px] tracking-tight transition-transform overflow-hidden font-extrabold text-[10.5px] sm:text-[11px] lg:text-[10.5px] ${getShiftToneClasses(
-                            displayShiftCode,
-                            isHonoredRequest,
-                          )} ${modOutlineClass} ${
+                          className={`relative flex items-center justify-center rounded-[6px] tracking-tight transition-transform overflow-hidden font-extrabold text-[10.5px] sm:text-[11px] lg:text-[10.5px] ${
+                            isOutOfService
+                              ? 'bg-[#F5F5F4] text-[#A8A29E] opacity-55'
+                              : getShiftToneClasses(displayShiftCode, isHonoredRequest)
+                          } ${modOutlineClass} ${
                             isCellDisabled
-                              ? 'opacity-35'
+                              ? isOutOfService
+                                ? ''
+                                : 'opacity-35'
                               : isEditable && isTableEditEnabled
                                 ? 'hover:scale-[1.04] active:scale-[0.96]'
                                 : ''
@@ -310,7 +328,7 @@ export function RosterGrid({
                               Δ
                             </span>
                           ) : null}
-                          <span>{displayParsed.cleanShift || '·'}</span>
+                          <span>{isOutOfService ? '—' : displayParsed.cleanShift || '·'}</span>
                           {isDisplayStandby ? (
                             <span className="ml-0.5 rounded-[3px] bg-[#D97706] px-[2.5px] text-[7.5px] font-extrabold text-white leading-tight">
                               S

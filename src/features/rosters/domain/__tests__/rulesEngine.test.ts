@@ -446,4 +446,48 @@ describe('Pure Roster Rules Engine', () => {
       output.issues.find((i) => i.code === 'missing_weekly_off' && i.weekStart === '2027-01-04'),
     ).toBeUndefined();
   });
+
+  it('skips pre-join weeks and treats mid-week joiner partial week as provisional', () => {
+    const midMonthJoiner: StaffRosterIdentity = {
+      ...DR_AFIF,
+      startDate: '2027-01-14', // Thursday of week 2027-01-11..2027-01-17
+    };
+    const assignments: Assignment[] = [];
+    // Assigned only from join date 2027-01-14 onward; week 2027-01-18..24 has 2 OFFs (compliant)
+    for (let d = 14; d <= 17; d++) {
+      assignments.push({
+        staffId: 101,
+        dutyDate: `2027-01-${String(d).padStart(2, '0')}`,
+        shiftCode: 'AM',
+      });
+    }
+    for (let d = 18; d <= 24; d++) {
+      assignments.push({
+        staffId: 101,
+        dutyDate: `2027-01-${String(d).padStart(2, '0')}`,
+        shiftCode: d >= 23 ? 'OFF' : 'AM',
+      });
+    }
+    for (let d = 25; d <= 31; d++) {
+      assignments.push({
+        staffId: 101,
+        dutyDate: `2027-01-${String(d).padStart(2, '0')}`,
+        shiftCode: d >= 30 ? 'OFF' : 'AM',
+      });
+    }
+
+    const output = evaluateRosterRules({
+      period: TEST_PERIOD,
+      people: [midMonthJoiner],
+      assignments,
+      configuration: DEFAULT_CONFIG,
+    });
+
+    // Week 2027-01-04 (entirely before join date) must produce zero weekly-off issues
+    expect(output.weeklyOff.find((w) => w.weekStart === '2027-01-04')).toBeUndefined();
+    expect(output.issues.filter((i) => i.code === 'missing_weekly_off')).toHaveLength(0);
+    // Join week 2027-01-11 is partial service -> provisional (not error)
+    const joinWeek = output.weeklyOff.find((w) => w.weekStart === '2027-01-11');
+    expect(joinWeek?.status).toBe('provisional');
+  });
 });

@@ -3,6 +3,7 @@ import { evaluateStaffSequences } from './sequences';
 import { evaluateStaffing } from './staffing';
 import {
   getMoWorkMode,
+  isStaffInServiceOnDate,
   type Assignment,
   type GoffPosition,
   type GoffProjection,
@@ -115,6 +116,13 @@ export function evaluateRosterRules(input: RulesInput): RulesOutput {
     }> = [];
 
     for (const week of weeks) {
+      const inServiceDaysInWeek = week.dates.filter((d) =>
+        isStaffInServiceOnDate(person, d),
+      ).length;
+      if (inServiceDaysInWeek === 0) {
+        continue;
+      }
+
       const shiftMap = new Map<string, string>();
       let goffCount = 0;
       for (const d of week.dates) {
@@ -136,6 +144,7 @@ export function evaluateRosterRules(input: RulesInput): RulesOutput {
         configuration.nightQualifyingCodes,
         configuration.semantics,
         hasAdjacent,
+        inServiceDaysInWeek < 7,
       );
 
       weeklyOffResults.push(offResult);

@@ -166,11 +166,28 @@ export function useRosterStaffQuery() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff_directory')
-        .select('id, staff_code, roster_name, display_name, staff_group, active')
+        .select(
+          'id, staff_code, roster_name, display_name, staff_group, active, start_date, end_date',
+        )
         .eq('active', true)
         .order('id', { ascending: true });
 
       if (error) throw error;
+
+      const { data: servicePeriodsData, error: periodsError } = await supabase
+        .from('staff_service_periods')
+        .select('staff_id, start_date, end_date')
+        .order('start_date', { ascending: true });
+
+      const periodsMap = new Map<number, Array<{ startDate: string; endDate: string | null }>>();
+      if (!periodsError && servicePeriodsData) {
+        for (const row of servicePeriodsData) {
+          const list = periodsMap.get(row.staff_id) ?? [];
+          list.push({ startDate: row.start_date, endDate: row.end_date });
+          periodsMap.set(row.staff_id, list);
+        }
+      }
+
       return (data ?? []).map(
         (s: {
           id: number;
@@ -179,12 +196,17 @@ export function useRosterStaffQuery() {
           display_name?: string | null;
           staff_group?: string | null;
           active?: boolean | null;
+          start_date?: string | null;
+          end_date?: string | null;
         }) => {
           const staffCode = s.staff_code ?? '';
           const rosterName = s.roster_name ?? s.display_name ?? (staffCode || 'Staff');
           const displayName = s.display_name ?? s.roster_name ?? rosterName;
           const staffGroup = s.staff_group ?? 'medical_officer';
           const active = s.active ?? true;
+          const servicePeriods =
+            periodsMap.get(s.id) ??
+            (s.start_date ? [{ startDate: s.start_date, endDate: s.end_date ?? null }] : undefined);
 
           return {
             id: s.id,
@@ -193,6 +215,9 @@ export function useRosterStaffQuery() {
             displayName,
             staffGroup,
             active,
+            startDate: s.start_date ?? null,
+            endDate: s.end_date ?? null,
+            servicePeriods,
           } as StaffRosterIdentity;
         },
       );

@@ -43,6 +43,11 @@ export type VersionedRuleConfiguration = {
   readonly semantics?: readonly ShiftSemanticDefinition[];
 };
 
+export type StaffServicePeriodWindow = {
+  readonly startDate: string; // YYYY-MM-DD
+  readonly endDate: string | null; // YYYY-MM-DD | null
+};
+
 export type StaffRosterIdentity = {
   readonly id: number;
   readonly staffCode: string;
@@ -50,7 +55,46 @@ export type StaffRosterIdentity = {
   readonly displayName: string;
   readonly staffGroup: string;
   readonly active: boolean;
+  readonly startDate?: string | null;
+  readonly endDate?: string | null;
+  readonly servicePeriods?: readonly StaffServicePeriodWindow[];
 };
+
+/**
+ * Returns true when the staff member is in service on `date` (YYYY-MM-DD).
+ * If no startDate/endDate or servicePeriods are recorded, assumes in-service for backwards compatibility.
+ */
+export function isStaffInServiceOnDate(
+  staff: Pick<StaffRosterIdentity, 'startDate' | 'endDate' | 'servicePeriods'>,
+  date: string,
+): boolean {
+  if (staff.servicePeriods && staff.servicePeriods.length > 0) {
+    return staff.servicePeriods.some(
+      (sp) => date >= sp.startDate && (!sp.endDate || date <= sp.endDate),
+    );
+  }
+  if (staff.startDate && date < staff.startDate) return false;
+  if (staff.endDate && date > staff.endDate) return false;
+  return true;
+}
+
+/**
+ * Returns true when the staff member has at least one active service day within [periodStart, periodEnd].
+ */
+export function isStaffInServiceDuringPeriod(
+  staff: Pick<StaffRosterIdentity, 'startDate' | 'endDate' | 'servicePeriods'>,
+  periodStart: string,
+  periodEnd: string,
+): boolean {
+  if (staff.servicePeriods && staff.servicePeriods.length > 0) {
+    return staff.servicePeriods.some(
+      (sp) => sp.startDate <= periodEnd && (!sp.endDate || sp.endDate >= periodStart),
+    );
+  }
+  if (staff.startDate && staff.startDate > periodEnd) return false;
+  if (staff.endDate && staff.endDate < periodStart) return false;
+  return true;
+}
 
 export type MoWorkMode = 'shift' | 'oh_clinical' | 'oh_non_clinical';
 
