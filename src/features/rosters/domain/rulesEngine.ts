@@ -107,13 +107,23 @@ export function evaluateRosterRules(input: RulesInput): RulesOutput {
   for (const person of people) {
     const staffAssignmentsMap = assignmentsByStaff.get(person.id) ?? new Map<string, Assignment>();
 
-    // A: Weekly OFF evaluation across all roster weeks
+    // A: Weekly OFF evaluation across all roster weeks (with carry-forward replacement detection)
+    const personWeekEvals: Array<{
+      week: (typeof weeks)[number];
+      offResult: WeeklyOffResult;
+      goffCount: number;
+    }> = [];
+
     for (const week of weeks) {
       const shiftMap = new Map<string, string>();
+      let goffCount = 0;
       for (const d of week.dates) {
         const a = staffAssignmentsMap.get(d);
         if (a) {
           shiftMap.set(d, a.shiftCode);
+          if (normalizeShiftCode(a.shiftCode).base === 'GOFF') {
+            goffCount += 1;
+          }
         }
       }
 
@@ -129,22 +139,95 @@ export function evaluateRosterRules(input: RulesInput): RulesOutput {
       );
 
       weeklyOffResults.push(offResult);
+      personWeekEvals.push({ week, offResult, goffCount });
+    }
+
+    // Match any short weeks against surplus OFF/GOFF in any later week of the period
+    type DeficitTracker = {
+      weekIdx: number;
+      originalDeficit: number;
+      remaining: number;
+      coveredByWeeks: string[];
+    };
+    const openDeficits: DeficitTracker[] = [];
+    const deficitByWeekIdx = new Map<number, DeficitTracker>();
+
+    for (let idx = 0; idx < personWeekEvals.length; idx++) {
+      const entry = personWeekEvals[idx];
+      if (!entry) continue;
+      const { week, offResult, goffCount } = entry;
 
       if (offResult.status === 'short') {
+        const deficit = Math.max(1, offResult.requiredOff - offResult.actualOff);
+        const tracker: DeficitTracker = {
+          weekIdx: idx,
+          originalDeficit: deficit,
+          remaining: deficit,
+          coveredByWeeks: [],
+        };
+        openDeficits.push(tracker);
+        deficitByWeekIdx.set(idx, tracker);
+      } else {
+        let surplus = Math.max(0, offResult.actualOff - offResult.requiredOff) + goffCount;
+        while (surplus > 0 && openDeficits.length > 0) {
+          const head = openDeficits[0];
+          if (!head) break;
+          const used = Math.min(surplus, head.remaining);
+          head.remaining -= used;
+          surplus -= used;
+          if (!head.coveredByWeeks.includes(week.weekStart)) {
+            head.coveredByWeeks.push(week.weekStart);
+          }
+          if (head.remaining <= 0) {
+            openDeficits.shift();
+          }
+        }
+      }
+    }
+
+    for (let idx = 0; idx < personWeekEvals.length; idx++) {
+      const entry = personWeekEvals[idx];
+      if (!entry) continue;
+      const { week, offResult } = entry;
+
+      if (offResult.status === 'short') {
+        const tracker = deficitByWeekIdx.get(idx);
         const reqStr = offResult.requiredOff === 1 ? '1 OFF' : '2 OFFs';
         const nightNote = offResult.hasQualifyingNight
           ? ' (Night duty worked requires 1 OFF)'
           : ' (No night duty worked requires 2 OFFs)';
-        issues.push({
-          id: `missing-off-${person.id}-${week.weekStart}`,
-          code: 'missing_weekly_off',
-          severity: 'error',
-          staffId: person.id,
-          staffName: person.rosterName,
-          weekStart: week.weekStart,
-          message: `${person.rosterName}: Missing weekly OFF for week ${week.weekStart} to ${week.weekEnd}. Entitled to ${reqStr}${nightNote}, but has ${offResult.actualOff}.`,
-          suggestion: `Assign ${offResult.requiredOff - offResult.actualOff} additional normal OFF(s) during this week.`,
-        });
+
+        if (tracker && tracker.remaining === 0) {
+          issues.push({
+            id: `compensated-off-${person.id}-${week.weekStart}`,
+            code: 'compensated_weekly_off',
+            severity: 'info',
+            staffId: person.id,
+            staffName: person.rosterName,
+            weekStart: week.weekStart,
+            message: `${person.rosterName}: Week ${week.weekStart} to ${week.weekEnd} short ${tracker.originalDeficit} OFF — replaced in later week (${tracker.coveredByWeeks.join(', ')}).`,
+            suggestion:
+              'Weekly OFF deficit was compensated by surplus OFF/GOFF in a subsequent week.',
+          });
+        } else {
+          const uncompensated = tracker
+            ? tracker.remaining
+            : offResult.requiredOff - offResult.actualOff;
+          const partialNote =
+            tracker && tracker.coveredByWeeks.length > 0
+              ? ` (${tracker.originalDeficit - uncompensated} replaced in ${tracker.coveredByWeeks.join(', ')}; ${uncompensated} still owed)`
+              : '';
+          issues.push({
+            id: `missing-off-${person.id}-${week.weekStart}`,
+            code: 'missing_weekly_off',
+            severity: 'error',
+            staffId: person.id,
+            staffName: person.rosterName,
+            weekStart: week.weekStart,
+            message: `${person.rosterName}: Missing weekly OFF for week ${week.weekStart} to ${week.weekEnd}. Entitled to ${reqStr}${nightNote}, but has ${offResult.actualOff}.${partialNote}`,
+            suggestion: `Assign ${uncompensated} additional normal OFF(s) this week, replace in a later week, or carry forward as +${uncompensated} GOFF next month.`,
+          });
+        }
       } else if (offResult.status === 'provisional') {
         issues.push({
           id: `provisional-week-${person.id}-${week.weekStart}`,

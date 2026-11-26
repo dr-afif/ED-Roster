@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { RosterIssue } from '../domain/types';
+import { RulesGuidanceModal } from './RulesGuidanceModal';
 
 interface RosterIssuesPanelProps {
   issues: readonly RosterIssue[];
@@ -8,6 +10,7 @@ interface RosterIssuesPanelProps {
 
 export function RosterIssuesPanel({ issues, onSelectIssue }: RosterIssuesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterSeverity, setFilterSeverity] = useState<'all' | 'error' | 'warning' | 'info'>('all');
 
   const errors = issues.filter((i) => i.severity === 'error');
@@ -23,16 +26,18 @@ export function RosterIssuesPanel({ issues, onSelectIssue }: RosterIssuesPanelPr
       className="overflow-hidden rounded-[22px] border border-[#E7E5E4] bg-white shadow-[0_6px_22px_-6px_rgba(28,25,23,0.07)]"
     >
       {/* Warm Editorial Header bar */}
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
-        aria-label={isExpanded ? 'Collapse issues panel' : 'Expand issues panel'}
-        className={`flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 bg-[#FAFAF9] px-4 py-3 text-left ${
+      <div
+        className={`flex w-full flex-wrap items-center justify-between gap-2 bg-[#FAFAF9] px-4 py-3 ${
           isExpanded ? 'border-b border-[#E7E5E4]' : ''
         }`}
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          aria-label={isExpanded ? 'Collapse issues panel' : 'Expand issues panel'}
+          className="flex flex-1 cursor-pointer flex-wrap items-center gap-2 text-left"
+        >
           <h3 className="text-[13px] font-extrabold text-[#18181B]">🛡️ Rules Engine Guidance</h3>
           {errors.length > 0 ? (
             <span className="rounded-full bg-[#FEE2E2] px-2.5 py-0.5 text-[10px] font-extrabold text-[#991B1B]">
@@ -54,12 +59,28 @@ export function RosterIssuesPanel({ issues, onSelectIssue }: RosterIssuesPanelPr
               All Roster Rules Satisfied
             </span>
           ) : null}
-        </div>
+        </button>
 
-        <span className="text-[11px] font-bold text-[#57534E]">
-          {isExpanded ? 'Hide ▲' : 'Show ▼'}
-        </span>
-      </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {issues.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#99F6E4] bg-[#F0FDFA] px-3 py-1 text-[11px] font-extrabold text-[#0F766E] hover:bg-[#CCFBF1] transition cursor-pointer"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              <span>Full Guidance</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-[11px] font-bold text-[#57534E] cursor-pointer"
+          >
+            {isExpanded ? 'Hide ▲' : 'Show ▼'}
+          </button>
+        </div>
+      </div>
 
       {/* Expanded body */}
       {isExpanded ? (
@@ -122,6 +143,13 @@ export function RosterIssuesPanel({ issues, onSelectIssue }: RosterIssuesPanelPr
           )}
         </div>
       ) : null}
+
+      <RulesGuidanceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        issues={issues}
+        onSelectIssue={onSelectIssue}
+      />
     </div>
   );
 }

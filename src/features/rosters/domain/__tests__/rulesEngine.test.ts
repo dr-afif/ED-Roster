@@ -398,4 +398,52 @@ describe('Pure Roster Rules Engine', () => {
 
     expect(outputModified.checksum).not.toBe(output1.checksum);
   });
+
+  it('downgrades missing_weekly_off to info (compensated_weekly_off) when replaced by surplus OFF/GOFF in a later week', () => {
+    const assignments: Assignment[] = [];
+    // Week 1 (2027-01-04 to 2027-01-10): 1 OFF (short 1 OFF under Policy B)
+    for (let d = 4; d <= 10; d++) {
+      const dateStr = `2027-01-${String(d).padStart(2, '0')}`;
+      assignments.push({
+        staffId: 101,
+        dutyDate: dateStr,
+        shiftCode: d === 10 ? 'OFF' : 'AM',
+      });
+    }
+    // Week 2 (2027-01-11 to 2027-01-17): standard 2 OFFs (no surplus)
+    for (let d = 11; d <= 17; d++) {
+      const dateStr = `2027-01-${String(d).padStart(2, '0')}`;
+      assignments.push({
+        staffId: 101,
+        dutyDate: dateStr,
+        shiftCode: d >= 16 ? 'OFF' : 'AM',
+      });
+    }
+    // Week 3 (2027-01-18 to 2027-01-24): 2 OFFs + 1 GOFF (1 surplus replacement 2 weeks later!)
+    for (let d = 18; d <= 24; d++) {
+      const dateStr = `2027-01-${String(d).padStart(2, '0')}`;
+      assignments.push({
+        staffId: 101,
+        dutyDate: dateStr,
+        shiftCode: d === 22 ? 'GOFF' : d >= 23 ? 'OFF' : 'AM',
+      });
+    }
+
+    const output = evaluateRosterRules({
+      period: TEST_PERIOD,
+      people: TEST_PEOPLE.slice(0, 1),
+      assignments,
+      configuration: DEFAULT_CONFIG,
+    });
+
+    const compensated = output.issues.find(
+      (i) => i.code === 'compensated_weekly_off' && i.weekStart === '2027-01-04',
+    );
+    expect(compensated).toBeDefined();
+    expect(compensated?.severity).toBe('info');
+    expect(compensated?.message).toContain('2027-01-18');
+    expect(
+      output.issues.find((i) => i.code === 'missing_weekly_off' && i.weekStart === '2027-01-04'),
+    ).toBeUndefined();
+  });
 });

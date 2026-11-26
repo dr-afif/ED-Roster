@@ -115,6 +115,7 @@ export type IssueSeverity = 'error' | 'warning' | 'info';
 export type IssueCode =
   | 'staffing_shortage'
   | 'missing_weekly_off'
+  | 'compensated_weekly_off'
   | 'consecutive_work_exceeded'
   | 'broken_night_bundle'
   | 'insufficient_night_rest'

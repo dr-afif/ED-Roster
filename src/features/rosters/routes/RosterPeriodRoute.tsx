@@ -1561,16 +1561,22 @@ export function RosterPeriodRoute() {
                 <RosterIssuesPanel
                   issues={rulesOutput.issues}
                   onSelectIssue={(issue: RosterIssue) => {
-                    if (issue.staffId && issue.date) {
+                    const weekStart = issue.weekStart;
+                    const targetDate =
+                      issue.date ||
+                      (weekStart
+                        ? (periodDates.find((d) => d >= weekStart) ?? periodDates[0])
+                        : undefined);
+                    if (issue.staffId && targetDate) {
                       const targetStaff = staffList.find((s) => s.id === issue.staffId);
                       if (targetStaff) {
                         const currentCode = activeAssignments.find(
-                          (a) => a.staffId === issue.staffId && a.dutyDate === issue.date,
+                          (a) => a.staffId === issue.staffId && a.dutyDate === targetDate,
                         )?.shiftCode;
-                        handleCellSelect(targetStaff, issue.date, currentCode);
+                        handleCellSelect(targetStaff, targetDate, currentCode);
                       }
-                    } else if (issue.date) {
-                      showToast(`Focused ${issue.date}`);
+                    } else if (targetDate) {
+                      showToast(`Focused ${targetDate}`);
                     }
                   }}
                 />
