@@ -168,16 +168,37 @@ describe('StaffRequestsRoute (Live-Aligned Workflow)', () => {
     expect(screen.getByText(/Roster Calendar/i)).toBeInTheDocument();
   });
 
-  it('renders personal request history with edit and delete options', async () => {
-    renderStaffRequests();
+  it('renders personal request history with edit and delete options when window is open', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-15T10:00:00+08:00'));
+    try {
+      renderStaffRequests();
 
-    fireEvent.click(screen.getByRole('button', { name: /My List/i }));
+      fireEvent.click(screen.getByRole('button', { name: /My List/i }));
 
-    expect(screen.getByText(/Request History/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/OFF/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Family event/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
+      expect(screen.getByText(/Request History/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/OFF/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Family event/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('locks staff edit/delete actions after the monthly cutoff day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-26T10:00:00+08:00'));
+    try {
+      renderStaffRequests('staff');
+
+      expect(screen.getByText(/Request CLOSED for December 2026/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /My List/i }));
+      expect(screen.queryByRole('button', { name: /Edit/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Delete/i })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens DateDetailPanel and submits a request when clicking a date cell', async () => {

@@ -5,6 +5,7 @@ export {
   DEFAULT_TALLY_THRESHOLDS,
   formatOrdinalDay,
   INITIAL_UPDATES,
+  isRequestWindowEffectivelyOpen,
   useAppUiState,
   useToast,
   type DepartmentUpdateItem,

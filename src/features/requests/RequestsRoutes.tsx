@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FIRST_NATIVE_ROSTER_PERIOD } from '@/shared/dates';
-import { MonthYearWheelModal, useAppUiState } from '@/shared/ui';
+import {
+  buildRequestWindowSummary,
+  isRequestWindowEffectivelyOpen,
+  MonthYearWheelModal,
+  useAppUiState,
+} from '@/shared/ui';
 import { useRuleVersionQuery } from '@/features/rosters/data/rosterQueries';
 import { useAuth } from '../../platform/auth';
 import {
@@ -30,7 +35,7 @@ import './calendar.css';
 
 export function StaffRequestsRoute() {
   const { user } = useAuth();
-  const { requestWindowSummary, deptSettings, showToast } = useAppUiState();
+  const { deptSettings, showToast } = useAppUiState();
   const isOwner = user?.role === 'owner';
   const selectedName = user?.rosterName || user?.displayName || 'Medical Officer';
   const selectedStaffId = user?.staffId || 1;
@@ -57,6 +62,17 @@ export function StaffRequestsRoute() {
   );
   const requestDailyOffLimit = Number(rawRuleConfig.request_daily_off_limit ?? DAILY_LIMIT);
   const requestOn1DailyLimit = Number(rawRuleConfig.request_on1_daily_limit ?? ON1_DAILY_LIMIT);
+  const requestCutoffDay = Number(rawRuleConfig.request_cutoff_day ?? deptSettings.cutoffDay ?? 25);
+  const requestWindowManualOpen =
+    rawRuleConfig.request_window_open !== undefined
+      ? Boolean(rawRuleConfig.request_window_open)
+      : deptSettings.isWindowOpen;
+  const isWindowEffectivelyOpen = isRequestWindowEffectivelyOpen(
+    requestWindowManualOpen,
+    requestCutoffDay,
+  );
+  const liveWindowSummary = buildRequestWindowSummary(requestWindowManualOpen, requestCutoffDay);
+  const isWindowClosedForUser = !isOwner && !isWindowEffectivelyOpen;
 
   const quotaConfig = useMemo(
     () => ({
@@ -234,7 +250,7 @@ export function StaffRequestsRoute() {
       {/* Live Request Window Status Pill */}
       <div
         className={`flex items-center justify-between gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold ${
-          deptSettings.isWindowOpen
+          isWindowEffectivelyOpen
             ? 'border-[#99F6E4] bg-[#F0FDFA] text-[#0F766E]'
             : 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]'
         }`}
@@ -242,10 +258,10 @@ export function StaffRequestsRoute() {
         <span className="inline-flex items-center gap-1.5 truncate">
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
-              deptSettings.isWindowOpen ? 'bg-emerald-600' : 'bg-amber-600'
+              isWindowEffectivelyOpen ? 'bg-emerald-600' : 'bg-amber-600'
             }`}
           />
-          <span className="truncate">{requestWindowSummary}</span>
+          <span className="truncate">{liveWindowSummary}</span>
         </span>
       </div>
 
@@ -429,6 +445,7 @@ export function StaffRequestsRoute() {
           onEdit={handleEditRequest}
           onDelete={handleDeleteRequest}
           isLoading={isLoadingRequests}
+          isWindowClosed={isWindowClosedForUser}
         />
       )}
 
@@ -455,6 +472,7 @@ export function StaffRequestsRoute() {
           selectedName={selectedName}
           selectedStaffId={selectedStaffId}
           isOwner={isOwner}
+          isWindowClosed={isWindowClosedForUser}
           quotaConfig={quotaConfig}
           editingRequest={editingRequest}
           teamMembers={teamMembers}

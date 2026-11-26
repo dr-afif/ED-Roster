@@ -2,8 +2,14 @@ import { Component, useState, type ReactNode } from 'react';
 import { CheckCircle2, Lock, Save, Settings } from 'lucide-react';
 import { OwnerUxBoundary } from '@/platform/auth';
 import { useSupabaseMetadata } from '@/platform/supabase';
+import type { Json } from '@/platform/supabase/database.types';
+import {
+  useRuleVersionQuery,
+  useUpdateRuleVersionMutation,
+} from '@/features/rosters/data/rosterQueries';
 import {
   buildRequestWindowSummary,
+  isRequestWindowEffectivelyOpen,
   ModuleBackBar,
   StatusBadge,
   useAppUiState,
@@ -81,29 +87,60 @@ function clampCutoffDay(raw: string, fallback = 25): number {
 
 export function SettingsAdminRoute() {
   const { deptSettings, setDeptSettings } = useAppUiState();
+  const { data: ruleVersion } = useRuleVersionQuery();
+  const updateRuleMutation = useUpdateRuleVersionMutation();
   const showToast = useToast();
+
+  const rawRuleConfig = (ruleVersion?.config as Record<string, unknown>) ?? {};
+  const syncedCutoffDay = Number(rawRuleConfig.request_cutoff_day ?? deptSettings.cutoffDay ?? 25);
+  const syncedWindowOpen =
+    rawRuleConfig.request_window_open !== undefined
+      ? Boolean(rawRuleConfig.request_window_open)
+      : deptSettings.isWindowOpen;
 
   const [departmentName, setDepartmentName] = useState(deptSettings.departmentName);
   const [hospitalName, setHospitalName] = useState(deptSettings.hospitalName);
-  const [cutoffDayInput, setCutoffDayInput] = useState(String(deptSettings.cutoffDay));
+  const [cutoffDayInput, setCutoffDayInput] = useState(() => String(syncedCutoffDay));
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
 
-  const resolvedCutoff = clampCutoffDay(cutoffDayInput, deptSettings.cutoffDay);
-  const autoWindowLabel = buildRequestWindowSummary(deptSettings.isWindowOpen, resolvedCutoff);
+  const resolvedCutoff = clampCutoffDay(cutoffDayInput, syncedCutoffDay);
+  const isEffectivelyOpen = isRequestWindowEffectivelyOpen(syncedWindowOpen, resolvedCutoff);
+  const autoWindowLabel = buildRequestWindowSummary(syncedWindowOpen, resolvedCutoff);
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const persistRequestWindowToSupabase = async (nextCutoff: number, nextOpen: boolean) => {
+    if (!ruleVersion) return;
+    await updateRuleMutation.mutateAsync({
+      id: ruleVersion.id,
+      effectiveFrom: ruleVersion.effective_from,
+      effectiveTo: ruleVersion.effective_to,
+      config: {
+        ...rawRuleConfig,
+        request_cutoff_day: nextCutoff,
+        request_window_open: nextOpen,
+      } as Json,
+      changeSummary: `Updated request window (open=${nextOpen}, cutoff=${nextCutoff})`,
+    });
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clamped = clampCutoffDay(cutoffDayInput, deptSettings.cutoffDay);
+    const clamped = clampCutoffDay(cutoffDayInput, syncedCutoffDay);
     setCutoffDayInput(String(clamped));
     setDeptSettings((prev) => ({
       ...prev,
       departmentName: departmentName.trim() || prev.departmentName,
       hospitalName: hospitalName.trim() || prev.hospitalName,
       cutoffDay: clamped,
+      isWindowOpen: syncedWindowOpen,
     }));
-    setSaveStatus('saved');
-    showToast('Department settings saved ✓');
-    setTimeout(() => setSaveStatus('idle'), 3000);
+    try {
+      await persistRequestWindowToSupabase(clamped, syncedWindowOpen);
+      setSaveStatus('saved');
+      showToast('Department settings saved ✓');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save settings.');
+    }
   };
 
   return (
@@ -144,12 +181,12 @@ export function SettingsAdminRoute() {
                 </div>
                 <span
                   className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-extrabold ${
-                    deptSettings.isWindowOpen
+                    isEffectivelyOpen
                       ? 'border-[#A7F3D0] bg-[#D1FAE5] text-[#065F46]'
                       : 'border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]'
                   }`}
                 >
-                  {deptSettings.isWindowOpen ? '● Currently Open' : '🔒 Currently Closed'}
+                  {isEffectivelyOpen ? '● Currently Open' : '🔒 Currently Closed'}
                 </span>
               </div>
 
@@ -231,7 +268,7 @@ export function SettingsAdminRoute() {
                   <div className="flex items-center justify-between gap-3 border-t border-[#EFECE6] pt-3">
                     <div>
                       <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#18181B]">
-                        {deptSettings.isWindowOpen ? (
+                        {syncedWindowOpen ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-[#0F766E]" />
                         ) : (
                           <Lock className="h-3.5 w-3.5 text-rose-600" />
@@ -243,13 +280,21 @@ export function SettingsAdminRoute() {
                       </p>
                     </div>
                     <ToggleSwitch
-                      checked={deptSettings.isWindowOpen}
-                      onToggle={() =>
+                      checked={syncedWindowOpen}
+                      onToggle={() => {
+                        const nextOpen = !syncedWindowOpen;
                         setDeptSettings((prev) => ({
                           ...prev,
-                          isWindowOpen: !prev.isWindowOpen,
-                        }))
-                      }
+                          isWindowOpen: nextOpen,
+                        }));
+                        void persistRequestWindowToSupabase(resolvedCutoff, nextOpen).catch(
+                          (err) => {
+                            showToast(
+                              err instanceof Error ? err.message : 'Failed to update window.',
+                            );
+                          },
+                        );
+                      }}
                       openLabel="Open"
                       closedLabel="Closed"
                       ariaLabel="MO Request Submission Window"

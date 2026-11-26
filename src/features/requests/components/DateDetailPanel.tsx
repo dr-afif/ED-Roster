@@ -34,6 +34,7 @@ export interface DateDetailPanelProps {
   selectedName: string;
   selectedStaffId: number;
   isOwner?: boolean;
+  isWindowClosed?: boolean;
   quotaConfig?: RequestQuotaConfig;
   editingRequest?: RequestRecord | null;
   teamMembers?: Array<{
@@ -63,6 +64,7 @@ export function DateDetailPanel({
   selectedName,
   selectedStaffId,
   isOwner = false,
+  isWindowClosed = false,
   quotaConfig,
   editingRequest,
   teamMembers = [],
@@ -175,7 +177,7 @@ export function DateDetailPanel({
                   const isOwn = Boolean(
                     selectedStaffId && r.staff_id && String(r.staff_id) === String(selectedStaffId),
                   );
-                  const canManage = isOwner || isOwn;
+                  const canManage = isOwner || (isOwn && !isWindowClosed);
                   const createdLabel = formatRequestTimestamp(r.submitted_at || r.created_at);
 
                   return (
@@ -231,22 +233,29 @@ export function DateDetailPanel({
 
           {error ? <div className="date-panel__error">{error}</div> : null}
 
-          <div>
-            <h3 className="date-panel__section-title">
-              {editingRequest ? 'Update Request' : 'Add a Request'}
-            </h3>
-            <NewRequestForm
-              selectedName={selectedName}
-              selectedStaffId={selectedStaffId}
-              isOwner={isOwner}
-              quotaConfig={quotaConfig}
-              initialValues={formInitialValues}
-              requests={requests}
-              teamMembers={teamMembers}
-              onSubmit={onSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </div>
+          {isWindowClosed ? (
+            <div className="rounded-[16px] border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-3 text-xs font-semibold text-[#92400E]">
+              Request submission window is currently closed. You can view existing requests, but
+              adding, editing, or deleting requests is disabled until the next window opens.
+            </div>
+          ) : (
+            <div>
+              <h3 className="date-panel__section-title">
+                {editingRequest ? 'Update Request' : 'Add a Request'}
+              </h3>
+              <NewRequestForm
+                selectedName={selectedName}
+                selectedStaffId={selectedStaffId}
+                isOwner={isOwner}
+                quotaConfig={quotaConfig}
+                initialValues={formInitialValues}
+                requests={requests}
+                teamMembers={teamMembers}
+                onSubmit={onSubmit}
+                isSubmitting={isSubmitting}
+              />
+            </div>
+          )}
         </div>
       </div>
     </>,

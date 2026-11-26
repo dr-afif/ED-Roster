@@ -25,6 +25,7 @@ export interface UserRequestsProps {
   onEdit: (request: RequestRecord) => void;
   onDelete: (request: RequestRecord) => void;
   isLoading?: boolean;
+  isWindowClosed?: boolean;
 }
 
 export function UserRequests({
@@ -39,6 +40,7 @@ export function UserRequests({
   onEdit,
   onDelete,
   isLoading = false,
+  isWindowClosed = false,
 }: UserRequestsProps) {
   const targetMonth = useMemo(() => {
     if (selectedMonth) return selectedMonth;
@@ -170,8 +172,9 @@ export function UserRequests({
             >
               <button
                 type="button"
-                onClick={() => onEdit(request)}
-                className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                disabled={isWindowClosed}
+                onClick={() => !isWindowClosed && onEdit(request)}
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer disabled:cursor-default"
               >
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${getShiftToneClasses(
@@ -192,22 +195,24 @@ export function UserRequests({
                 </div>
               </button>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onEdit(request)}
-                  className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[11px] font-bold text-[#0F766E] hover:border-[#0F766E] cursor-pointer"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(request)}
-                  className="rounded-full border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C] hover:bg-rose-100 cursor-pointer"
-                >
-                  Delete
-                </button>
-              </div>
+              {!isWindowClosed ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(request)}
+                    className="rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[11px] font-bold text-[#0F766E] hover:border-[#0F766E] cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(request)}
+                    className="rounded-full border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C] hover:bg-rose-100 cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

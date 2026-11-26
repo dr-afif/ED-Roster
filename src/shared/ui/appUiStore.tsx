@@ -101,6 +101,24 @@ export function formatOrdinalDay(day: number): string {
   return `${n}th`;
 }
 
+export function getMalaysiaDayOfMonth(now = new Date()): number {
+  const formatted = new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    timeZone: 'Asia/Kuala_Lumpur',
+  }).format(now);
+  const parsed = parseInt(formatted, 10);
+  return Number.isFinite(parsed) ? parsed : now.getDate();
+}
+
+export function isRequestWindowEffectivelyOpen(
+  isWindowOpen: boolean,
+  cutoffDay: number,
+  now = new Date(),
+): boolean {
+  if (!isWindowOpen) return false;
+  return getMalaysiaDayOfMonth(now) <= cutoffDay;
+}
+
 export function buildRequestWindowSummary(isWindowOpen: boolean, cutoffDay: number): string {
   const now = new Date();
   const thisMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -111,6 +129,9 @@ export function buildRequestWindowSummary(isWindowOpen: boolean, cutoffDay: numb
   });
   if (!isWindowOpen) {
     return `Request CLOSED for ${nextMonthLabel}`;
+  }
+  if (getMalaysiaDayOfMonth(now) > cutoffDay) {
+    return `Request CLOSED for ${nextMonthLabel} (cutoff passed: ${formatOrdinalDay(cutoffDay)} ${thisMonthLabel})`;
   }
   return `Request OPEN for ${nextMonthLabel} (until the ${formatOrdinalDay(cutoffDay)} ${thisMonthLabel})`;
 }
