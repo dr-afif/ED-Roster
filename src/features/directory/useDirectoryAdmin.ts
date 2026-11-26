@@ -167,7 +167,7 @@ export function useStaffDirectoryQuery() {
 }
 
 export type CreateStaffPayload = {
-  email: string;
+  email?: string;
   role: 'owner' | 'staff';
   staff_code: string;
   roster_name: string;
@@ -184,7 +184,7 @@ export function useCreateStaffMemberMutation() {
   return useMutation({
     mutationFn: async (payload: CreateStaffPayload) => {
       const { data, error } = await supabase.rpc('admin_create_staff_member', {
-        p_email: payload.email,
+        p_email: payload.email?.trim().toLowerCase() ?? '',
         p_role: payload.role,
         p_staff_code: payload.staff_code,
         p_roster_name: payload.roster_name,

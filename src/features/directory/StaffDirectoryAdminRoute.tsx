@@ -393,8 +393,9 @@ export function StaffDirectoryAdminRoute() {
     e.preventDefault();
     setFormError(null);
 
-    if (!inviteForm.email || !inviteForm.email.includes('@')) {
-      setFormError('Please enter a valid Google email address.');
+    const trimmedEmail = inviteForm.email.trim().toLowerCase();
+    if (trimmedEmail && !trimmedEmail.includes('@')) {
+      setFormError('Please enter a valid Google email address (or leave blank).');
       return;
     }
     if (!inviteForm.staff_code.trim()) {
@@ -424,7 +425,7 @@ export function StaffDirectoryAdminRoute() {
 
     try {
       await createMutation.mutateAsync({
-        email: inviteForm.email.trim().toLowerCase(),
+        email: trimmedEmail || undefined,
         role: allowlistRole,
         staff_code: inviteForm.staff_code.trim(),
         roster_name: rosterName,
@@ -435,7 +436,11 @@ export function StaffDirectoryAdminRoute() {
         start_date: inviteForm.start_date || getTodayIso(),
       });
       setIsInviteOpen(false);
-      showToast('Staff member invited & registered ✓');
+      showToast(
+        trimmedEmail
+          ? 'Staff member invited & registered ✓'
+          : 'Staff member registered (no app login yet) ✓',
+      );
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to register staff member.');
     }
@@ -1533,17 +1538,19 @@ export function StaffDirectoryAdminRoute() {
                     htmlFor="invite-email"
                     className="block text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#57534E] mb-1"
                   >
-                    Google Account Email
+                    Google Account Email (Optional)
                   </label>
                   <input
                     id="invite-email"
                     type="email"
-                    required
                     value={inviteForm.email}
                     onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                    placeholder="aina@hsaas.upm.edu.my"
+                    placeholder="aina@hsaas.upm.edu.my (optional)"
                     className="w-full rounded-[12px] border-[1.5px] border-[#E7E5E4] bg-white px-3 py-2 text-[12.5px] text-[#18181B] focus:border-[#0F766E] focus:outline-none"
                   />
+                  <p className="mt-1 text-[10px] text-[#78716C]">
+                    Leave blank to roster without app access until their UPM email is ready.
+                  </p>
                 </div>
                 <div>
                   <label
