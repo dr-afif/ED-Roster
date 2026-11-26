@@ -6,7 +6,9 @@ export function createAppQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        gcTime: 5 * 60_000,
+        gcTime: 24 * 60 * 60_000,
+        refetchOnMount: 'always',
+        refetchOnReconnect: true,
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           if (isAppError(error) && !error.retryable) {

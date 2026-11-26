@@ -11,6 +11,7 @@ import {
 } from './authContext';
 import { AuthErrorScreen, AuthLoadingScreen, SignInScreen, UnapprovedScreen } from './AuthScreens';
 import { sanitizeReturnToPath } from './oauthCallbackGuard';
+import { clearPersistedQueryCache } from '@/platform/query';
 import { useSupabaseClient, useSupabaseMetadata } from '@/platform/supabase';
 
 const RETURN_TO_STORAGE_KEY = 'resq.auth.v1.returnTo';
@@ -294,6 +295,7 @@ function LiveAuthProvider({ children }: { children: ReactNode }) {
 
       if (event === 'SIGNED_OUT' || !session) {
         writeCachedAuthUser(null);
+        clearPersistedQueryCache();
         setUser(null);
         setStatus('unauthenticated');
         queryClient.clear();
