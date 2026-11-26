@@ -25,6 +25,7 @@ export interface DeptSettingsState {
   hospitalName: string;
   cutoffDay: number;
   isWindowOpen: boolean;
+  requestWindowOverrideMonth?: string | null;
   autoEnforceQuotas: boolean;
   telegramEnabled: boolean;
   driveSyncEnabled: boolean;
@@ -80,6 +81,7 @@ export const DEFAULT_DEPT_SETTINGS: DeptSettingsState = {
   hospitalName: 'Hospital Sultan Abdul Aziz Shah (HSAAS)',
   cutoffDay: 25,
   isWindowOpen: true,
+  requestWindowOverrideMonth: null,
   autoEnforceQuotas: true,
   telegramEnabled: true,
   driveSyncEnabled: true,
@@ -110,16 +112,34 @@ export function getMalaysiaDayOfMonth(now = new Date()): number {
   return Number.isFinite(parsed) ? parsed : now.getDate();
 }
 
+export function getMalaysiaYearMonth(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    timeZone: 'Asia/Kuala_Lumpur',
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === 'year')?.value ?? String(now.getFullYear());
+  const month =
+    parts.find((p) => p.type === 'month')?.value ?? String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 export function isRequestWindowEffectivelyOpen(
   isWindowOpen: boolean,
   cutoffDay: number,
+  overrideMonth: string | null = null,
   now = new Date(),
 ): boolean {
   if (!isWindowOpen) return false;
+  if (overrideMonth && overrideMonth === getMalaysiaYearMonth(now)) return true;
   return getMalaysiaDayOfMonth(now) <= cutoffDay;
 }
 
-export function buildRequestWindowSummary(isWindowOpen: boolean, cutoffDay: number): string {
+export function buildRequestWindowSummary(
+  isWindowOpen: boolean,
+  cutoffDay: number,
+  overrideMonth: string | null = null,
+): string {
   const now = new Date();
   const thisMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -131,6 +151,9 @@ export function buildRequestWindowSummary(isWindowOpen: boolean, cutoffDay: numb
     return `Request CLOSED for ${nextMonthLabel}`;
   }
   if (getMalaysiaDayOfMonth(now) > cutoffDay) {
+    if (overrideMonth && overrideMonth === getMalaysiaYearMonth(now)) {
+      return `Request OPEN (manual override) for ${nextMonthLabel} (cutoff: ${formatOrdinalDay(cutoffDay)} ${thisMonthLabel})`;
+    }
     return `Request CLOSED for ${nextMonthLabel} (cutoff passed: ${formatOrdinalDay(cutoffDay)} ${thisMonthLabel})`;
   }
   return `Request OPEN for ${nextMonthLabel} (until the ${formatOrdinalDay(cutoffDay)} ${thisMonthLabel})`;

@@ -67,11 +67,20 @@ export function StaffRequestsRoute() {
     rawRuleConfig.request_window_open !== undefined
       ? Boolean(rawRuleConfig.request_window_open)
       : deptSettings.isWindowOpen;
+  const requestWindowOverrideMonth =
+    rawRuleConfig.request_window_override_month !== undefined
+      ? (rawRuleConfig.request_window_override_month as string | null)
+      : (deptSettings.requestWindowOverrideMonth ?? null);
   const isWindowEffectivelyOpen = isRequestWindowEffectivelyOpen(
     requestWindowManualOpen,
     requestCutoffDay,
+    requestWindowOverrideMonth,
   );
-  const liveWindowSummary = buildRequestWindowSummary(requestWindowManualOpen, requestCutoffDay);
+  const liveWindowSummary = buildRequestWindowSummary(
+    requestWindowManualOpen,
+    requestCutoffDay,
+    requestWindowOverrideMonth,
+  );
   const isWindowClosedForUser = !isOwner && !isWindowEffectivelyOpen;
 
   const quotaConfig = useMemo(

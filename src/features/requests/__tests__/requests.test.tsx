@@ -464,6 +464,20 @@ describe('NewRequestForm Fair Queue & Replacement Confirmation', () => {
     expect(screen.queryByText(/Confirm Request Change/i)).not.toBeInTheDocument();
   });
 
+  it('supports manual override after cutoff and auto-expires next month', async () => {
+    const { isRequestWindowEffectivelyOpen } = await import('@/shared/ui');
+    const nov26 = new Date('2026-11-26T10:00:00+08:00');
+    const dec01 = new Date('2026-12-01T10:00:00+08:00');
+    const nov15 = new Date('2026-11-15T10:00:00+08:00');
+
+    expect(isRequestWindowEffectivelyOpen(true, 25, null, nov15)).toBe(true);
+    expect(isRequestWindowEffectivelyOpen(false, 25, null, nov15)).toBe(false);
+    expect(isRequestWindowEffectivelyOpen(true, 25, null, nov26)).toBe(false);
+    expect(isRequestWindowEffectivelyOpen(true, 25, '2026-11', nov26)).toBe(true);
+    expect(isRequestWindowEffectivelyOpen(true, 25, '2026-11', dec01)).toBe(true);
+    expect(isRequestWindowEffectivelyOpen(true, 25, '2026-10', nov26)).toBe(false);
+  });
+
   it('prompts for confirmation when changing the shift type of an existing request', async () => {
     const { onSubmit } = renderForm({
       id: 10,

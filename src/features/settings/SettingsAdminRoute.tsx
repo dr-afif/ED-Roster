@@ -10,6 +10,7 @@ import {
 import {
   buildRequestWindowSummary,
   getMalaysiaDayOfMonth,
+  getMalaysiaYearMonth,
   isRequestWindowEffectivelyOpen,
   ModuleBackBar,
   StatusBadge,
@@ -103,6 +104,10 @@ export function SettingsAdminRoute() {
     rawRuleConfig.request_window_open !== undefined
       ? Boolean(rawRuleConfig.request_window_open)
       : deptSettings.isWindowOpen;
+  const syncedOverrideMonth =
+    rawRuleConfig.request_window_override_month !== undefined
+      ? (rawRuleConfig.request_window_override_month as string | null)
+      : (deptSettings.requestWindowOverrideMonth ?? null);
 
   const [departmentName, setDepartmentName] = useState(deptSettings.departmentName);
   const [hospitalName, setHospitalName] = useState(deptSettings.hospitalName);
@@ -111,10 +116,23 @@ export function SettingsAdminRoute() {
 
   const resolvedCutoff = clampCutoffDay(cutoffDayInput, syncedCutoffDay);
   const isPastCutoff = getMalaysiaDayOfMonth() > resolvedCutoff;
-  const isEffectivelyOpen = isRequestWindowEffectivelyOpen(syncedWindowOpen, resolvedCutoff);
-  const autoWindowLabel = buildRequestWindowSummary(syncedWindowOpen, resolvedCutoff);
+  const isEffectivelyOpen = isRequestWindowEffectivelyOpen(
+    syncedWindowOpen,
+    resolvedCutoff,
+    syncedOverrideMonth,
+  );
+  const isManualOverrideActive = isPastCutoff && isEffectivelyOpen;
+  const autoWindowLabel = buildRequestWindowSummary(
+    syncedWindowOpen,
+    resolvedCutoff,
+    syncedOverrideMonth,
+  );
 
-  const persistRequestWindowToSupabase = async (nextCutoff: number, nextOpen: boolean) => {
+  const persistRequestWindowToSupabase = async (
+    nextCutoff: number,
+    nextOpen: boolean,
+    nextOverrideMonth: string | null,
+  ) => {
     if (!ruleVersion) return;
     await updateRuleMutation.mutateAsync({
       id: ruleVersion.id,
@@ -124,8 +142,9 @@ export function SettingsAdminRoute() {
         ...rawRuleConfig,
         request_cutoff_day: nextCutoff,
         request_window_open: nextOpen,
+        request_window_override_month: nextOverrideMonth,
       } as Json,
-      changeSummary: `Updated request window (open=${nextOpen}, cutoff=${nextCutoff})`,
+      changeSummary: `Updated request window (open=${nextOpen}, cutoff=${nextCutoff}, override=${nextOverrideMonth ?? 'none'})`,
     });
   };
 
@@ -139,9 +158,10 @@ export function SettingsAdminRoute() {
       hospitalName: hospitalName.trim() || prev.hospitalName,
       cutoffDay: clamped,
       isWindowOpen: syncedWindowOpen,
+      requestWindowOverrideMonth: syncedOverrideMonth,
     }));
     try {
-      await persistRequestWindowToSupabase(clamped, syncedWindowOpen);
+      await persistRequestWindowToSupabase(clamped, syncedWindowOpen, syncedOverrideMonth);
       setSaveStatus('saved');
       showToast('Department settings saved ✓');
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -283,27 +303,36 @@ export function SettingsAdminRoute() {
                         <span>MO Request Submission Window</span>
                       </div>
                       <p className="text-[11px] text-[#78716C]">
-                        {isPastCutoff
-                          ? `Auto-closed after cutoff day ${resolvedCutoff} — raise cutoff day to reopen`
-                          : 'Allow MOs to submit or edit upcoming month requests'}
+                        {isManualOverrideActive
+                          ? `Manual override active (bypassing cutoff day ${resolvedCutoff} — toggle off to close)`
+                          : isPastCutoff
+                            ? `Auto-closed after cutoff day ${resolvedCutoff} — toggle on for emergency override`
+                            : 'Allow MOs to submit or edit upcoming month requests'}
                       </p>
                     </div>
                     <ToggleSwitch
                       checked={isEffectivelyOpen}
-                      disabled={isPastCutoff}
                       onToggle={() => {
-                        const nextOpen = !syncedWindowOpen;
+                        const nextOverrideMonth = isPastCutoff
+                          ? isEffectivelyOpen
+                            ? null
+                            : getMalaysiaYearMonth()
+                          : null;
+                        const nextOpen = isPastCutoff ? true : !isEffectivelyOpen;
                         setDeptSettings((prev) => ({
                           ...prev,
                           isWindowOpen: nextOpen,
+                          requestWindowOverrideMonth: nextOverrideMonth,
                         }));
-                        void persistRequestWindowToSupabase(resolvedCutoff, nextOpen).catch(
-                          (err) => {
-                            showToast(
-                              err instanceof Error ? err.message : 'Failed to update window.',
-                            );
-                          },
-                        );
+                        void persistRequestWindowToSupabase(
+                          resolvedCutoff,
+                          nextOpen,
+                          nextOverrideMonth,
+                        ).catch((err) => {
+                          showToast(
+                            err instanceof Error ? err.message : 'Failed to update window.',
+                          );
+                        });
                       }}
                       openLabel="Open"
                       closedLabel="Closed"
