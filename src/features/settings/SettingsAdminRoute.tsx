@@ -9,6 +9,7 @@ import {
 } from '@/features/rosters/data/rosterQueries';
 import {
   buildRequestWindowSummary,
+  getMalaysiaDayOfMonth,
   isRequestWindowEffectivelyOpen,
   ModuleBackBar,
   StatusBadge,
@@ -45,12 +46,14 @@ function ToggleSwitch({
   openLabel = 'Enabled',
   closedLabel = 'Disabled',
   ariaLabel,
+  disabled = false,
 }: {
   checked: boolean;
   onToggle: () => void;
   openLabel?: string;
   closedLabel?: string;
   ariaLabel: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -58,8 +61,11 @@ function ToggleSwitch({
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
+      disabled={disabled}
       onClick={onToggle}
-      className="inline-flex min-h-[44px] shrink-0 items-center gap-2 cursor-pointer"
+      className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 ${
+        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+      }`}
     >
       <span className={`text-xs font-extrabold ${checked ? 'text-[#0F766E]' : 'text-[#78716C]'}`}>
         {checked ? openLabel : closedLabel}
@@ -104,6 +110,7 @@ export function SettingsAdminRoute() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
 
   const resolvedCutoff = clampCutoffDay(cutoffDayInput, syncedCutoffDay);
+  const isPastCutoff = getMalaysiaDayOfMonth() > resolvedCutoff;
   const isEffectivelyOpen = isRequestWindowEffectivelyOpen(syncedWindowOpen, resolvedCutoff);
   const autoWindowLabel = buildRequestWindowSummary(syncedWindowOpen, resolvedCutoff);
 
@@ -268,7 +275,7 @@ export function SettingsAdminRoute() {
                   <div className="flex items-center justify-between gap-3 border-t border-[#EFECE6] pt-3">
                     <div>
                       <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#18181B]">
-                        {syncedWindowOpen ? (
+                        {isEffectivelyOpen ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-[#0F766E]" />
                         ) : (
                           <Lock className="h-3.5 w-3.5 text-rose-600" />
@@ -276,11 +283,14 @@ export function SettingsAdminRoute() {
                         <span>MO Request Submission Window</span>
                       </div>
                       <p className="text-[11px] text-[#78716C]">
-                        Allow MOs to submit or edit upcoming month requests
+                        {isPastCutoff
+                          ? `Auto-closed after cutoff day ${resolvedCutoff} — raise cutoff day to reopen`
+                          : 'Allow MOs to submit or edit upcoming month requests'}
                       </p>
                     </div>
                     <ToggleSwitch
-                      checked={syncedWindowOpen}
+                      checked={isEffectivelyOpen}
+                      disabled={isPastCutoff}
                       onToggle={() => {
                         const nextOpen = !syncedWindowOpen;
                         setDeptSettings((prev) => ({

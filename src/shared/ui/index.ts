@@ -4,6 +4,7 @@ export {
   DEFAULT_DEPT_SETTINGS,
   DEFAULT_TALLY_THRESHOLDS,
   formatOrdinalDay,
+  getMalaysiaDayOfMonth,
   INITIAL_UPDATES,
   isRequestWindowEffectivelyOpen,
   useAppUiState,
