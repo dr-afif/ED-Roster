@@ -139,5 +139,8 @@ describe('RosterExportModal & livePdfExport', () => {
     expect(html).toContain('Head of Department');
     expect(html).toContain('New Year&#39;s Day');
     expect(html).toContain('shift-cell-am');
+    expect(html).toContain('Math.min(widthScale, heightScale)');
+    expect(html).not.toContain('Math.min(widthScale, heightScale, 1)');
+    expect(html).toContain('height: 8.5mm;');
   });
 });

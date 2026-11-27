@@ -237,6 +237,11 @@ function renderSpreadsheetTable(
   days: readonly LivePdfSpreadsheetDay[],
   doctors: readonly LivePdfSpreadsheetDoctor[],
 ): string {
+  const rowHeightMm =
+    doctors.length > 0
+      ? Math.max(4.8, Math.min(8.5, Math.floor((124 / doctors.length) * 10) / 10))
+      : 4.8;
+
   const headerHtml = `
     <tr>
       <th class="spreadsheet-name-col">NAME</th>
@@ -262,7 +267,7 @@ function renderSpreadsheetTable(
   const bodyHtml = doctors
     .map((doc) => {
       return `
-      <tr>
+      <tr style="height: ${rowHeightMm}mm;">
         <td class="spreadsheet-name-cell">${escapeHtml(doc.name.toUpperCase())}</td>
         ${days
           .map((day) => {
@@ -496,20 +501,19 @@ export function buildPrintDocument({
             transform-origin: top center;
           }
           .scale-target.ep-only {
-            width: 198mm;
+            width: 112mm;
           }
           .scale-target.landscape {
             width: 285mm;
           }
           .sheet {
             width: 145mm;
-            min-height: 285mm;
             display: flex;
             flex-direction: column;
             gap: 2.4mm;
           }
           .sheet.ep-only {
-            width: 198mm;
+            width: 112mm;
             align-items: center;
           }
           .sheet.ep-only .header {
@@ -528,6 +532,7 @@ export function buildPrintDocument({
           .sheet.landscape {
             width: 285mm;
             min-height: 198mm;
+            justify-content: space-between;
             gap: 2.0mm;
           }
           .header {
@@ -976,7 +981,7 @@ export function buildPrintDocument({
             if (!frame || !target || !sheet) return;
             var widthScale = frame.clientWidth / sheet.scrollWidth;
             var heightScale = frame.clientHeight / sheet.scrollHeight;
-            var scale = Math.min(widthScale, heightScale, 1);
+            var scale = Math.min(widthScale, heightScale);
             target.style.transform = 'scale(' + scale + ')';
           }
 
