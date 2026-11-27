@@ -6,8 +6,8 @@ export const SHIFT_COLOR_OPTIONS = [
   },
   {
     value: 'pm',
-    label: 'Evening (Periwinkle Blue)',
-    preview: 'bg-[#DCE7F9] text-[#1E3A8A] border-[#B8CEF2]',
+    label: 'Evening (Soft Yellow)',
+    preview: 'bg-[#FEF9C3] text-[#854D0E] border-[#FDE047]',
   },
   {
     value: 'on',
@@ -31,28 +31,28 @@ export const SHIFT_COLOR_OPTIONS = [
   },
   {
     value: 'al',
-    label: 'Annual Leave (Mint)',
-    preview: 'bg-[#DCF5E8] text-[#14532D] border-[#A7DEC1]',
+    label: 'Annual Leave (Soft Purple)',
+    preview: 'bg-[#F3E8FF] text-[#6B21A8] border-[#D8B4FE]',
   },
   {
     value: 'mc',
-    label: 'Medical Certificate (Amber)',
-    preview: 'bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]',
+    label: 'Medical Certificate (Soft Purple)',
+    preview: 'bg-[#F3E8FF] text-[#6B21A8] border-[#D8B4FE]',
   },
   {
     value: 'el',
-    label: 'Emergency Leave (Crimson)',
-    preview: 'bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]',
+    label: 'Emergency Leave (Soft Purple)',
+    preview: 'bg-[#F3E8FF] text-[#6B21A8] border-[#D8B4FE]',
   },
   {
     value: 'hka',
-    label: 'Haji / Public Holiday OFF (Sand)',
-    preview: 'bg-[#FEF3C7] text-[#854D0E] border-[#FDE047]',
+    label: 'Haji / Public Holiday OFF (Soft Purple)',
+    preview: 'bg-[#F3E8FF] text-[#6B21A8] border-[#D8B4FE]',
   },
   {
     value: 'course',
-    label: 'Course / Training (Teal)',
-    preview: 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4]',
+    label: 'Course / Training (Soft Orange)',
+    preview: 'bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74]',
   },
   {
     value: 'default',

@@ -265,9 +265,9 @@
   border: 1px solid #c6d8b6;
 }
 .tone-pm {
-  background: #dce7f9;
-  color: #1e3a8a;
-  border: 1px solid #b8cef2;
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
 }
 .tone-nd {
   background: #fce7f1;
@@ -275,9 +275,9 @@
   border: 1px solid #f8b9d4;
 }
 .tone-on {
-  background: #fef3c7;
-  color: #854d0e;
-  border: 1px solid #fde047;
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
 }
 .tone-off {
   background: #f5f5f4;
@@ -285,9 +285,9 @@
   border: 1px solid #e7e5e4;
 }
 .tone-leave {
-  background: #d1fae5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
 }
 .tone-tl {
   background: #f0fdfa;
@@ -302,9 +302,9 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .tone-pm.req-solid {
-  background: #1d4ed8;
+  background: #ca8a04;
   color: #ffffff;
-  border-color: #1e40af;
+  border-color: #a16207;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .tone-nd.req-solid {
@@ -314,9 +314,9 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .tone-on.req-solid {
-  background: #d97706;
+  background: #ea580c;
   color: #ffffff;
-  border-color: #b45309;
+  border-color: #c2410c;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .tone-off.req-solid {
@@ -326,9 +326,9 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .tone-leave.req-solid {
-  background: #0f766e;
+  background: #7e22ce;
   color: #ffffff;
-  border-color: #115e59;
+  border-color: #6b21a8;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
