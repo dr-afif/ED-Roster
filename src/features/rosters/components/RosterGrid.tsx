@@ -33,6 +33,7 @@ export interface RosterGridProps {
   }>;
   amendedCellKeys?: ReadonlySet<string>;
   dirtyCellKeys?: ReadonlySet<string>;
+  explicitAssignmentKeys?: ReadonlySet<string>;
 }
 
 const WORKING_SHIFTS = new Set(['AM', 'PM', 'ON1', 'ON2', 'PN', 'MEDSB']);
@@ -53,6 +54,7 @@ export function RosterGrid({
   requests = [],
   amendedCellKeys,
   dirtyCellKeys,
+  explicitAssignmentKeys,
 }: RosterGridProps) {
   void shiftDefinitions;
 
@@ -172,16 +174,28 @@ export function RosterGrid({
                     const isSunday = utcDay === 0;
                     const holiday = holidays.find((h) => h.date === date);
 
-                    const assignment = cellMap.get(`${staff.id}:${date}`);
+                    const cellKey = `${staff.id}:${date}`;
+                    const assignment = cellMap.get(cellKey);
                     const shiftCode = assignment?.shiftCode;
                     const parsed = stripShiftModifiers(shiftCode);
-                    const reqEntry = requestMap.get(`${staff.id}:${date}`);
-                    const isPendingRequest = Boolean(!parsed.cleanShift && reqEntry?.request);
+                    const reqEntry = requestMap.get(cellKey);
+                    const isAutoRequest = Boolean(
+                      parsed.cleanShift &&
+                      reqEntry?.request &&
+                      explicitAssignmentKeys &&
+                      !explicitAssignmentKeys.has(cellKey) &&
+                      !dirtyCellKeys?.has(cellKey),
+                    );
+                    const isPendingRequest =
+                      Boolean(!parsed.cleanShift && reqEntry?.request) || isAutoRequest;
                     const displayShiftCode =
                       shiftCode || (isPendingRequest ? reqEntry?.request : undefined);
                     const displayParsed = stripShiftModifiers(displayShiftCode);
                     const isHonoredRequest = Boolean(
-                      reqEntry && parsed.cleanShift && parsed.cleanShift === reqEntry.request,
+                      !isAutoRequest &&
+                      reqEntry &&
+                      parsed.cleanShift &&
+                      parsed.cleanShift === reqEntry.request,
                     );
                     const isOverride = Boolean(
                       reqEntry && parsed.cleanShift && parsed.cleanShift !== reqEntry.request,
@@ -225,10 +239,10 @@ export function RosterGrid({
                                 ? ` (ended ${staff.endDate})`
                                 : ''
                           }`
-                        : shiftCode
+                        : shiftCode && !isAutoRequest
                           ? `${rosterName} on ${date}: ${shiftCode}`
                           : isPendingRequest
-                            ? `${rosterName} on ${date}: Requested ${reqEntry?.request} (Not yet assigned)`
+                            ? `${rosterName} on ${date}: Requested ${reqEntry?.request} (Auto-applied)`
                             : `${rosterName} on ${date}: No assignment`,
                     );
                     if (isHonoredRequest) {

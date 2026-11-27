@@ -73,6 +73,7 @@ import {
   type RosterPeriod,
   type StaffRosterIdentity,
   isStaffInServiceDuringPeriod,
+  isStaffInServiceOnDate,
   type VersionedRuleConfiguration,
 } from '../domain/types';
 
@@ -293,15 +294,51 @@ export function RosterPeriodRoute() {
     periodDates[periodDates.length - 1],
   );
 
-  // Construct draft assignments
+  // Construct explicit draft assignments and auto-honor pending requests
+  const explicitDraftAssignmentKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const r of draftAssignmentRows) {
+      keys.add(`${r.staff_id}:${r.duty_date}`);
+    }
+    return keys;
+  }, [draftAssignmentRows]);
+
   const draftAssignments: Assignment[] = useMemo(() => {
-    return draftAssignmentRows.map((r: DraftAssignmentRow) => ({
+    const explicit: Assignment[] = draftAssignmentRows.map((r: DraftAssignmentRow) => ({
       staffId: r.staff_id,
       dutyDate: r.duty_date,
       shiftCode: r.shift_code,
       note: r.cell_note ?? undefined,
     }));
-  }, [draftAssignmentRows]);
+
+    if (periodShiftRequests.length === 0) {
+      return explicit;
+    }
+
+    const staffById = new Map(staffList.map((s) => [s.id, s]));
+    const seen = new Set(explicitDraftAssignmentKeys);
+    const merged = [...explicit];
+
+    for (const req of periodShiftRequests) {
+      if (req.staff_id == null || !req.date || !req.request) continue;
+      const staffId = Number(req.staff_id);
+      if (!Number.isFinite(staffId)) continue;
+      const key = `${staffId}:${req.date}`;
+      if (seen.has(key)) continue;
+
+      const staff = staffById.get(staffId);
+      if (staff && !isStaffInServiceOnDate(staff, req.date)) continue;
+
+      seen.add(key);
+      merged.push({
+        staffId,
+        dutyDate: req.date,
+        shiftCode: req.request.toUpperCase().trim(),
+      });
+    }
+
+    return merged;
+  }, [draftAssignmentRows, explicitDraftAssignmentKeys, periodShiftRequests, staffList]);
 
   // Construct planned assignments (frozen at publication)
   const plannedAssignments: Assignment[] = useMemo(() => {
@@ -1546,6 +1583,7 @@ export function RosterPeriodRoute() {
             periodDates={periodDates}
             staffList={enrichedDisplay.staffList}
             assignments={tableAssignments}
+            explicitAssignmentKeys={isPlanning ? explicitDraftAssignmentKeys : undefined}
             shiftDefinitions={shiftDefinitions}
             holidays={publicHolidays as PublicHolidayEntry[]}
             isEditable={isGridInteractive}
