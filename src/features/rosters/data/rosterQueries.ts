@@ -174,10 +174,16 @@ export function useRosterStaffQuery() {
 
       if (error) throw error;
 
-      const { data: servicePeriodsData, error: periodsError } = await supabase
-        .from('staff_service_periods')
-        .select('staff_id, start_date, end_date')
-        .order('start_date', { ascending: true });
+      const [
+        { data: servicePeriodsData, error: periodsError },
+        { data: profilesData, error: profilesError },
+      ] = await Promise.all([
+        supabase
+          .from('staff_service_periods')
+          .select('staff_id, start_date, end_date')
+          .order('start_date', { ascending: true }),
+        supabase.from('staff_profiles').select('staff_id, phone'),
+      ]);
 
       const periodsMap = new Map<number, Array<{ startDate: string; endDate: string | null }>>();
       if (!periodsError && servicePeriodsData) {
@@ -185,6 +191,15 @@ export function useRosterStaffQuery() {
           const list = periodsMap.get(row.staff_id) ?? [];
           list.push({ startDate: row.start_date, endDate: row.end_date });
           periodsMap.set(row.staff_id, list);
+        }
+      }
+
+      const phoneMap = new Map<number, string>();
+      if (!profilesError && profilesData) {
+        for (const row of profilesData) {
+          if (row.staff_id != null && row.phone) {
+            phoneMap.set(row.staff_id, row.phone);
+          }
         }
       }
 
@@ -217,6 +232,7 @@ export function useRosterStaffQuery() {
             active,
             startDate: s.start_date ?? null,
             endDate: s.end_date ?? null,
+            mobileNumber: phoneMap.get(s.id) ?? null,
             servicePeriods,
           } as StaffRosterIdentity;
         },

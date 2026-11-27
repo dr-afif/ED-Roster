@@ -242,11 +242,11 @@ export function RosterExportModal({
     // Contacts
     const moContacts: LivePdfContact[] = staffList.slice(0, 15).map((s) => ({
       name: s.rosterName || s.displayName,
-      phone: (s as unknown as { mobileNumber?: string }).mobileNumber || undefined,
+      phone: s.mobileNumber || undefined,
     }));
     const epContacts: LivePdfContact[] = epStaffMembers.map((s) => ({
       name: s.rosterName || s.displayName,
-      phone: (s as unknown as { mobileNumber?: string }).mobileNumber || undefined,
+      phone: s.mobileNumber || undefined,
     }));
 
     return {

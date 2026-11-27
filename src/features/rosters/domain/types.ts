@@ -57,6 +57,7 @@ export type StaffRosterIdentity = {
   readonly active: boolean;
   readonly startDate?: string | null;
   readonly endDate?: string | null;
+  readonly mobileNumber?: string | null;
   readonly servicePeriods?: readonly StaffServicePeriodWindow[];
 };
 
