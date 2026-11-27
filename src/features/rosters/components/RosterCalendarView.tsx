@@ -40,6 +40,11 @@ function normalizeShortName(raw?: string): string {
   return (raw || '').replace(/^Dr\.?\s+/i, '').trim();
 }
 
+function formatEpDisplayName(raw?: string): string {
+  const clean = normalizeShortName(raw);
+  return clean ? `DR ${clean}` : '';
+}
+
 export function parseEpNamesList(raw?: string | null): string[] {
   if (!raw) return [];
   return raw
@@ -376,7 +381,7 @@ export function RosterCalendarView({
                       : 'border-[#E7E5E4] bg-white text-[#18181B] hover:border-[#0F766E]'
                   }`}
                 >
-                  {name}
+                  {formatEpDisplayName(name)}
                 </button>
               );
             })}
@@ -675,7 +680,7 @@ export function RosterCalendarView({
                               key={epName}
                               className="inline-flex items-center gap-0.5 break-words leading-[1.25]"
                             >
-                              <span>{epName}</span>
+                              <span>{formatEpDisplayName(epName)}</span>
                               {isEditable && isEpEditMode ? (
                                 <button
                                   type="button"
@@ -774,7 +779,7 @@ export function RosterCalendarView({
                               key={epName}
                               className="inline-flex items-center gap-0.5 break-words leading-[1.25]"
                             >
-                              <span>{epName}</span>
+                              <span>{formatEpDisplayName(epName)}</span>
                               {isEditable && isEpEditMode ? (
                                 <button
                                   type="button"
@@ -875,7 +880,7 @@ export function RosterCalendarView({
                               key={epName}
                               className="inline-flex items-center gap-0.5 break-words leading-[1.25]"
                             >
-                              <span>{epName}</span>
+                              <span>{formatEpDisplayName(epName)}</span>
                               {isEditable && isEpEditMode ? (
                                 <button
                                   type="button"

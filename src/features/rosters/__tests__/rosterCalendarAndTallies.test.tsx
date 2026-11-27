@@ -82,7 +82,7 @@ describe('RosterCalendarView (Duty Timetable & EP Coverage)', () => {
     // Verify MO and EP assignments for Day 1 (uppercase short names rendered)
     expect(screen.getAllByText('Siti').length).toBeGreaterThan(0);
     expect(screen.getByText('Tan')).toBeInTheDocument();
-    expect(screen.getAllByText('Dr Afif').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DR Afif').length).toBeGreaterThan(0);
     expect(screen.getByText("New Year's Day")).toBeInTheDocument();
   });
 
