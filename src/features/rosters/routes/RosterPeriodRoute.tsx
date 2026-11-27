@@ -245,9 +245,13 @@ export function RosterPeriodRoute() {
 
   // Mutations
   const periodId = periodRow?.id ?? 0;
-  const upsertMutation = useUpsertDraftAssignmentMutation(periodId);
-  const deleteMutation = useDeleteDraftAssignmentMutation(periodId);
-  const batchSaveDraftMutation = useBatchSaveDraftAssignmentsMutation(periodId);
+  const periodMeta = useMemo(
+    () => ({ year: yyyy, month: mm, ruleVersionId: ruleVersionRow?.id }),
+    [yyyy, mm, ruleVersionRow?.id],
+  );
+  const upsertMutation = useUpsertDraftAssignmentMutation(periodId, periodMeta);
+  const deleteMutation = useDeleteDraftAssignmentMutation(periodId, periodMeta);
+  const batchSaveDraftMutation = useBatchSaveDraftAssignmentsMutation(periodId, periodMeta);
   const upsertEpMutation = useUpsertEpAssignmentMutation(periodId);
   const batchUpsertEpMutation = useBatchUpsertEpAssignmentsMutation(periodId);
   const publishMutation = usePublishRosterMutation(periodId);
@@ -666,7 +670,7 @@ export function RosterPeriodRoute() {
 
   const handleSaveFastEdits = useCallback(() => {
     const entries = Object.entries(pendingFastEdits);
-    if (entries.length === 0 || !periodId) return;
+    if (entries.length === 0 || (!periodId && (!yyyy || !mm))) return;
     const upserts: Array<{ staffId: number; dutyDate: string; shiftCode: string }> = [];
     const deletes: Array<{ staffId: number; dutyDate: string }> = [];
     for (const [key, code] of entries) {
@@ -688,7 +692,7 @@ export function RosterPeriodRoute() {
         },
       },
     );
-  }, [pendingFastEdits, periodId, batchSaveDraftMutation, showToast]);
+  }, [pendingFastEdits, periodId, yyyy, mm, batchSaveDraftMutation, showToast]);
 
   useEffect(() => {
     if (

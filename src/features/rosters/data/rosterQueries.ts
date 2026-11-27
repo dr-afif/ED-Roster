@@ -247,7 +247,64 @@ export function usePublicHolidaysQuery() {
   });
 }
 
-export function useUpsertDraftAssignmentMutation(periodId: number) {
+export interface RosterPeriodMeta {
+  year: string;
+  month: string;
+  ruleVersionId?: number | null;
+}
+
+async function ensureRosterPeriodId(periodId: number, periodMeta?: RosterPeriodMeta): Promise<number> {
+  if (periodId > 0) return periodId;
+  if (!periodMeta?.year || !periodMeta?.month) {
+    throw new Error('No roster period record found for this month.');
+  }
+  const periodStart = `${periodMeta.year}-${periodMeta.month}-01`;
+  const lastDay = new Date(Number(periodMeta.year), Number(periodMeta.month), 0).getDate();
+  const periodEnd = `${periodMeta.year}-${periodMeta.month}-${String(lastDay).padStart(2, '0')}`;
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from('roster_periods')
+    .select('id')
+    .eq('period_start', periodStart)
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+  if (existing?.id) return existing.id;
+
+  let activeRuleVersionId = periodMeta.ruleVersionId ?? null;
+  if (!activeRuleVersionId) {
+    const { data: rv } = await supabase
+      .from('rule_versions')
+      .select('id')
+      .eq('status', 'active')
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    activeRuleVersionId = rv?.id ?? 1;
+  }
+
+  const { data: created, error: createErr } = await supabase
+    .from('roster_periods')
+    .upsert(
+      {
+        period_start: periodStart,
+        period_end: periodEnd,
+        status: 'draft',
+        active_rule_version_id: activeRuleVersionId,
+      },
+      { onConflict: 'period_start' },
+    )
+    .select('id')
+    .single();
+
+  if (createErr) throw createErr;
+  return created.id;
+}
+
+export function useUpsertDraftAssignmentMutation(
+  periodId: number,
+  periodMeta?: RosterPeriodMeta,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -257,12 +314,13 @@ export function useUpsertDraftAssignmentMutation(periodId: number) {
       shiftCode: string;
       cellNote?: string;
     }) => {
+      const resolvedPeriodId = await ensureRosterPeriodId(periodId, periodMeta);
       const attemptUpsert = () =>
         supabase
           .from('roster_draft_assignments')
           .upsert(
             {
-              period_id: periodId,
+              period_id: resolvedPeriodId,
               staff_id: payload.staffId,
               duty_date: payload.dutyDate,
               shift_code: payload.shiftCode,
@@ -345,27 +403,41 @@ export function useUpsertDraftAssignmentMutation(periodId: number) {
         queryClient.setQueryData(queryKeys.rosters.draftAssignments(periodId), context.previous);
       }
     },
-    onSettled: () => {
+    onSettled: (data) => {
+      const targetPeriodId = data?.period_id ?? periodId;
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.rosters.draftAssignments(periodId),
+        queryKey: queryKeys.rosters.draftAssignments(targetPeriodId),
       });
+      if (periodId <= 0 && periodMeta) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.rosters.period(periodMeta.year, periodMeta.month),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['roster_periods', 'all_periods'],
+        });
+      }
     },
   });
 }
 
-export function useDeleteDraftAssignmentMutation(periodId: number) {
+export function useDeleteDraftAssignmentMutation(
+  periodId: number,
+  periodMeta?: RosterPeriodMeta,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: { staffId: number; dutyDate: string }) => {
+      const resolvedPeriodId = await ensureRosterPeriodId(periodId, periodMeta);
       const { error } = await supabase
         .from('roster_draft_assignments')
         .delete()
-        .eq('period_id', periodId)
+        .eq('period_id', resolvedPeriodId)
         .eq('staff_id', payload.staffId)
         .eq('duty_date', payload.dutyDate);
 
       if (error) throw error;
+      return resolvedPeriodId;
     },
     onMutate: async (payload) => {
       const key = queryKeys.rosters.draftAssignments(periodId);
@@ -381,15 +453,26 @@ export function useDeleteDraftAssignmentMutation(periodId: number) {
         queryClient.setQueryData(queryKeys.rosters.draftAssignments(periodId), context.previous);
       }
     },
-    onSettled: () => {
+    onSettled: (resolvedPeriodId) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.rosters.draftAssignments(periodId),
+        queryKey: queryKeys.rosters.draftAssignments(resolvedPeriodId ?? periodId),
       });
+      if (periodId <= 0 && periodMeta) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.rosters.period(periodMeta.year, periodMeta.month),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['roster_periods', 'all_periods'],
+        });
+      }
     },
   });
 }
 
-export function useBatchSaveDraftAssignmentsMutation(periodId: number) {
+export function useBatchSaveDraftAssignmentsMutation(
+  periodId: number,
+  periodMeta?: RosterPeriodMeta,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -397,11 +480,12 @@ export function useBatchSaveDraftAssignmentsMutation(periodId: number) {
       upserts: Array<{ staffId: number; dutyDate: string; shiftCode: string }>;
       deletes: Array<{ staffId: number; dutyDate: string }>;
     }) => {
+      const resolvedPeriodId = await ensureRosterPeriodId(periodId, periodMeta);
       const nowIso = new Date().toISOString();
 
       if (payload.upserts.length > 0) {
         const rows = payload.upserts.map((u) => ({
-          period_id: periodId,
+          period_id: resolvedPeriodId,
           staff_id: u.staffId,
           duty_date: u.dutyDate,
           shift_code: u.shiftCode,
@@ -446,7 +530,7 @@ export function useBatchSaveDraftAssignmentsMutation(periodId: number) {
             supabase
               .from('roster_draft_assignments')
               .delete()
-              .eq('period_id', periodId)
+              .eq('period_id', resolvedPeriodId)
               .eq('staff_id', d.staffId)
               .eq('duty_date', d.dutyDate),
           ),
@@ -454,11 +538,20 @@ export function useBatchSaveDraftAssignmentsMutation(periodId: number) {
         const firstErr = results.find((r) => r.error)?.error;
         if (firstErr) throw firstErr;
       }
+      return resolvedPeriodId;
     },
-    onSuccess: () => {
+    onSuccess: (resolvedPeriodId) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.rosters.draftAssignments(periodId),
+        queryKey: queryKeys.rosters.draftAssignments(resolvedPeriodId),
       });
+      if (periodId <= 0 && periodMeta) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.rosters.period(periodMeta.year, periodMeta.month),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['roster_periods', 'all_periods'],
+        });
+      }
     },
   });
 }
