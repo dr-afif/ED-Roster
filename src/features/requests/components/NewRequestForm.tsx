@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
-import { getShiftToneClasses } from '@/shared/ui';
+import { getRequestPillClasses } from '../requestTone';
 import {
   ADMIN_ALL_SHIFT_TYPES,
   DAILY_LIMIT,
@@ -495,7 +495,7 @@ export function NewRequestForm({
                     className={`rounded-[14px] py-2.5 px-2 text-center text-[12px] font-extrabold transition active:scale-[0.96] cursor-pointer ${
                       isCapped
                         ? 'border border-[#E7E5E4] bg-stone-100 text-stone-400 opacity-55 cursor-not-allowed'
-                        : `${getShiftToneClasses(st.Name)} ${
+                        : `${getRequestPillClasses(st.Name)} ${
                             isSelected ? 'ring-2 ring-[#18181B] ring-offset-2' : ''
                           }`
                     }`}

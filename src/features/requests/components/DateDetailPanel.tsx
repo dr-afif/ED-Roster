@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { getShiftToneClasses } from '@/shared/ui';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
+import { getRequestPillClasses } from '../requestTone';
 import { NewRequestForm, type RequestQuotaConfig } from './NewRequestForm';
 
 function formatDisplayDate(date: Date) {
@@ -189,7 +189,7 @@ export function DateDetailPanel({
                     >
                       <div className="date-panel__request-info flex-1">
                         <span
-                          className={`date-panel__request-badge shrink-0 ${getShiftToneClasses(
+                          className={`date-panel__request-badge shrink-0 ${getRequestPillClasses(
                             r.request,
                           )}`}
                         >

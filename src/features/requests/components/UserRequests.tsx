@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { getShiftToneClasses, Skeleton } from '@/shared/ui';
+import { Skeleton } from '@/shared/ui';
 import { DEFAULT_MONTHLY_LIMIT, getMonthKey, toIsoDate, type RequestRecord } from '../domain/quota';
+import { getRequestPillClasses } from '../requestTone';
 
 function formatDisplayDate(dateLike: string | Date): string {
   const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
@@ -177,7 +178,7 @@ export function UserRequests({
                 className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer disabled:cursor-default"
               >
                 <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${getShiftToneClasses(
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${getRequestPillClasses(
                     request.request,
                   )}`}
                 >

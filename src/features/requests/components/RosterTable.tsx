@@ -1,29 +1,7 @@
 import { useMemo, useState } from 'react';
-import { getShiftToneClasses, Skeleton, useIsMobileViewport } from '@/shared/ui';
+import { Skeleton, useIsMobileViewport } from '@/shared/ui';
 import { getMonthKey, toIsoDate, type RequestRecord } from '../domain/quota';
-
-const REQUEST_CLASS_MAP: Record<string, string> = {
-  am: 'req--am',
-  oh: 'req--am',
-  pm: 'req--pm',
-  night: 'req--night',
-  on: 'req--night',
-  on1: 'req--night',
-  on2: 'req--night',
-  pn: 'req--night',
-  nd: 'req--night',
-  al: 'req--leave',
-  el: 'req--leave',
-  mc: 'req--leave',
-  hka: 'req--leave',
-  ghka: 'req--leave',
-  course: 'req--course',
-  court: 'req--course',
-  medsb: 'req--course',
-  off: 'req--off',
-  goff: 'req--off',
-  leave: 'req--off',
-};
+import { getRequestPillClasses, getRequestVariant } from '../requestTone';
 
 function buildDatesForMonth(referenceDate: Date) {
   const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
@@ -45,16 +23,6 @@ function buildDatesForMonth(referenceDate: Date) {
 function isWeekend(dateObj: Date) {
   const day = dateObj.getDay();
   return day === 0 || day === 6;
-}
-
-function getRequestVariant(value?: string | null) {
-  const token = (value ?? '').toString().trim().toLowerCase();
-  if (!token) return 'req--default';
-  if (REQUEST_CLASS_MAP[token]) return REQUEST_CLASS_MAP[token];
-  if (token.includes('night')) return 'req--night';
-  if (token.includes('course')) return 'req--course';
-  if (token.includes('off') || token.includes('leave')) return 'req--off';
-  return 'req--default';
 }
 
 export interface RosterTableProps {
@@ -221,7 +189,7 @@ export function RosterTable({
                           key={`${name}-${r.date}-${r.code}`}
                           type="button"
                           onClick={() => onSelectDate?.(r.date)}
-                          className={`rounded-full px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition active:scale-[0.95] ${getShiftToneClasses(
+                          className={`rounded-full px-2.5 py-1 text-[10.5px] font-extrabold cursor-pointer transition active:scale-[0.95] ${getRequestPillClasses(
                             r.code,
                           )}`}
                         >

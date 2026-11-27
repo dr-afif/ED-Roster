@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Skeleton } from '@/shared/ui';
 import { toIsoDate, type RequestRecord } from '../domain/quota';
+import { getRequestVariant } from '../requestTone';
 
 const DAY_LABELS = [
   { short: 'M', full: 'Mon' },
@@ -11,29 +12,6 @@ const DAY_LABELS = [
   { short: 'S', full: 'Sat' },
   { short: 'S', full: 'Sun' },
 ] as const;
-
-const REQUEST_CLASS_MAP: Record<string, string> = {
-  am: 'req--am',
-  oh: 'req--am',
-  pm: 'req--pm',
-  on: 'req--night',
-  on1: 'req--night',
-  on2: 'req--night',
-  nd: 'req--night',
-  night: 'req--night',
-  pn: 'req--night',
-  al: 'req--leave',
-  el: 'req--leave',
-  mc: 'req--leave',
-  hka: 'req--leave',
-  ghka: 'req--leave',
-  course: 'req--course',
-  court: 'req--course',
-  medsb: 'req--course',
-  off: 'req--off',
-  goff: 'req--off',
-  leave: 'req--off',
-};
 
 function buildCalendarMatrix(currentDate: Date): (Date | null)[][] {
   const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -56,16 +34,6 @@ function buildCalendarMatrix(currentDate: Date): (Date | null)[][] {
     weeks[wi].push(cells[i] ?? null);
   }
   return weeks;
-}
-
-function getRequestVariant(value?: string | null): string {
-  const token = (value ?? '').toString().trim().toLowerCase();
-  if (!token) return 'req--default';
-  if (REQUEST_CLASS_MAP[token]) return REQUEST_CLASS_MAP[token];
-  if (token.includes('night')) return 'req--night';
-  if (token.includes('course')) return 'req--course';
-  if (token.includes('off') || token.includes('leave')) return 'req--off';
-  return 'req--default';
 }
 
 export interface CalendarViewProps {

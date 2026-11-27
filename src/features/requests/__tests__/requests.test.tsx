@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StaffRequestsRoute, AdminRequestsRoute } from '../RequestsRoutes';
 import { NewRequestForm } from '../components/NewRequestForm';
+import { getRequestPillClasses, getRequestVariant } from '../requestTone';
 import { AuthContext, type AuthBoundaryState } from '@/platform/auth/authContext';
 import {
   buildUsageByDateAndGroup,
@@ -504,5 +505,62 @@ describe('NewRequestForm Fair Queue & Replacement Confirmation', () => {
         comment: 'Initial note',
       });
     });
+  });
+});
+
+describe('Request Page Shift Pill Colour Coding', () => {
+  it('keeps AM, ON1, and OFF colours unchanged', () => {
+    expect(getRequestVariant('AM')).toBe('req--am');
+    expect(getRequestPillClasses('AM')).toContain('bg-[#E5EED8]');
+
+    expect(getRequestVariant('ON1')).toBe('req--night');
+    expect(getRequestPillClasses('ON1')).toContain('bg-[#FCE7F1]');
+
+    expect(getRequestVariant('OFF')).toBe('req--off');
+    expect(getRequestPillClasses('OFF')).toContain('bg-[#F5F5F4]');
+  });
+
+  it('uses yellow for PM, orange for Course, and purple for other Leaves', () => {
+    expect(getRequestVariant('PM')).toBe('req--pm');
+    expect(getRequestPillClasses('PM')).toContain('bg-[#FEF9C3]');
+    expect(getRequestPillClasses('PM')).toContain('text-[#854D0E]');
+
+    for (const courseCode of ['COURSE', 'COURT', 'MEDSB']) {
+      expect(getRequestVariant(courseCode)).toBe('req--course');
+      expect(getRequestPillClasses(courseCode)).toContain('bg-[#FFEDD5]');
+      expect(getRequestPillClasses(courseCode)).toContain('text-[#9A3412]');
+    }
+
+    for (const leaveCode of ['AL', 'EL', 'MC', 'HKA', 'GHKA', 'LEAVE']) {
+      expect(getRequestVariant(leaveCode)).toBe('req--leave');
+      expect(getRequestPillClasses(leaveCode)).toContain('bg-[#F3E8FF]');
+      expect(getRequestPillClasses(leaveCode)).toContain('text-[#6B21A8]');
+    }
+  });
+
+  it('applies the updated pill classes to rendered NewRequestForm shift buttons', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <NewRequestForm
+          selectedName="Dr Afif"
+          selectedStaffId={1}
+          requests={[]}
+          onSubmit={vi.fn().mockResolvedValue(undefined)}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /^AM$/i })).toHaveClass('bg-[#E5EED8]');
+    expect(screen.getByRole('button', { name: /^ON1$/i })).toHaveClass('bg-[#FCE7F1]');
+    expect(screen.getByRole('button', { name: /^OFF$/i })).toHaveClass('bg-[#F5F5F4]');
+    expect(screen.getByRole('button', { name: /^PM$/i })).toHaveClass('bg-[#FEF9C3]');
+    expect(screen.getByRole('button', { name: /^COURSE$/i })).toHaveClass('bg-[#FFEDD5]');
+    expect(screen.getByRole('button', { name: /^AL$/i })).toHaveClass('bg-[#F3E8FF]');
+    expect(screen.getByRole('button', { name: /^HKA$/i })).toHaveClass('bg-[#F3E8FF]');
+    expect(screen.getByRole('button', { name: /^GHKA$/i })).toHaveClass('bg-[#F3E8FF]');
   });
 });
