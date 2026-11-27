@@ -598,8 +598,22 @@ describe('Daily OFF / Leave Quota Counting Across Statuses & Admin Codes', () =>
     });
 
     const occupiedRequests = [
-      { id: 101, staff_id: 2, name: 'Dr Sarah', date: '2026-12-18', request: 'MC', status: 'approved' },
-      { id: 102, staff_id: 3, name: 'Dr Ali', date: '2026-12-18', request: 'GOFF', status: 'submitted' },
+      {
+        id: 101,
+        staff_id: 2,
+        name: 'Dr Sarah',
+        date: '2026-12-18',
+        request: 'MC',
+        status: 'approved',
+      },
+      {
+        id: 102,
+        staff_id: 3,
+        name: 'Dr Ali',
+        date: '2026-12-18',
+        request: 'GOFF',
+        status: 'submitted',
+      },
       { id: 103, staff_id: 4, name: 'Dr Lim', date: '2026-12-18', request: 'EL', status: 'active' },
     ];
 

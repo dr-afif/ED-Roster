@@ -253,7 +253,10 @@ export interface RosterPeriodMeta {
   ruleVersionId?: number | null;
 }
 
-async function ensureRosterPeriodId(periodId: number, periodMeta?: RosterPeriodMeta): Promise<number> {
+async function ensureRosterPeriodId(
+  periodId: number,
+  periodMeta?: RosterPeriodMeta,
+): Promise<number> {
   if (periodId > 0) return periodId;
   if (!periodMeta?.year || !periodMeta?.month) {
     throw new Error('No roster period record found for this month.');
@@ -301,10 +304,7 @@ async function ensureRosterPeriodId(periodId: number, periodMeta?: RosterPeriodM
   return created.id;
 }
 
-export function useUpsertDraftAssignmentMutation(
-  periodId: number,
-  periodMeta?: RosterPeriodMeta,
-) {
+export function useUpsertDraftAssignmentMutation(periodId: number, periodMeta?: RosterPeriodMeta) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -420,10 +420,7 @@ export function useUpsertDraftAssignmentMutation(
   });
 }
 
-export function useDeleteDraftAssignmentMutation(
-  periodId: number,
-  periodMeta?: RosterPeriodMeta,
-) {
+export function useDeleteDraftAssignmentMutation(periodId: number, periodMeta?: RosterPeriodMeta) {
   const queryClient = useQueryClient();
 
   return useMutation({
