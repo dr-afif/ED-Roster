@@ -564,3 +564,77 @@ describe('Request Page Shift Pill Colour Coding', () => {
     expect(screen.getByRole('button', { name: /^GHKA$/i })).toHaveClass('bg-[#F3E8FF]');
   });
 });
+
+describe('Daily OFF / Leave Quota Counting Across Statuses & Admin Codes', () => {
+  it('counts submitted and approved requests alongside active ones, while ignoring withdrawn/superseded', () => {
+    const limitGroupIdByShiftType = buildLimitGroupIdByShiftType(DEFAULT_SHIFT_TYPES);
+    const requests = [
+      { name: 'Dr A', date: '2026-12-20', request: 'OFF', status: 'active' },
+      { name: 'Dr B', date: '2026-12-20', request: 'AL', status: 'submitted' },
+      { name: 'Dr C', date: '2026-12-20', request: 'COURSE', status: 'approved' },
+      { name: 'Dr D', date: '2026-12-20', request: 'OFF', status: 'withdrawn' },
+      { name: 'Dr E', date: '2026-12-20', request: 'OFF', status: 'superseded' },
+    ];
+
+    const usage = buildUsageByDateAndGroup(requests, limitGroupIdByShiftType);
+    expect(usage['2026-12-20']?.OFF).toBe(3);
+
+    expect(
+      getMonthlyRequestCount({
+        requests: [
+          { name: 'Dr B', date: '2026-12-20', request: 'AL', status: 'submitted' },
+          { name: 'Dr B', date: '2026-12-21', request: 'OFF', status: 'approved' },
+          { name: 'Dr B', date: '2026-12-22', request: 'OFF', status: 'withdrawn' },
+        ],
+        targetName: 'Dr B',
+        dateString: '2026-12-20',
+      }),
+    ).toBe(2);
+  });
+
+  it('caps OFF/Leave buttons for regular staff when 3 slots are occupied by submitted/approved or admin leave codes (MC/EL/GOFF), but allows owner override', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const occupiedRequests = [
+      { id: 101, staff_id: 2, name: 'Dr Sarah', date: '2026-12-18', request: 'MC', status: 'approved' },
+      { id: 102, staff_id: 3, name: 'Dr Ali', date: '2026-12-18', request: 'GOFF', status: 'submitted' },
+      { id: 103, staff_id: 4, name: 'Dr Lim', date: '2026-12-18', request: 'EL', status: 'active' },
+    ];
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <NewRequestForm
+          selectedName="Dr Afif"
+          selectedStaffId={1}
+          isOwner={false}
+          initialValues={{ date: '2026-12-18' }}
+          requests={occupiedRequests}
+          onSubmit={vi.fn().mockResolvedValue(undefined)}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /^OFF$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^AL$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^COURSE$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^AM$/i })).not.toBeDisabled();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <NewRequestForm
+          selectedName="Dr Afif"
+          selectedStaffId={1}
+          isOwner={true}
+          initialValues={{ date: '2026-12-18' }}
+          requests={occupiedRequests}
+          onSubmit={vi.fn().mockResolvedValue(undefined)}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /^OFF$/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /^AL$/i })).not.toBeDisabled();
+  });
+});

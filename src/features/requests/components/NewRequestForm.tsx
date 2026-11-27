@@ -80,10 +80,7 @@ export function NewRequestForm({
   const [isStaffPickerOpen, setIsStaffPickerOpen] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
 
-  const availableShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
-    if (!isOwner) {
-      return DEFAULT_SHIFT_TYPES;
-    }
+  const allKnownShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
     if (dbShiftDefs.length > 0) {
       const mapped = dbShiftDefs
         .filter((s) => s.is_active && !LEGACY_HIDDEN_SHIFTS.has(s.code.toUpperCase()))
@@ -104,7 +101,14 @@ export function NewRequestForm({
       return mapped;
     }
     return ADMIN_ALL_SHIFT_TYPES;
-  }, [isOwner, dbShiftDefs]);
+  }, [dbShiftDefs]);
+
+  const availableShiftTypes: ShiftTypeDefinition[] = useMemo(() => {
+    if (!isOwner) {
+      return DEFAULT_SHIFT_TYPES;
+    }
+    return allKnownShiftTypes;
+  }, [isOwner, allKnownShiftTypes]);
 
   const limitGroupById = useMemo(
     () =>
@@ -115,8 +119,8 @@ export function NewRequestForm({
     [dailyOffLimit, on1DailyLimit],
   );
   const limitGroupIdByShiftType = useMemo(
-    () => buildLimitGroupIdByShiftType(availableShiftTypes),
-    [availableShiftTypes],
+    () => buildLimitGroupIdByShiftType([...ADMIN_ALL_SHIFT_TYPES, ...allKnownShiftTypes]),
+    [allKnownShiftTypes],
   );
 
   const usageByDateAndGroup = useMemo(() => {

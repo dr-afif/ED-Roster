@@ -142,13 +142,18 @@ export function buildLimitOverridesByDateAndGroup(
   }, {});
 }
 
+export function isActiveRequestStatus(status?: string | null): boolean {
+  const normalized = (status ?? '').toLowerCase();
+  return normalized === 'active' || normalized === 'submitted' || normalized === 'approved';
+}
+
 export function buildUsageByDateAndGroup(
   requests: RequestRecord[] = [],
   limitGroupIdByShiftType: Record<string, string> = {},
 ): Record<string, Record<string, number>> {
   return (requests ?? []).reduce<Record<string, Record<string, number>>>((acc, request) => {
     const status = (request?.status ?? '').toLowerCase();
-    if (status && status !== 'active') return acc;
+    if (status && !isActiveRequestStatus(status)) return acc;
 
     const requestType = (request?.request ?? '').toString().trim().toUpperCase();
     const groupId = limitGroupIdByShiftType[requestType];
@@ -230,8 +235,7 @@ export function getMonthlyRequestCount({
 
   const userActiveRequests = (requests ?? []).filter((request) => {
     const isUser = request.name && request.name.trim().toLowerCase() === normalizedTargetName;
-    const isActive = (request.status ?? '').toLowerCase() === 'active';
-    if (!isUser || !isActive || !request.date) return false;
+    if (!isUser || !isActiveRequestStatus(request.status) || !request.date) return false;
 
     const requestDate = new Date(request.date);
     if (Number.isNaN(requestDate.getTime())) return false;
@@ -276,8 +280,7 @@ export function getMonthlyWeekendRequestCount({
 
   const userActiveWeekendRequests = (requests ?? []).filter((request) => {
     const isUser = request.name && request.name.trim().toLowerCase() === normalizedTargetName;
-    const isActive = (request.status ?? '').toLowerCase() === 'active';
-    if (!isUser || !isActive || !request.date) return false;
+    if (!isUser || !isActiveRequestStatus(request.status) || !request.date) return false;
 
     const requestDate = new Date(request.date);
     if (Number.isNaN(requestDate.getTime())) return false;
